@@ -126,6 +126,21 @@ namespace Mirage
             s.saveStatusToDB(id);
         }
 
+        public void saveRegisters(HttpResponseMessage response)
+        {
+            Globals.logJSON(response.Content.ReadAsStringAsync().Result);
+
+            var objResponse1 = JsonConvert.DeserializeObject<List<Registers>>(response.Content.ReadAsStringAsync().Result);
+            r = objResponse1; // JsonConvert.DeserializeObject<List<Registers>>(response.Content.ReadAsStringAsync().Result);
+
+            Globals.logJSON(response.Content.ReadAsStringAsync().Result);
+
+            if (Globals.debugLevel > 0)
+                r.print();
+
+            r.saveToDB(id);
+        }
+
         public string getBaseURI()
         {
             return "http://" + ipAddress + "/api/v2.0.0/";
@@ -258,8 +273,8 @@ namespace Mirage
                 */
 
 
-                query = "INSERT INTO robot_status (ROBOT_ID, MODE_ID, STATE_ID, UPTIME, BATTERY_TIME_REMAINING, BATTERY_PERCENTAGE, DISTANCE_TO_NEXT_TARGET, MOVED, ALLOWED_METHODS, FOOTPRINT, joystick_low_speed_mode_enabled,";
-                query += "joystick_web_session_id, map_id, mission_queue_id, mission_queue_url, mission_text, mode_key_state, mode_text, robot_model, robot_name, safety_system_muted, serial_number, session_id, state_text,";
+                query = "INSERT INTO robot_status (ROBOT_ID, MODE_ID, STATE_ID, UPTIME, BATTERY_TIME_REMAINING, BATTERY_PERCENTAGE, DISTANCE_TO_NEXT_TARGET, MOVED, FOOTPRINT, joystick_low_speed_mode_enabled,"; // ALLOWED_METHODS,
+                query += "joystick_web_session_id, map_id, mission_queue_id, mission_queue_url, mission_text, mode_key_state, mode_text, safety_system_muted, serial_number, session_id, "; //robot_model, robot_name, state_text, 
                 query += "unloaded_map_changes, POSITION_ID, ERROR_ID, USER_PROMPT_ID, VELOCITY_ID) ";
 
                 query += "VALUES (";
@@ -271,7 +286,7 @@ namespace Mirage
                 query += Globals.addToDB(battery_percentage);
                 query += Globals.addToDB(distance_to_next_target);
                 query += Globals.addToDB(moved);
-                query += Globals.addToDB(allowed_methods);
+                //query += Globals.addToDB(allowed_methods);
                 query += Globals.addToDB(footprint);
                 query += Globals.addToDB(joystick_low_speed_mode_enabled);
                 query += Globals.addToDB(joystick_web_session_id);
@@ -281,12 +296,12 @@ namespace Mirage
                 query += Globals.addToDB(mission_text);
                 query += Globals.addToDB(mode_key_state);
                 query += Globals.addToDB(mode_text);
-                query += Globals.addToDB(robot_model);
-                query += Globals.addToDB(robot_name);
+                //query += Globals.addToDB(robot_model);
+                //query += Globals.addToDB(robot_name);
                 query += Globals.addToDB(safety_system_muted);
                 query += Globals.addToDB(serial_number);
                 query += Globals.addToDB(session_id);
-                query += Globals.addToDB(state_text);
+                //query += Globals.addToDB(state_text);
                 query += Globals.addToDB(unloaded_map_changes);
                 query += Globals.addToDB(position_id);
                 query += Globals.addToDB(error_id);

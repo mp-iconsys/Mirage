@@ -48,5 +48,14 @@ namespace Mirage
                 robots[i].saveStatus(await httpResponseTasks[i]);
             }
         }
+
+        public async Task saveFleetRegistersAsync()
+        {
+            for (int i = 0; i < Globals.numberOfRobots; i++)
+            {
+                robots[i].saveRegisters(await httpResponseTasks[i]);
+            }
+        }
+
     }
 }

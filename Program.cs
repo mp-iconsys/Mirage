@@ -111,6 +111,10 @@ namespace Mirage
 
                         await mirFleet.saveFleetStatusAsync();
 
+                        mirFleet.issueGetRequests("registers");
+
+                        await mirFleet.saveFleetRegistersAsync();
+
                         // Create a task to fetch a message
                         //Task<HttpResponseMessage> m = testMRI.sendGetRequest("status");
 

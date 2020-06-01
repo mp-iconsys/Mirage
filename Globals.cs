@@ -197,7 +197,17 @@ public static class Globals
             }
 
             if (value.ToString() == "''")
-                return DBNull.Value;
+            { 
+                return "NULL,";
+            }
+            else if(value.ToString() == "false")
+            {
+                return "'0',";
+            }
+            else if (value.ToString() == "true")
+            {
+                return "'1',";
+            }
             else
                 return "'" + value + "',";
         }

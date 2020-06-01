@@ -7,6 +7,7 @@
 */
 
 using System;
+using System.Collections.Generic;
 
 public class Registers
 {
@@ -25,6 +26,24 @@ public class Registers
 			//allFloatRegisters[i].toString(); 
 		}
 	}
+
+	public void print()
+    {
+		// First, instantiate the ints and then floats so that IDs line up
+		for (int i = 0; i < allIntRegisters.Length; i++)
+		{
+			allIntRegisters[i].toString(); 
+		}
+		for (int i = 0; i < allFloatRegisters.Length; i++)
+		{
+			allFloatRegisters[i].toString(); 
+		}
+	}
+
+	public void saveToDB(int robotID)
+    {
+
+    }
 }
 
 public class Register
@@ -32,10 +51,12 @@ public class Register
 	private static int globalID = 0;
 	private int id = 0;
 	private string label, url = "registers/";
+	//private Type value;
 
 	public int ID { get; set;  }
 	public string Label { get; set; }
 	public string URL { get; set; }
+	//public Type Value { get; set; }
 
 	public Register()
     {
