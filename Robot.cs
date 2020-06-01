@@ -1,26 +1,120 @@
 ﻿using System;
+using System.Security.Cryptography;
 using System.Collections.Generic;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Net.Http;
+using System.Threading.Tasks;
+using Newtonsoft.Json;
 
 namespace Mirage
 {
-    /* Robot Class
+    /* Robot Class, mainly a data container
      * Contains:
-     * - Comms, based on HttpClient class to fetch REST Api data
+     * - Connection details: IP + username & password (or pin)
      * - Generic data about the status of the robot
-     * 
-     * 
+     * - Registers (100 int, 100 float)
+     * - Other data?
     */
-
     public class Robot
     {
-        // Comms Class. Contains the comms information
+        private int id;
+        private string ipAddress;
+        private AuthenticationHeaderValue authValue;
+        private Registers r;
+        private Status s;
 
-        // Registers Class. Contains all 200 PLC registers
-        public Registers r = new Registers();
+        // Instantiate with connection details
+        public Robot()
+        {
+            fetchConnectionDetails();
 
-        // Robot status. Contains most of the entries from the /status/ API
-        public Status s = new Status();
+            r = new Registers();
+            s = new Status();
+        }
+
+        // For when we're fetching the details from the database
+        public Robot(string ipAddress, AuthenticationHeaderValue authValue)
+        {
+            this.ipAddress = ipAddress;
+            this.authValue = authValue;
+
+            r = new Registers();
+            s = new Status();
+        }
+
+        public void fetchConnectionDetails()
+        {
+            string apiUsername, apiPassword;
+
+            Console.WriteLine("Please Enter The IP Address Of The Robot:");
+            ipAddress = Console.ReadLine();
+            // TODO: Check that the input is correct - length & type
+
+            Console.WriteLine("Enter API Username:");
+            apiUsername = Console.ReadLine();
+
+            Console.WriteLine("Enter API Password:");
+            apiPassword = Console.ReadLine();
+
+            // Basic Auth type for the API. Set up as follows: BASE64( username: sha256(pass) )
+            // So, first get sha256 of the pass, Concat to "username:" and then do base64 conversion
+            authValue = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes($"{apiUsername}:{ComputeSha256Hash(apiPassword)}")));
+
+            Console.WriteLine(authValue);
+        }
+
+        // Private cause we're only using it to get the Hash
+        // Within the Robot class. Should really salt it if we're 
+        // Storing it within a DB
+        private string ComputeSha256Hash(string rawData)
+        {
+            // Create a SHA256   
+            using (SHA256 sha256Hash = SHA256.Create())
+            {
+                // ComputeHash - returns byte array  
+                byte[] bytes = sha256Hash.ComputeHash(Encoding.UTF8.GetBytes(rawData));
+
+                // Convert byte array to a string   
+                StringBuilder builder = new StringBuilder();
+
+                for (int i = 0; i < bytes.Length; i++)
+                {
+                    builder.Append(bytes[i].ToString("x2"));
+                }
+
+                return builder.ToString();
+            }
+        }
+
+        public void formConnection(HttpClient comms)
+        {
+            comms.BaseAddress = new Uri("http://" + ipAddress + "/api/v2.0.0/");
+            comms.DefaultRequestHeaders.Authorization = authValue;
+        }
+
+        // This sends an async API get request to the robot to fetch data at the specified uri
+        // It does not return data straight away. This allows us to make a bunch of calls
+        // For all of the robots and then wait for the data to get to us as it comes through.
+        public async Task<HttpResponseMessage> sendGetRequest(HttpClient comms, string uri)
+        {
+            formConnection(comms);
+            return await comms.GetAsync(uri);
+        }
+
+        public void saveStatus(HttpResponseMessage response)
+        {
+            s = JsonConvert.DeserializeObject<Status>(response.Content.ReadAsStringAsync().Result);
+        }
+
+        /*
+        public async Task saveStatus(HttpResponseMessage response)
+        {
+            s = await JsonConvert.DeserializeObject<Status>(response.Content.ReadAsStringAsync().Result);
+        }
+        */
     }
+
 
     public class Status
     {
@@ -70,129 +164,63 @@ namespace Mirage
             Console.WriteLine("joystick_web_session_id: " + joystick_web_session_id);
         }
 
+        public void saveStatusToDB()
+        {
+
+        }
+
+        public void saveStatusToMemory(HttpResponseMessage response)
+        {
+
+        }
     }
 
     public class Position
     {
-        /// <summary>
-        /// 
-        /// </summary>
-        public double y { get; set; }
-        /// <summary>
-        /// 
-        /// </summary>
         public double x { get; set; }
-        /// <summary>
-        /// 
-        /// </summary>
+        public double y { get; set; }
         public double orientation { get; set; }
     }
 
     public class ErrorsItem
     {
-        /// <summary>
-        /// 
-        /// </summary>
         public int code { get; set; }
-        /// <summary>
-        /// 
-        /// </summary>
         public string description { get; set; }
-        /// <summary>
-        /// 
-        /// </summary>
         public string module { get; set; }
     }
 
     public class Velocity
     {
-        /// <summary>
-        /// 
-        /// </summary>
         public double linear { get; set; }
-        /// <summary>
-        /// 
-        /// </summary>
         public double angular { get; set; }
     }
 
     public class User_prompt
     {
-        /// <summary>
-        /// 
-        /// </summary>
         public string guid { get; set; }
-        /// <summary>
-        /// 
-        /// </summary>
         public string question { get; set; }
-        /// <summary>
-        /// 
-        /// </summary>
         public List<string> options { get; set; }
-        /// <summary>
-        /// 
-        /// </summary>
         public int timeout { get; set; }
-        /// <summary>
-        /// 
-        /// </summary>
         public string user_group { get; set; }
     }
 
     public class Cart
     {
-        /// <summary>
-        /// 
-        /// </summary>
-        public int width { get; set; }
-        /// <summary>
-        /// 
-        /// </summary>
-        public int length { get; set; }
-        /// <summary>
-        /// 
-        /// </summary>
-        public int offset_locked_wheels { get; set; }
-        /// <summary>
-        /// 
-        /// </summary>
         public int id { get; set; }
-        /// <summary>
-        /// 
-        /// </summary>
+        public int length { get; set; }
+        public int width { get; set; }
         public int height { get; set; }
+        public int offset_locked_wheels { get; set; }
     }
 
     public class Hook_status
     {
-        /// <summary>
-        /// 
-        /// </summary>
         public string available { get; set; }
-        /// <summary>
-        /// 
-        /// </summary>
         public int angle { get; set; }
-        /// <summary>
-        /// 
-        /// </summary>
         public Cart cart { get; set; }
-        /// <summary>
-        /// 
-        /// </summary>
         public int height { get; set; }
-        /// <summary>
-        /// 
-        /// </summary>
         public string braked { get; set; }
-        /// <summary>
-        /// 
-        /// </summary>
         public int length { get; set; }
-        /// <summary>
-        /// 
-        /// </summary>
         public string cart_attached { get; set; }
     }
 }
