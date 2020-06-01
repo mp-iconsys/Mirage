@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Net;
 using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Threading.Tasks;
-using System.Configuration;
 using System.Threading;
 using MySql.Data.MySqlClient;
 
@@ -11,12 +9,6 @@ namespace Mirage
 {
     class Program
     {
-        static bool keepRunning = true;
-        static int debugLevel, pollInterval, numberOfRobots;
-        static string logFile, emailAlert, baseURL;
-        static MySqlConnection db;
-        static HttpClient comms;
-
         //============================================= 
         //  Get Static Information
         //=============================================
@@ -36,34 +28,46 @@ namespace Mirage
         public static async Task Main(string[] args)
         {
             // Capture CTRL+C
-            Console.CancelKeyPress += delegate (object sender, ConsoleCancelEventArgs e) {
+            Console.CancelKeyPress += delegate (object sender, ConsoleCancelEventArgs e) 
+            {
                 e.Cancel = true;
-                keepRunning = false;
+                Globals.keepRunning = false;
             };
 
             // TODO: Capture seg faults 
 
             // TODO: some sort of thread diagnostics???
 
-            readAllSettings();
+            Globals.readAllSettings();
 
-            connectToDB();
+            Globals.connectToDB();
 
-            setUpDefaultComms();
+            Globals.setUpDefaultComms();
+
+            // Download maps
+
+            // Download missions
+
+            // Create the fleet which will contain out robot data
+            Fleet mirFleet = new Fleet();
+
+            // Load robot data from DB if we've already configured a session
 
             // Create a fleet of robots which we're going to poll for data
-            Robot[] fleet = new Robot[numberOfRobots];
+            //Robot[] fleet = new Robot[Globals.numberOfRobots];
 
-            for(int i = 0; i < numberOfRobots; i++)
-            {
+
+
+            //for(int i = 0; i < numberOfRobots; i++)
+            //{
                 // Go through the fleet
                 // For each robot start a connection and issue async method to get data
                 // For each of the robots issue await method to store data
                 // Save to DB
                 // Rinse and repeat in a while loop
-            }    
+            //}    
 
-            Robot testMRI = new Robot();
+            //Robot testMRI = new Robot();
 
             //AuthenticationHeaderValue authValue = fetchAuthentication();
 
@@ -82,25 +86,36 @@ namespace Mirage
             Client.Timeout = TimeSpan.FromMinutes(10);
             ============================================= */
 
-            if (debugLevel > 0)
+            if (Globals.debugLevel > 0)
                 Console.WriteLine("==== Starting connections ====");
 
             //============================================= 
             // M A I N      L O O P
             //============================================= 
-            while (keepRunning)
+            int i = 0;
+
+            while (Globals.keepRunning)
             {
+                if(Globals.debugLevel > 0)
+                    Console.WriteLine("==== Loop No: " + ++i + " ====");
+
                 try
                 {
                     //testMRI.formConnection(comms);
 
                     try 
                     {
+                        // We're sending GET requests to the MiR servers
+                        // 
+                        mirFleet.issueGetRequests("status");
+
+                        await mirFleet.saveFleetStatusAsync();
+
                         // Create a task to fetch a message
-                        Task<HttpResponseMessage> m = testMRI.sendGetRequest(comms, "status");
+                        //Task<HttpResponseMessage> m = testMRI.sendGetRequest("status");
 
                         // Save status 
-                        testMRI.saveStatus(await m);
+                        //testMRI.saveStatus(await m);
                         /*
                         var result = await comms.GetAsync(urlParameters);
                         Console.WriteLine(result.Content.ReadAsStringAsync().Result);
@@ -132,10 +147,10 @@ namespace Mirage
                     Console.WriteLine($"Connection Problems: '{e}'");
                 }
 
-                Thread.Sleep(pollInterval*1000); // Ugly as fuck but will change to event based stuff once I add a GUI
+                Thread.Sleep(Globals.pollInterval*1000); // Ugly as fuck but will change to event based stuff once I add a GUI
             }
 
-            closeComms();
+            Globals.closeComms();
 
             Console.WriteLine("==== Graceful Exit ====");
             Environment.Exit(1);
@@ -185,128 +200,11 @@ namespace Mirage
         }
         */
 
-        static void readAllSettings()
-        {
-            if (debugLevel > 0)
-                Console.WriteLine("==== Fetching App Settings From App.config ====");
-
-            try
-            {
-                var appSettings = ConfigurationManager.AppSettings;
-
-                if (appSettings.Count == 0)
-                {
-                    Console.WriteLine("AppSettings Branch Within App.config Is Empty.");
-                    // Send an email alert???
-                }
-                else
-                {
-                    // Need to cast vars as default type is string
-                    debugLevel      = int.Parse(ConfigurationManager.AppSettings["debugLevel"]);
-                    pollInterval    = int.Parse(ConfigurationManager.AppSettings["pollInterval"]);
-                    numberOfRobots  = int.Parse(ConfigurationManager.AppSettings["numberOfRobots"]);
-                    logFile         = ConfigurationManager.AppSettings["logFile"];
-                    emailAlert      = ConfigurationManager.AppSettings["emailAlert"];
-                    baseURL         = ConfigurationManager.AppSettings["baseURL"];
-
-                    if (debugLevel > 0)
-                    {
-                        foreach (var key in appSettings.AllKeys)
-                        {
-                            Console.WriteLine("Key: {0} Value: {1}", key, appSettings[key]);
-                        }
-                    }
-                }
-            }
-            catch (ConfigurationErrorsException)
-            {
-                Console.WriteLine("==== Error reading app settings ====");
-                // TODO: Use default values or send an email and terminate?
-            }
-        }
-
-        static void connectToDB()
-        {
-            if (debugLevel > 0)
-                Console.WriteLine("==== Connecting To Databases ====");
-            try
-            {
-                db = new MySqlConnection(ConfigurationManager.ConnectionStrings["master"].ConnectionString);
-                db.Open();
-
-                if (debugLevel > 0)
-                    Console.WriteLine("Local Master DB Connection Established");
-            }
-            catch (MySqlException ex)
-            {
-                Console.WriteLine("Local Master DB Connection Failed");
-                // Print MySQL exception
-                // Send Email
-
-                Console.WriteLine("Attempting A Connation With Local Slave DB");
-
-                try
-                {    
-                    db = new MySqlConnection(ConfigurationManager.ConnectionStrings["slave"].ConnectionString);
-                    db.Open();
-
-                    if (debugLevel > 0)
-                    {
-                        Console.WriteLine("Local Slave DB Connection Established");
-                    }
-                }
-                catch(MySqlException e)
-                {
-                    Console.WriteLine("Local Slave DB Connection Failed");
-                    // Print MySQL exception
-                    // Send email and terminate process?
-                    keepRunning = false;
-                }
-            }
-        }
-
-        static void logJSON(string json)
-        {
-            string query = "INSERT INTO mir.storage(DATA) values ('" + json + "');";
-            MySqlCommand insertQuery = new MySqlCommand(query, db);
-            insertQuery.ExecuteNonQuery();
-            Console.WriteLine("Inserting Data");
-            /*
-            insertQuery.Close();
-            MySqlDataReader MyReader2;
-            MyReader2 = insertQuery.ExecuteReader();     // Here our query will be executed and data saved into the database.  
-            Console.WriteLine("Inserting Data");
-            while (MyReader2.Read())
-            {
-            }
-            */
-        }
-
         // We're assuming here that the REST API will use the same format accross all of the robots
         // NOTE! This does not actually connect to the robots! Just sets up default values
         // Actual connection is done through the Robot class method, once we know the IP + authentication
-        static void setUpDefaultComms()
-        {
-            if (debugLevel > 0)
-                Console.WriteLine("==== Setting Up Default API Connection Details ====");
 
-            // TODO: Catch Exceptions if they exist (maybe a null exception?)
-            comms = new HttpClient();
-            comms.DefaultRequestVersion = HttpVersion.Version11;
-            comms.DefaultRequestHeaders.Accept.Clear();
-            comms.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-            comms.DefaultRequestHeaders.Add("Accept-Language", "en_US");
-            comms.Timeout = TimeSpan.FromMinutes(10);
-        }
-
-        static void closeComms()
-        {
-            if (debugLevel > 0)
-                Console.WriteLine("==== Closing Socket Connections ====");
-
-            comms.Dispose();
-        }
-
+        /*
         static void httpResponseCheck(HttpResponseMessage response)
         {
             if (response.IsSuccessStatusCode)
@@ -323,6 +221,7 @@ namespace Mirage
                 // Send email cause of critical error
             }
         }
+        */
 
         /*
         static void ReadSetting(string key)
