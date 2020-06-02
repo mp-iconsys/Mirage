@@ -3,28 +3,11 @@ using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Threading;
-using MySql.Data.MySqlClient;
 
 namespace Mirage
 {
     class Program
     {
-        //============================================= 
-        //  Get Static Information
-        //=============================================
-        // Use a form or an initial installation to get static info on first startup. Then save in config.
-        // Make sure to cast the data in correct format as it's all returned as strings!!! (much pain was had by Mikolaj)
-        // This includes:
-        // - Test to see if we can connect to DB?
-        // - Details of each of the robot: Mainly IP, etc
-        // - IP of the API box
-        //
-        // Save these in a config file
-
-        // By declaring a single shared static we reduce the number of sockets
-        // You'll need to do this per each robot -> part of the robot class???
-        //private static HttpClient Client = new HttpClient();
-
         public static async Task Main(string[] args)
         {
             // Capture CTRL+C
@@ -44,50 +27,17 @@ namespace Mirage
 
             Globals.setUpDefaultComms();
 
+            // Create the fleet which will contain out robot data
+            Fleet mirFleet = new Fleet();
+
             // Download maps
 
             // Download missions
 
-            // Create the fleet which will contain out robot data
-            Fleet mirFleet = new Fleet();
-
             // Load robot data from DB if we've already configured a session
 
-            // Create a fleet of robots which we're going to poll for data
-            //Robot[] fleet = new Robot[Globals.numberOfRobots];
-
-
-
-            //for(int i = 0; i < numberOfRobots; i++)
-            //{
-                // Go through the fleet
-                // For each robot start a connection and issue async method to get data
-                // For each of the robots issue await method to store data
-                // Save to DB
-                // Rinse and repeat in a while loop
-            //}    
-
-            //Robot testMRI = new Robot();
-
-            //AuthenticationHeaderValue authValue = fetchAuthentication();
-
-            // Works: IDs go all the way up to 200
-            //Registers r = new Registers();
-
-            /*============================================= 
-            /* Default HttpClient Connection Details
-            /*============================================= 
-            Client.BaseAddress = new Uri(baseURL);
-            Client.DefaultRequestVersion = HttpVersion.Version11;
-            Client.DefaultRequestHeaders.Accept.Clear();
-            Client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-            Client.DefaultRequestHeaders.Add("Accept-Language", "en_US");
-            Client.DefaultRequestHeaders.Authorization = authValue;
-            Client.Timeout = TimeSpan.FromMinutes(10);
-            ============================================= */
-
             if (Globals.debugLevel > 0)
-                Console.WriteLine("==== Starting connections ====");
+                Console.WriteLine("==== Starting Main Loop ====");
 
             //============================================= 
             // M A I N      L O O P
@@ -101,12 +51,11 @@ namespace Mirage
 
                 try
                 {
-                    //testMRI.formConnection(comms);
-
                     try 
                     {
                         // We're sending GET requests to the MiR servers
-                        // 
+                        // Saving them asynchronously as they come along
+
                         mirFleet.issueGetRequests("status");
 
                         await mirFleet.saveFleetStatusAsync();
@@ -114,36 +63,17 @@ namespace Mirage
                         mirFleet.issueGetRequests("registers");
 
                         await mirFleet.saveFleetRegistersAsync();
-
-                        // Create a task to fetch a message
-                        //Task<HttpResponseMessage> m = testMRI.sendGetRequest("status");
-
-                        // Save status 
-                        //testMRI.saveStatus(await m);
-                        /*
-                        var result = await comms.GetAsync(urlParameters);
-                        Console.WriteLine(result.Content.ReadAsStringAsync().Result);
-                        //testRobot.
-                        Status stat = new Status();
-                        stat = JsonConvert.DeserializeObject<Status>(result.Content.ReadAsStringAsync().Result);
-
-                        if (debugLevel > 0)
-                        {
-                            logJSON(result.Content.ReadAsStringAsync().Result);
-                        }
-
-                        stat.printStatus();
-                        */
                     }
                     catch (HttpRequestException e)
                     {
+                        // TODO: Handle more exceptions
                         // Remove the task which is causing the exception
 
                         Console.WriteLine("Couldn't connect to the robot");
                         Console.WriteLine("Check your network, dns settings, robot is up, etc.");
                         Console.WriteLine("Please see error log (enter location here) for more details");
                         // Store the detailed error in the error log
-                        //Console.WriteLine(e);
+                        Console.WriteLine(e);
                     }
                 }
                 catch (WebException e)
@@ -242,28 +172,7 @@ namespace Mirage
             }
         }
 
-        static void AddUpdateAppSettings(string key, string value)
-        {
-            try
-            {
-                var configFile = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
-                var settings = configFile.AppSettings.Settings;
-                if (settings[key] == null)
-                {
-                    settings.Add(key, value);
-                }
-                else
-                {
-                    settings[key].Value = value;
-                }
-                configFile.Save(ConfigurationSaveMode.Modified);
-                ConfigurationManager.RefreshSection(configFile.AppSettings.SectionInformation.Name);
-            }
-            catch (ConfigurationErrorsException)
-            {
-                Console.WriteLine("Error writing app settings");
-            }
-        }
+
         */
 
         /*

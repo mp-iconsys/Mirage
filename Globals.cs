@@ -13,7 +13,8 @@ using System.Net.Http.Headers;
 public static class Globals
 {
     public static bool keepRunning = true;
-    public static int debugLevel, pollInterval, numberOfRobots;
+    public static bool resumingSession = false;
+    public static int debugLevel, pollInterval, sizeOfFleet;
     public static string logFile, emailAlert, baseURL;
     public static MySqlConnection db;
     public static HttpClient comms;
@@ -37,10 +38,21 @@ public static class Globals
                 // Need to cast vars as default type is string
                 debugLevel = int.Parse(ConfigurationManager.AppSettings["debugLevel"]);
                 pollInterval = int.Parse(ConfigurationManager.AppSettings["pollInterval"]);
-                numberOfRobots = int.Parse(ConfigurationManager.AppSettings["numberOfRobots"]);
+                sizeOfFleet = int.Parse(ConfigurationManager.AppSettings["sizeOfFleet"]);
                 logFile = ConfigurationManager.AppSettings["logFile"];
                 emailAlert = ConfigurationManager.AppSettings["emailAlert"];
-                baseURL = ConfigurationManager.AppSettings["baseURL"];
+                resumingSession = bool.Parse(ConfigurationManager.AppSettings["resumingSession"]);
+
+                Console.WriteLine("Do you want to start a new session? (y/n)");
+                string newSession = Console.ReadLine();
+
+                if (newSession == "y")
+                    resumingSession = false;
+                else if (newSession == "n")
+                    resumingSession = true;
+                else
+                    Console.WriteLine("The answer must be either 'y' or 'n'");
+                // goto -> above
 
                 if (debugLevel > 0)
                 {
@@ -73,6 +85,7 @@ public static class Globals
         catch (MySqlException ex)
         {
             Console.WriteLine("Local Master DB Connection Failed");
+            Console.WriteLine(ex);
             // Print MySQL exception
             // Send Email
 
@@ -91,6 +104,7 @@ public static class Globals
             catch (MySqlException e)
             {
                 Console.WriteLine("Local Slave DB Connection Failed");
+                Console.WriteLine(e);
                 // Print MySQL exception
                 // Send email and terminate process?
                 keepRunning = false;
@@ -217,6 +231,31 @@ public static class Globals
                 Console.WriteLine("Value is null");
 
             return "NULL,";
+        }
+    }
+
+    public static void AddUpdateAppSettings(string key, string value)
+    {
+        try
+        {
+            var configFile = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
+            var settings = configFile.AppSettings.Settings;
+
+            if (settings[key] == null)
+            {
+                settings.Add(key, value);
+            }
+            else
+            {
+                settings[key].Value = value;
+            }
+
+            configFile.Save(ConfigurationSaveMode.Modified);
+            ConfigurationManager.RefreshSection(configFile.AppSettings.SectionInformation.Name);
+        }
+        catch (ConfigurationErrorsException)
+        {
+            Console.WriteLine("Error writing app settings");
         }
     }
 }

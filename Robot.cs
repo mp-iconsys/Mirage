@@ -6,6 +6,7 @@ using System.Text;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using MySql.Data.MySqlClient;
 
 namespace Mirage
 {
@@ -16,12 +17,15 @@ namespace Mirage
      * - Registers (100 int, 100 float)
      * - Other data?
     */
+
+    // TODO: Clean-up so we're a bit more tidy
+    // TODO: Define an interface
     public class Robot
     {
         private int id = 0;
-        private string ipAddress;
+        private string ipAddress; // TODO: change to actual IPAddress class from .net library
         private AuthenticationHeaderValue authValue;
-        private Registers r;
+        private Register[] registers;
         private Status s;
 
         // Instantiate with connection details
@@ -29,7 +33,10 @@ namespace Mirage
         {
             fetchConnectionDetails();
 
-            r = new Registers();
+            registers = new Register[200];
+            for (int i = 0; i < registers.Length; i++)
+                registers[i] = new Register();
+
             s = new Status();
         }
 
@@ -40,7 +47,10 @@ namespace Mirage
 
             fetchConnectionDetails();
 
-            r = new Registers();
+            registers = new Register[200];
+            for (int i = 0; i < registers.Length; i++)
+                registers[i] = new Register();
+
             s = new Status();
         }
 
@@ -51,7 +61,10 @@ namespace Mirage
             this.ipAddress = ipAddress;
             this.authValue = authValue;
 
-            r = new Registers();
+            registers = new Register[200];
+            for (int i = 0; i < registers.Length; i++)
+                registers[i] = new Register();
+
             s = new Status();
         }
 
@@ -59,21 +72,52 @@ namespace Mirage
         {
             string apiUsername, apiPassword;
 
-            Console.WriteLine("Please Enter The IP Address Of The Robot:");
-            ipAddress = Console.ReadLine();
-            // TODO: Check that the input is correct - length & type
+            if (Globals.resumingSession)
+            {
+                // We're resuming an existing session so fetch the robot connection details from a database
+                string query = "SELECT IP, AUTH FROM robot WHERE ROBOT_ID =" + id;
+                var getRobotData = new MySqlCommand(query, Globals.db);
 
-            Console.WriteLine("Enter API Username:");
-            apiUsername = Console.ReadLine();
+                using (MySqlDataReader reader = getRobotData.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        ipAddress = reader.GetString("IP");
+                        authValue = new AuthenticationHeaderValue("Basic", reader.GetString("AUTH"));
+                    }
+                } 
+            }
+            else
+            {
+                // We've got a new session so input the details manually in the terminal
+                // Firstm fetch the details
 
-            Console.WriteLine("Enter API Password:");
-            apiPassword = Console.ReadLine();
+                Console.WriteLine("Please Enter The IP Address Of The Robot No" + id + ":");
+                ipAddress = Console.ReadLine();
+                // TODO: Check that the input is correct - length & type
 
-            // Basic Auth type for the API. Set up as follows: BASE64( username: sha256(pass) )
-            // So, first get sha256 of the pass, Concat to "username:" and then do base64 conversion
-            authValue = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes($"{apiUsername}:{ComputeSha256Hash(apiPassword)}")));
+                Console.WriteLine("Enter API Username:");
+                apiUsername = Console.ReadLine();
 
-            Console.WriteLine(authValue);
+                Console.WriteLine("Enter API Password:");
+                apiPassword = Console.ReadLine();
+
+                // Basic Auth type for the API. Set up as follows: BASE64( username: sha256(pass) )
+                // So, first get sha256 of the pass, Concat to "username:" and then do base64 conversion
+                authValue = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes($"{apiUsername}:{ComputeSha256Hash(apiPassword)}")));
+
+                if (Globals.debugLevel > 0)
+                {
+                    Console.WriteLine(authValue);
+                }
+
+                // Store the data in the DB
+                string query = "INSERT INTO robot (`ROBOT_ID`, `IP`, `AUTH`) VALUES ('" + id + "', '" + ipAddress + "', '" + Convert.ToBase64String(Encoding.UTF8.GetBytes($"{apiUsername}:{ComputeSha256Hash(apiPassword)}")) + "');";
+                Globals.issueInsertQuery(query);
+
+                // Change the App.config setting so that we load an existing config next time
+                Globals.AddUpdateAppSettings("resumingSession", "true");
+            }
         }
 
         // Private cause we're only using it to get the Hash
@@ -118,7 +162,8 @@ namespace Mirage
         {
             s = JsonConvert.DeserializeObject<Status>(response.Content.ReadAsStringAsync().Result);
 
-            Globals.logJSON(response.Content.ReadAsStringAsync().Result);
+            if(Globals.debugLevel > 0)
+                Globals.logJSON(response.Content.ReadAsStringAsync().Result);
 
             if (Globals.debugLevel > 0)
                 s.printStatus();
@@ -128,30 +173,65 @@ namespace Mirage
 
         public void saveRegisters(HttpResponseMessage response)
         {
-            Globals.logJSON(response.Content.ReadAsStringAsync().Result);
-
-            var objResponse1 = JsonConvert.DeserializeObject<List<Registers>>(response.Content.ReadAsStringAsync().Result);
-            r = objResponse1; // JsonConvert.DeserializeObject<List<Registers>>(response.Content.ReadAsStringAsync().Result);
-
-            Globals.logJSON(response.Content.ReadAsStringAsync().Result);
+            registers = JsonConvert.DeserializeObject<Register[]>(response.Content.ReadAsStringAsync().Result);
 
             if (Globals.debugLevel > 0)
-                r.print();
+            { 
+                Globals.logJSON(response.Content.ReadAsStringAsync().Result);
 
-            r.saveToDB(id);
+                for(int i = 0;  i < registers.Length; i++)
+                    registers[i].toString();
+            }
+
+            saveRegistersToDB(id, registers);
+        }
+
+        public string saveRegisterToDB(Register r, int robotID)
+        {
+            string query;
+            query = "('" + robotID + "','" + r.id + "','" + r.value + "'),";
+            return query;
+        }
+
+        public void saveRegistersToDB(int robotID, Register[] registers)
+        {
+            string query = "INSERT INTO registers (`ROBOT_ID`, `REGISTER_ID`, `VALUE`) VALUES ";
+
+            for (int i = 0; i < (registers.Length - 1); i++)
+            {
+                query += saveRegisterToDB(registers[i], robotID);
+            }
+
+            // Need to treat the last register separately
+            query += "('" + robotID + "','" + registers[(registers.Length - 1)].id + "','" + registers[(registers.Length - 1)].value + "');";
+
+            Globals.issueInsertQuery(query);
         }
 
         public string getBaseURI()
         {
             return "http://" + ipAddress + "/api/v2.0.0/";
         }
-        /*
-        public async Task saveStatus(HttpResponseMessage response)
-        {
-            s = await JsonConvert.DeserializeObject<Status>(response.Content.ReadAsStringAsync().Result);
-        }
-        */
 
+        public class Register
+        {
+            public int id { get; set; }
+            public string label { get; set; }
+            public string url { get; set; }
+            public float value { get; set; }
+
+            public Register() {}
+
+            public string getURL()
+            {
+                return url + id;
+            }
+
+            public void toString()
+            {
+                Console.WriteLine("id: " + id + " Label: " + label + " url: " + url + " getURL: " + getURL() + " value: " + value);
+            }
+        }
 
         public class Status
         {

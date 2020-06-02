@@ -10,10 +10,10 @@ namespace Mirage
 
         public Fleet() 
         {
-            robots = new Robot[Globals.numberOfRobots];
-            httpResponseTasks = new Task<HttpResponseMessage>[Globals.numberOfRobots];
+            robots = new Robot[Globals.sizeOfFleet];
+            httpResponseTasks = new Task<HttpResponseMessage>[Globals.sizeOfFleet];
 
-            instantiateRobots(Globals.numberOfRobots);
+            instantiateRobots(Globals.sizeOfFleet);
         }
 
         public Fleet (int sizeOfFleet)
@@ -35,7 +35,7 @@ namespace Mirage
 
         public void issueGetRequests(string type)
         {
-            for(int i = 0; i < Globals.numberOfRobots; i++)
+            for(int i = 0; i < Globals.sizeOfFleet; i++)
             {
                 httpResponseTasks[i] = robots[i].sendGetRequest(type);
             }
@@ -43,7 +43,7 @@ namespace Mirage
 
         public async Task saveFleetStatusAsync()
         {
-            for (int i = 0; i < Globals.numberOfRobots; i++)
+            for (int i = 0; i < Globals.sizeOfFleet; i++)
             {
                 robots[i].saveStatus(await httpResponseTasks[i]);
             }
@@ -51,7 +51,7 @@ namespace Mirage
 
         public async Task saveFleetRegistersAsync()
         {
-            for (int i = 0; i < Globals.numberOfRobots; i++)
+            for (int i = 0; i < Globals.sizeOfFleet; i++)
             {
                 robots[i].saveRegisters(await httpResponseTasks[i]);
             }
