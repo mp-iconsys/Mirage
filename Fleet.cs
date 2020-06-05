@@ -57,5 +57,22 @@ namespace Mirage
             }
         }
 
+        public async Task saveSoftwareLogsAsync()
+        {
+            for (int i = 0; i < Globals.sizeOfFleet; i++)
+            {
+                robots[i].saveSoftwareLogs(await httpResponseTasks[i]);
+            }
+        }
+
+        public async Task saveMapsAsync()
+        {
+            for (int i = 0; i < Globals.sizeOfFleet; i++)
+            {
+                robots[i].saveMaps(await httpResponseTasks[i]);
+                robots[i].saveMapsData();
+            }
+        }
+
     }
 }

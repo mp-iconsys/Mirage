@@ -30,6 +30,13 @@ namespace Mirage
             // Create the fleet which will contain out robot data
             Fleet mirFleet = new Fleet();
 
+            mirFleet.issueGetRequests("/software/logs");
+
+            await mirFleet.saveSoftwareLogsAsync();
+
+            mirFleet.issueGetRequests("maps");
+
+            await mirFleet.saveMapsAsync();
             // Download maps
 
             // Download missions

@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using MySql.Data.MySqlClient;
+using System.Linq;
 
 namespace Mirage
 {
@@ -26,6 +27,8 @@ namespace Mirage
         private string ipAddress; // TODO: change to actual IPAddress class from .net library
         private AuthenticationHeaderValue authValue;
         private Register[] registers;
+        public List<SoftwareLog> SoftwareLogs { get; set; }
+        public List<Map> Maps { get; set; }
         private Status s;
 
         // Instantiate with connection details
@@ -53,7 +56,6 @@ namespace Mirage
 
             s = new Status();
         }
-
 
         // For when we're fetching the details from the database
         public Robot(string ipAddress, AuthenticationHeaderValue authValue)
@@ -168,7 +170,7 @@ namespace Mirage
             if (Globals.debugLevel > 0)
                 s.printStatus();
 
-            s.saveStatusToDB(id);
+            s.saveStatusToDB(id, Maps);
         }
 
         public void saveRegisters(HttpResponseMessage response)
@@ -184,6 +186,24 @@ namespace Mirage
             }
 
             saveRegistersToDB(id, registers);
+        }
+
+        public void saveSoftwareLogs(HttpResponseMessage response)
+        {
+            if(Globals.debugLevel > 2)
+                Console.WriteLine(response.Content.ReadAsStringAsync().Result);
+
+            SoftwareLogs = JsonConvert.DeserializeObject<List<SoftwareLog>>(response.Content.ReadAsStringAsync().Result);
+
+            if (Globals.debugLevel > 0)
+            {
+                Globals.logJSON(response.Content.ReadAsStringAsync().Result);
+
+                for (int i = 0; i < SoftwareLogs.Count; i++)
+                    SoftwareLogs[i].toString();
+            }
+
+            saveSoftLogsToDB(id);
         }
 
         public string saveRegisterToDB(Register r, int robotID)
@@ -204,6 +224,84 @@ namespace Mirage
 
             // Need to treat the last register separately
             query += "('" + robotID + "','" + registers[(registers.Length - 1)].id + "','" + registers[(registers.Length - 1)].value + "');";
+
+            Globals.issueInsertQuery(query);
+        }
+
+        public void saveSoftLogsToDB(int robotID)
+        {
+            string query = "INSERT INTO software_logs (`ROBOT_ID`, `FROM`, `TO`, `ACTION`, `STATE`, `START_TIME`, `END_TIME`, `URL`, `GUID`) VALUES ";
+
+            for (int i = 0; i < (SoftwareLogs.Count - 1); i++)
+            {
+                query += "('" + robotID + "', '" + SoftwareLogs[i].From + "', '" + SoftwareLogs[i].To + "', '" + SoftwareLogs[i].Action + "', '" + SoftwareLogs[i].State + "', '" + SoftwareLogs[i].Start_time
+                      + "', '" + SoftwareLogs[i].End_time + "', '" + SoftwareLogs[i].Url + "', '" + SoftwareLogs[i].Guid + "'),";
+            }
+
+            // Need to treat the last register separately
+            query   += "('" + robotID + "', '" + SoftwareLogs[(SoftwareLogs.Count - 1)].From + "', '" + SoftwareLogs[(SoftwareLogs.Count - 1)].To + "', '" + SoftwareLogs[(SoftwareLogs.Count - 1)].Action + "', '" + SoftwareLogs[(SoftwareLogs.Count - 1)].State + "', '" + SoftwareLogs[(SoftwareLogs.Count - 1)].Start_time
+                    + "', '" + SoftwareLogs[(SoftwareLogs.Count - 1)].End_time + "', '" + SoftwareLogs[(SoftwareLogs.Count - 1)].Url + "', '" + SoftwareLogs[(SoftwareLogs.Count - 1)].Guid + "')";
+
+            Globals.issueInsertQuery(query);
+        }
+
+        public void saveMaps(HttpResponseMessage response)
+        {
+            Maps = JsonConvert.DeserializeObject<List<Map>>(response.Content.ReadAsStringAsync().Result);
+
+            if (Globals.debugLevel > -1)
+                Globals.logJSON(response.Content.ReadAsStringAsync().Result);
+
+            if (Globals.debugLevel > 0)
+            { 
+                for(int i = 0; i < Maps.Count; i++)
+                {
+                    Maps[i].Map_id = i;
+                    Maps[i].printMap();
+                }    
+            }
+        }
+
+        public async void saveMapsData()
+        {
+            Task<HttpResponseMessage> responseMsg;
+            HttpResponseMessage resp;
+
+            for (int i = 0; i < Maps.Count; i++)
+            {
+                responseMsg = sendGetRequest("maps/" + Maps[i].Guid);
+                resp = await responseMsg;
+                Maps[i] = JsonConvert.DeserializeObject<Map>(resp.Content.ReadAsStringAsync().Result);
+            }
+
+            if (Globals.debugLevel > 0)
+            {
+                for (int i = 0; i < Maps.Count; i++)
+                    Maps[i].printMap();
+            }
+
+            saveMapsToDB();
+        }
+
+        public void saveMapsToDB()
+        {
+            string query = "REPLACE INTO maps (`MAP_ID`, `ROBOT_ID`, `NAME`, `CREATED_BY_NAME`, `CREATED_BY_ID`, `MAP`, `METADATA`, `ONE_WAY_MAP`, `ORIGIN_THETA`, `ORIGIN_X`, `ORIGIN_Y`, `PATH_GUIDES`, `PATHS`, `POSITIONS`, `RESOLUTION`) VALUES ";
+
+            int i;
+
+            for (i = 0; i < (Maps.Count - 1); i++)
+            {
+                query   += "('" + Maps[i].Map_id + "', '" + id + "', '" + Maps[i].Name + "', '" + Maps[i].Created_by_name + "', '" + Maps[i].Created_by_id + "', '" + Maps[i].map + "', '" + Maps[i].Metadata + "', '"
+                        + Maps[i].One_way_map + "', '" + Maps[i].Origin_theta + "', '" + Maps[i].Origin_x + "', '" + Maps[i].Origin_y + "', '" + Maps[i].Path_guides + "', '" + Maps[i].Paths + "', '"
+                        + Maps[i].Positions + "', '" + Maps[i].Resolution + "'),";
+            }
+
+            // Need to treat the last register separately
+            i = (Maps.Count - 1);
+
+            query += "('" + Maps[i].Map_id + "', '" + id + "', '" + Maps[i].Name + "', '" + Maps[i].Created_by_name + "', '" + Maps[i].Created_by_id + "', '" + Maps[i].map + "', '" + Maps[i].Metadata + "', '"
+                    + Maps[i].One_way_map + "', '" + Maps[i].Origin_theta + "', '" + Maps[i].Origin_x + "', '" + Maps[i].Origin_y + "', '" + Maps[i].Path_guides + "', '" + Maps[i].Paths + "', '"
+                    + Maps[i].Positions + "', '" + Maps[i].Resolution + "');";
 
             Globals.issueInsertQuery(query);
         }
@@ -230,6 +328,30 @@ namespace Mirage
             public void toString()
             {
                 Console.WriteLine("id: " + id + " Label: " + label + " url: " + url + " getURL: " + getURL() + " value: " + value);
+            }
+        }
+
+        public class SoftwareLog
+        {
+            public string Action { get; set; }
+            public string End_time { get; set; }
+            public string From { get; set; }
+            public string Guid { get; set; }
+            public string Start_time { get; set; }
+            public string State { get; set; }
+            public string To { get; set; }
+            public string Url { get; set; }
+
+            public void toString()
+            {
+                Console.WriteLine("Action: " + Action);
+                Console.WriteLine("End_time: " + End_time);
+                Console.WriteLine("From: " + From);
+                Console.WriteLine("Guid: " + Guid);
+                Console.WriteLine("Start_time: " + Start_time);
+                Console.WriteLine("State: " + State);
+                Console.WriteLine("To: " + To);
+                Console.WriteLine("Url: " + Url);
             }
         }
 
@@ -284,7 +406,7 @@ namespace Mirage
                 Console.WriteLine("velocity angular: " + velocity.angular);
             }
 
-            public void saveStatusToDB(int robotID)
+            public void saveStatusToDB(int robotID, List<Map> m)
             {
                 int?    position_id = null, 
                         error_id = null, 
@@ -324,12 +446,28 @@ namespace Mirage
                 
                 if (errors != null)
                 {
-                    query = "INSERT INTO error (CODE, DESCRIPTION, MODULE) VALUES ('";
-                    query += errors. + "', '" + position.y + "', '" + position.orientation + "');";
+                    if(errors.Count == 0 || !errors.Any())
+                    {
+                        Console.WriteLine("No Errors");
+                    }
+                    else
+                    { 
+                        query = "INSERT INTO error (CODE, DESCRIPTION, MODULE) VALUES ";
 
-                    Globals.issueInsertQuery(query);
+                        int i;
 
-                    position_id = Globals.getIDQuery("position");
+                        for(i = 0; i < (errors.Count-1); i++)
+                        { 
+                            query += "('" + errors[i].code + "','" + MySqlHelper.EscapeString(errors[i].description) + "', '" + MySqlHelper.EscapeString(errors[i].module) + "'),";
+                        }
+
+                        i = errors.Count - 1;
+                        query += "('" + errors[i].code + "','" + MySqlHelper.EscapeString(errors[i].description) + "', '" + MySqlHelper.EscapeString(errors[i].module) + "');";
+
+                        Globals.issueInsertQuery(query);
+
+                        error_id = Globals.getIDQuery("error");
+                    }
                 }
                 else
                 {
@@ -370,6 +508,13 @@ namespace Mirage
                 query += Globals.addToDB(footprint);
                 query += Globals.addToDB(joystick_low_speed_mode_enabled);
                 query += Globals.addToDB(joystick_web_session_id);
+                
+                for(int i = 0; i < m.Count; i++)
+                {
+                    if (m[i].Guid == map_id)
+                        map_id = m[i].Map_id.ToString();
+                }
+                
                 query += Globals.addToDB(map_id);
                 query += Globals.addToDB(mission_queue_id);
                 query += Globals.addToDB(mission_queue_url);
@@ -442,6 +587,51 @@ namespace Mirage
                 public string braked { get; set; }
                 public int length { get; set; }
                 public string cart_attached { get; set; }
+            }
+        }
+
+        public class Map
+        {
+            public List<string> Allowed_methods { get; set; }
+            public string Created_by { get; set; }
+            public string Created_by_id { get; set; }
+            public string Created_by_name { get; set; }
+            public string Guid { get; set; }
+            public string map { get; set; }
+            public string Metadata { get; set; }
+            public string Name { get; set; }
+            public string One_way_map { get; set; }
+            public float Origin_theta { get; set; }
+            public float Origin_x { get; set; }
+            public float Origin_y { get; set; }
+            public string Path_guides { get; set; }
+            public string Paths { get; set; }
+            public string Positions { get; set; }
+            public double Resolution { get; set; }
+            public string Session_id { get; set; }
+            public string Url { get; set; }
+            public int Map_id { get; set; }
+
+            public void printMap()
+            {
+                Console.WriteLine("Created_by: " + Created_by);
+                Console.WriteLine("Created_by_id: " + Created_by_id);
+                Console.WriteLine("Created_by_name: " + Created_by_name);
+                Console.WriteLine("Guid: " + Guid);
+                Console.WriteLine("map: " + map);
+                Console.WriteLine("Metadata: " + Metadata);
+                Console.WriteLine("Name: " + Name);
+                Console.WriteLine("One_way_map: " + One_way_map);
+                Console.WriteLine("Origin_theta: " + Origin_theta);
+                Console.WriteLine("Origin_x: " + Origin_x);
+                Console.WriteLine("Origin_y: " + Origin_y);
+                Console.WriteLine("Path_guides: " + Path_guides);
+                Console.WriteLine("Paths: " + Paths);
+                Console.WriteLine("Positions: " + Positions);
+                Console.WriteLine("Resolution: " + Resolution);
+                Console.WriteLine("Session_id: " + Session_id);
+                Console.WriteLine("Url: " + Url);
+                Console.WriteLine("Map_id: " + Map_id);
             }
         }
     }
