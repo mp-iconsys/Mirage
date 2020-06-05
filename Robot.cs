@@ -175,7 +175,7 @@ namespace Mirage
         {
             registers = JsonConvert.DeserializeObject<Register[]>(response.Content.ReadAsStringAsync().Result);
 
-            if (Globals.debugLevel > 0)
+            if (Globals.debugLevel > 2)
             { 
                 Globals.logJSON(response.Content.ReadAsStringAsync().Result);
 
@@ -261,7 +261,7 @@ namespace Mirage
             public string unloaded_map_changes { get; set; }
 
             public Position position { get; set; }
-            public List<ErrorsItem> errors { get; set; }
+            public List<ErrorsItem> errors { get; set; } // Try without a list
             public User_prompt user_prompt { get; set; }
             public Velocity velocity { get; set; }
 
@@ -321,11 +321,11 @@ namespace Mirage
                     // No position data
                 }
 
-                /*
+                
                 if (errors != null)
                 {
-                    query = "INSERT INTO position (CODE, DESCRIPTION, MODULE) VALUES ('";
-                    query += errors.GetHashCode + "', '" + position.y + "', '" + position.orientation + "');";
+                    query = "INSERT INTO error (CODE, DESCRIPTION, MODULE) VALUES ('";
+                    query += errors. + "', '" + position.y + "', '" + position.orientation + "');";
 
                     Globals.issueInsertQuery(query);
 
@@ -336,7 +336,7 @@ namespace Mirage
                     // No position data
                 }
                 
-
+                /*
                 if (user_prompt != null)
                 {
                     query = "INSERT INTO position (X, Y, ORIENTATION) VALUES ('";
@@ -373,7 +373,7 @@ namespace Mirage
                 query += Globals.addToDB(map_id);
                 query += Globals.addToDB(mission_queue_id);
                 query += Globals.addToDB(mission_queue_url);
-                query += Globals.addToDB(mission_text);
+                query += Globals.addToDB(MySqlHelper.EscapeString(mission_text));
                 query += Globals.addToDB(mode_key_state);
                 query += Globals.addToDB(mode_text);
                 //query += Globals.addToDB(robot_model);

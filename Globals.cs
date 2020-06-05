@@ -138,7 +138,8 @@ public static class Globals
 
     public static void logJSON(string json)
     {
-        issueInsertQuery("INSERT INTO mir.logger(DATA) values ('" + json + "');");
+        Console.WriteLine(json);
+        issueInsertQuery("INSERT INTO mir.logger(DATA) values ('" + MySqlHelper.EscapeString(json) + "');");
     }
 
     public static void issueInsertQuery(string query)
@@ -211,10 +212,10 @@ public static class Globals
             }
 
             if (value.ToString() == "''")
-            { 
+            {
                 return "NULL,";
             }
-            else if(value.ToString() == "false")
+            else if (value.ToString() == "false")
             {
                 return "'0',";
             }
