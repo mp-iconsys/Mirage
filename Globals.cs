@@ -5,6 +5,13 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 
+/*  D E B U G    L E V E L S
+ *  0 - No Debug, just standard messages 
+ *  1 - Events
+ *  2 - ...
+ *  4 - Everything
+*/
+
 /* Contains global variables used by all of the classes.
  * 
  * 
@@ -14,14 +21,14 @@ public static class Globals
 {
     public static bool keepRunning = true;
     public static bool resumingSession = false;
-    public static int debugLevel, pollInterval, sizeOfFleet;
+    public static int debugLevel = 0, pollInterval, sizeOfFleet;
     public static string logFile, emailAlert, baseURL;
     public static MySqlConnection db;
     public static HttpClient comms;
 
     public static void readAllSettings()
     {
-        if (debugLevel > 0)
+        if (debugLevel > -1)
             Console.WriteLine("==== Fetching App Settings From App.config ====");
 
         try
@@ -54,7 +61,7 @@ public static class Globals
                     Console.WriteLine("The answer must be either 'y' or 'n'");
                 // goto -> above
 
-                if (debugLevel > 0)
+                if (debugLevel > -1)
                 {
                     foreach (var key in appSettings.AllKeys)
                     {
@@ -72,14 +79,14 @@ public static class Globals
 
     public static void connectToDB()
     {
-        if (debugLevel > 0)
+        if (debugLevel > -1)
             Console.WriteLine("==== Connecting To Databases ====");
         try
         {
             db = new MySqlConnection(ConfigurationManager.ConnectionStrings["master"].ConnectionString);
             db.Open();
 
-            if (debugLevel > 0)
+            if (debugLevel > -1)
                 Console.WriteLine("Local Master DB Connection Established");
         }
         catch (MySqlException ex)
@@ -96,7 +103,7 @@ public static class Globals
                 db = new MySqlConnection(ConfigurationManager.ConnectionStrings["slave"].ConnectionString);
                 db.Open();
 
-                if (debugLevel > 0)
+                if (debugLevel > -1)
                 {
                     Console.WriteLine("Local Slave DB Connection Established");
                 }
@@ -116,7 +123,7 @@ public static class Globals
     {
         // TODO: Set up httpClient as a service to make network debugging easier
 
-        if (debugLevel > 0)
+        if (debugLevel > -1)
             Console.WriteLine("==== Setting Up Default API Connection Details ====");
 
         // TODO: Catch Exceptions if they exist (maybe a null exception?)
@@ -130,7 +137,7 @@ public static class Globals
 
     public static void closeComms()
     {
-        if (debugLevel > 0)
+        if (debugLevel > -1)
             Console.WriteLine("==== Closing Socket Connections ====");
 
         comms.Dispose();
@@ -146,7 +153,7 @@ public static class Globals
     {
         int rowsAffected = 0;
 
-        if (debugLevel > 0)
+        if (debugLevel > 3)
             Console.WriteLine(query);
 
         try
@@ -205,7 +212,7 @@ public static class Globals
     {
         if (null != value)
         {
-            if(debugLevel > 0)
+            if(debugLevel > 1)
             { 
                 Console.WriteLine("Value isn't null");
                 Console.WriteLine("Value is: " + value.ToString());
@@ -228,7 +235,7 @@ public static class Globals
         }
         else
         {
-            if(debugLevel > 0)
+            if(debugLevel > 1)
                 Console.WriteLine("Value is null");
 
             return "NULL,";

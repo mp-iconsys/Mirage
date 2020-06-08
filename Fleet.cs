@@ -81,6 +81,5 @@ namespace Mirage
                 robots[i].saveMapsData();
             }
         }
-
     }
 }

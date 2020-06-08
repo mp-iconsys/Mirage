@@ -50,7 +50,7 @@ namespace Mirage
 
             // Load robot data from DB if we've already configured a session
 
-            if (Globals.debugLevel > 0)
+            if (Globals.debugLevel > -1)
                 Console.WriteLine("==== Starting Main Loop ====");
 
             //============================================= 
@@ -60,8 +60,8 @@ namespace Mirage
 
             while (Globals.keepRunning)
             {
-                if(Globals.debugLevel > 0)
-                    Console.WriteLine("==== Loop No: " + ++i + " ====");
+                if(Globals.debugLevel > -1)
+                    Console.WriteLine("==== Loop " + ++i + " Starting ====");
 
                 try
                 {
@@ -70,13 +70,19 @@ namespace Mirage
                         // We're sending GET requests to the MiR servers
                         // Saving them asynchronously as they come along
 
+                        Console.WriteLine("==== Getting Status ====");
+
                         mirFleet.issueGetRequests("status");
 
                         await mirFleet.saveFleetStatusAsync();
 
+                        Console.WriteLine("==== Getting Registers ====");
+
                         mirFleet.issueGetRequests("registers");
 
                         await mirFleet.saveFleetRegistersAsync();
+
+                        Console.WriteLine("==== Loop " + i + " Finished ====");
                     }
                     catch (HttpRequestException e)
                     {

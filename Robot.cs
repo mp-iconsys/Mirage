@@ -109,7 +109,7 @@ namespace Mirage
                 // So, first get sha256 of the pass, Concat to "username:" and then do base64 conversion
                 authValue = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes($"{apiUsername}:{ComputeSha256Hash(apiPassword)}")));
 
-                if (Globals.debugLevel > 0)
+                if (Globals.debugLevel > 1)
                 {
                     Console.WriteLine(authValue);
                 }
@@ -165,10 +165,10 @@ namespace Mirage
         {
             s = JsonConvert.DeserializeObject<Status>(response.Content.ReadAsStringAsync().Result);
 
-            if(Globals.debugLevel > 0)
+            if(Globals.debugLevel > 2)
                 Globals.logJSON(response.Content.ReadAsStringAsync().Result);
 
-            if (Globals.debugLevel > 0)
+            if (Globals.debugLevel > 2)
                 s.printStatus();
 
             s.saveStatusToDB(id, Maps);
@@ -196,7 +196,7 @@ namespace Mirage
 
             SoftwareLogs = JsonConvert.DeserializeObject<List<SoftwareLog>>(response.Content.ReadAsStringAsync().Result);
 
-            if (Globals.debugLevel > 0)
+            if (Globals.debugLevel > 2)
             {
                 Globals.logJSON(response.Content.ReadAsStringAsync().Result);
 
@@ -250,7 +250,7 @@ namespace Mirage
         {
             Maps = JsonConvert.DeserializeObject<List<Map>>(response.Content.ReadAsStringAsync().Result);
 
-            if (Globals.debugLevel > 1)
+            if (Globals.debugLevel > 2)
                 Globals.logJSON(response.Content.ReadAsStringAsync().Result);
 
                 for(int i = 0; i < Maps.Count; i++)
@@ -259,7 +259,7 @@ namespace Mirage
 
                     Maps[i].Map_id = i;
 
-                    if (Globals.debugLevel > 0)
+                    if (Globals.debugLevel > 1)
                         Maps[i].printMap();
                 }    
         }
@@ -274,7 +274,7 @@ namespace Mirage
                 responseMsg.Wait(); // Block the current thread 
                                     // We want the set-up to be synchronous
 
-                if(Globals.debugLevel > 0)
+                if(Globals.debugLevel > 3)
                 { 
                     Console.WriteLine("==== Iterator : " + i + " ====");
                     Console.WriteLine("==== Maps ID Prior To call: " + Maps[i].Map_id + " ====");
@@ -326,7 +326,7 @@ namespace Mirage
         {
             Settings = JsonConvert.DeserializeObject<List<Setting>>(response.Content.ReadAsStringAsync().Result);
 
-            if (Globals.debugLevel > -1)
+            if (Globals.debugLevel > 3)
             {
                 Globals.logJSON(response.Content.ReadAsStringAsync().Result);
 
@@ -339,7 +339,7 @@ namespace Mirage
 
         public void saveSettingsToDB()
         {
-            string query = "INSERT INTO settings (`SETTING_ID`, `ROBOT_ID`, `NAME`, `PARENT_NAME`, `URL`, `VALUE`, `DEFAULT_VALUE`) VALUES ";
+            string query = "REPLACE INTO settings (`SETTING_ID`, `ROBOT_ID`, `NAME`, `PARENT_NAME`, `URL`, `VALUE`, `DEFAULT_VALUE`) VALUES ";
 
             int i;
 
@@ -492,7 +492,8 @@ namespace Mirage
                 {
                     if(errors.Count == 0 || !errors.Any())
                     {
-                        Console.WriteLine("No Errors");
+                        if(Globals.debugLevel > 1)
+                            Console.WriteLine("==== Robot " + robotID + " Has No Errors ====");
                     }
                     else
                     { 
@@ -533,10 +534,15 @@ namespace Mirage
                     // No position data
                 }
                 */
+                // Removed following fields from the query:
+                // - serial_number
+                // - session_id
+                // - mode_key_state
+                // - mission_queue_url
+                // - footprint ???
 
-
-                query = "INSERT INTO robot_status (ROBOT_ID, MODE_ID, STATE_ID, UPTIME, BATTERY_TIME_REMAINING, BATTERY_PERCENTAGE, DISTANCE_TO_NEXT_TARGET, MOVED, FOOTPRINT, joystick_low_speed_mode_enabled,"; // ALLOWED_METHODS,
-                query += "joystick_web_session_id, map_id, mission_queue_id, mission_queue_url, mission_text, mode_key_state, mode_text, safety_system_muted, serial_number, session_id, "; //robot_model, robot_name, state_text, 
+                query = "INSERT INTO robot_status (ROBOT_ID, MODE_ID, STATE_ID, UPTIME, BATTERY_TIME_REMAINING, BATTERY_PERCENTAGE, DISTANCE_TO_NEXT_TARGET, MOVED, joystick_low_speed_mode_enabled,"; // FOOTPRINT, ALLOWED_METHODS,
+                query += "joystick_web_session_id, map_id, mission_queue_id, mission_text, mode_text, safety_system_muted, "; //mission_queue_url, robot_model, robot_name, state_text, mode_key_state, serial_number, session_id,
                 query += "unloaded_map_changes, POSITION_ID, ERROR_ID, USER_PROMPT_ID, VELOCITY_ID) ";
 
                 query += "VALUES (";
@@ -549,7 +555,7 @@ namespace Mirage
                 query += Globals.addToDB(distance_to_next_target);
                 query += Globals.addToDB(moved);
                 //query += Globals.addToDB(allowed_methods);
-                query += Globals.addToDB(footprint);
+                //query += Globals.addToDB(footprint);
                 query += Globals.addToDB(joystick_low_speed_mode_enabled);
                 query += Globals.addToDB(joystick_web_session_id);
                 
@@ -561,15 +567,26 @@ namespace Mirage
                 
                 query += Globals.addToDB(map_id);
                 query += Globals.addToDB(mission_queue_id);
-                query += Globals.addToDB(mission_queue_url);
-                query += Globals.addToDB(MySqlHelper.EscapeString(mission_text));
-                query += Globals.addToDB(mode_key_state);
+                //query += Globals.addToDB(mission_queue_url);
+                try 
+                { 
+                    query += Globals.addToDB(MySqlHelper.EscapeString(mission_text));
+                }
+                catch (System.ArgumentNullException e)
+                {
+                    Console.WriteLine("Oh hey, obscure MySQL helper bug.");
+                    Console.WriteLine("Actual Exception: ");
+                    Console.WriteLine(e);
+
+                    query += Globals.addToDB(MySqlHelper.EscapeString("hello, this is expt"));
+                }
+                //query += Globals.addToDB(mode_key_state);
                 query += Globals.addToDB(mode_text);
                 //query += Globals.addToDB(robot_model);
                 //query += Globals.addToDB(robot_name);
                 query += Globals.addToDB(safety_system_muted);
-                query += Globals.addToDB(serial_number);
-                query += Globals.addToDB(session_id);
+                //query += Globals.addToDB(serial_number);
+                //query += Globals.addToDB(session_id);
                 //query += Globals.addToDB(state_text);
                 query += Globals.addToDB(unloaded_map_changes);
                 query += Globals.addToDB(position_id);
