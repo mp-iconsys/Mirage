@@ -37,7 +37,14 @@ namespace Mirage
             mirFleet.issueGetRequests("maps");
 
             await mirFleet.saveMapsAsync();
-            // Download maps
+
+            mirFleet.issueGetRequests("settings");
+
+            await mirFleet.saveSettingsAsync();
+
+            mirFleet.issueGetRequests("settings/advanced");
+
+            await mirFleet.saveSettingsAsync();
 
             // Download missions
 

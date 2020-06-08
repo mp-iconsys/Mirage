@@ -29,6 +29,7 @@ namespace Mirage
         private Register[] registers;
         public List<SoftwareLog> SoftwareLogs { get; set; }
         public List<Map> Maps { get; set; }
+        public List<Setting> Settings { get; set; }
         private Status s;
 
         // Instantiate with connection details
@@ -230,7 +231,7 @@ namespace Mirage
 
         public void saveSoftLogsToDB(int robotID)
         {
-            string query = "INSERT INTO software_logs (`ROBOT_ID`, `FROM`, `TO`, `ACTION`, `STATE`, `START_TIME`, `END_TIME`, `URL`, `GUID`) VALUES ";
+            string query = "REPLACE INTO software_logs (`ROBOT_ID`, `FROM`, `TO`, `ACTION`, `STATE`, `START_TIME`, `END_TIME`, `URL`, `GUID`) VALUES ";
 
             for (int i = 0; i < (SoftwareLogs.Count - 1); i++)
             {
@@ -249,29 +250,39 @@ namespace Mirage
         {
             Maps = JsonConvert.DeserializeObject<List<Map>>(response.Content.ReadAsStringAsync().Result);
 
-            if (Globals.debugLevel > -1)
+            if (Globals.debugLevel > 1)
                 Globals.logJSON(response.Content.ReadAsStringAsync().Result);
 
-            if (Globals.debugLevel > 0)
-            { 
                 for(int i = 0; i < Maps.Count; i++)
                 {
+                    Console.WriteLine("Iterating : " + i);
+
                     Maps[i].Map_id = i;
-                    Maps[i].printMap();
+
+                    if (Globals.debugLevel > 0)
+                        Maps[i].printMap();
                 }    
-            }
         }
 
-        public async void saveMapsData()
+        public void saveMapsData()
         {
             Task<HttpResponseMessage> responseMsg;
-            HttpResponseMessage resp;
 
             for (int i = 0; i < Maps.Count; i++)
             {
                 responseMsg = sendGetRequest("maps/" + Maps[i].Guid);
-                resp = await responseMsg;
-                Maps[i] = JsonConvert.DeserializeObject<Map>(resp.Content.ReadAsStringAsync().Result);
+                responseMsg.Wait(); // Block the current thread 
+                                    // We want the set-up to be synchronous
+
+                if(Globals.debugLevel > 0)
+                { 
+                    Console.WriteLine("==== Iterator : " + i + " ====");
+                    Console.WriteLine("==== Maps ID Prior To call: " + Maps[i].Map_id + " ====");
+                }
+
+                Maps[i] = JsonConvert.DeserializeObject<Map>(responseMsg.Result.Content.ReadAsStringAsync().Result);
+                Maps[i].Map_id = i;
+                //Maps[i].printMap();
             }
 
             if (Globals.debugLevel > 0)
@@ -309,6 +320,39 @@ namespace Mirage
         public string getBaseURI()
         {
             return "http://" + ipAddress + "/api/v2.0.0/";
+        }
+
+        public void saveSettings(HttpResponseMessage response)
+        {
+            Settings = JsonConvert.DeserializeObject<List<Setting>>(response.Content.ReadAsStringAsync().Result);
+
+            if (Globals.debugLevel > -1)
+            {
+                Globals.logJSON(response.Content.ReadAsStringAsync().Result);
+
+                for (int i = 0; i < Settings.Count; i++)
+                    Settings[i].toString();
+            }
+
+            saveSettingsToDB();
+        }
+
+        public void saveSettingsToDB()
+        {
+            string query = "INSERT INTO settings (`SETTING_ID`, `ROBOT_ID`, `NAME`, `PARENT_NAME`, `URL`, `VALUE`, `DEFAULT_VALUE`) VALUES ";
+
+            int i;
+
+            for (i = 0; i < (Settings.Count - 1); i++)
+            {
+                query += "('" + Settings[i].Id + "','" + id + "','" + Settings[i].Name + "','" + Settings[i].Parent_name + "','" + Settings[i].Url + "','" + Settings[i].Value + "','" + Settings[i].Default + "'),";
+            }
+
+            // Need to treat the last register separately
+            i = (Settings.Count - 1);
+            query += "('" + Settings[i].Id + "','" + id + "','" + Settings[i].Name + "','" + Settings[i].Parent_name + "','" + Settings[i].Url + "','" + Settings[i].Value + "','" + Settings[i].Default + "');";
+
+            Globals.issueInsertQuery(query);
         }
 
         public class Register
@@ -614,6 +658,8 @@ namespace Mirage
 
             public void printMap()
             {
+                Console.WriteLine();
+                Console.WriteLine("==== MAP NO: " + Map_id + " ====");
                 Console.WriteLine("Created_by: " + Created_by);
                 Console.WriteLine("Created_by_id: " + Created_by_id);
                 Console.WriteLine("Created_by_name: " + Created_by_name);
@@ -631,9 +677,29 @@ namespace Mirage
                 Console.WriteLine("Resolution: " + Resolution);
                 Console.WriteLine("Session_id: " + Session_id);
                 Console.WriteLine("Url: " + Url);
-                Console.WriteLine("Map_id: " + Map_id);
+                Console.WriteLine("==== END OF MAP PRINT NO: " + Map_id + " ====");
+                Console.WriteLine();
+            }
+        }
+    
+        public class Setting
+        {
+            public int Id { get; set; }
+            public string Name { get; set; }
+            public string Parent_name { get; set; }
+            public string Url { get; set; }
+            public string Value { get; set; }
+            public string Default { get; set; }
+
+            public void toString()
+            {
+                Console.WriteLine("ID: " + Id);
+                Console.WriteLine("Name: " + Name);
+                Console.WriteLine("Parent_name: " + Parent_name);
+                Console.WriteLine("Url: " + Url);
+                Console.WriteLine("Value: " + Value);
+                Console.WriteLine("Default: " + Default);
             }
         }
     }
- 
 }
