@@ -255,7 +255,7 @@ namespace Mirage
 
                 for(int i = 0; i < Maps.Count; i++)
                 {
-                    Console.WriteLine("Iterating : " + i);
+                    //Console.WriteLine("Iterating : " + i);
 
                     Maps[i].Map_id = i;
 
@@ -285,7 +285,7 @@ namespace Mirage
                 //Maps[i].printMap();
             }
 
-            if (Globals.debugLevel > 0)
+            if (Globals.debugLevel > 1)
             {
                 for (int i = 0; i < Maps.Count; i++)
                     Maps[i].printMap();
@@ -497,10 +497,11 @@ namespace Mirage
                     }
                     else
                     { 
-                        query = "INSERT INTO error (CODE, DESCRIPTION, MODULE) VALUES ";
+                        query = "REPLACE INTO error (CODE, DESCRIPTION, MODULE) VALUES ";
 
                         int i;
 
+                        // Assume we only have one error here - no need to faff around
                         for(i = 0; i < (errors.Count-1); i++)
                         { 
                             query += "('" + errors[i].code + "','" + MySqlHelper.EscapeString(errors[i].description) + "', '" + MySqlHelper.EscapeString(errors[i].module) + "'),";
@@ -511,7 +512,7 @@ namespace Mirage
 
                         Globals.issueInsertQuery(query);
 
-                        error_id = Globals.getIDQuery("error");
+                        error_id = errors[i].code;
                     }
                 }
                 else
@@ -543,7 +544,7 @@ namespace Mirage
 
                 query = "INSERT INTO robot_status (ROBOT_ID, MODE_ID, STATE_ID, UPTIME, BATTERY_TIME_REMAINING, BATTERY_PERCENTAGE, DISTANCE_TO_NEXT_TARGET, MOVED, joystick_low_speed_mode_enabled,"; // FOOTPRINT, ALLOWED_METHODS,
                 query += "joystick_web_session_id, map_id, mission_queue_id, mission_text, mode_text, safety_system_muted, "; //mission_queue_url, robot_model, robot_name, state_text, mode_key_state, serial_number, session_id,
-                query += "unloaded_map_changes, POSITION_ID, ERROR_ID, USER_PROMPT_ID, VELOCITY_ID) ";
+                query += "unloaded_map_changes, POSITION_ID, ERROR_CODE, USER_PROMPT_ID, VELOCITY_ID) ";
 
                 query += "VALUES (";
                 query += Globals.addToDB(robotID);

@@ -3,11 +3,14 @@ using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Threading;
+using System.Timers;
 
 namespace Mirage
 {
     class Program
     {
+        public static Fleet mirFleet;
+
         public static async Task Main(string[] args)
         {
             // Capture CTRL+C
@@ -28,7 +31,7 @@ namespace Mirage
             Globals.setUpDefaultComms();
 
             // Create the fleet which will contain out robot data
-            Fleet mirFleet = new Fleet();
+            mirFleet = new Fleet();
 
             mirFleet.issueGetRequests("/software/logs");
 
@@ -56,8 +59,16 @@ namespace Mirage
             //============================================= 
             // M A I N      L O O P
             //============================================= 
-            int i = 0;
+            System.Timers.Timer aTimer = new System.Timers.Timer();
+            aTimer.Elapsed += new ElapsedEventHandler(OnTimedEvent);
+            aTimer.Interval = Globals.pollInterval;
+            aTimer.Enabled = true;
 
+            Console.WriteLine("Press the Enter key to exit anytime... ");
+            Console.ReadLine();
+
+
+            /*
             while (Globals.keepRunning)
             {
                 if(Globals.debugLevel > -1)
@@ -101,32 +112,15 @@ namespace Mirage
                     Console.WriteLine($"Connection Problems: '{e}'");
                 }
 
-                Thread.Sleep(Globals.pollInterval*1000); // Ugly as fuck but will change to event based stuff once I add a GUI
+                //Thread.Sleep(Globals.pollInterval*1000); // Ugly as fuck but will change to event based stuff once I add a GUI
             }
-
+            */
+            
             Globals.closeComms();
 
             Console.WriteLine("==== Graceful Exit ====");
+
             Environment.Exit(1);
-
-            /*
-            HttpResponseMessage response = Client.GetAsync(urlParameters).Result;  // Blocking call! Program will wait here until a response is received or a timeout occurs.
-            if (response.IsSuccessStatusCode)
-            {
-                // Parse the response body.
-                var dataObjects = response.Content.ReadAsAsync<IEnumerable<DataObject>>().Result;  //Make sure to add a reference to System.Net.Http.Formatting.dll
-                foreach (var d in dataObjects)
-                {
-                    Console.WriteLine("{0}", d.Name);
-                }
-            }
-            else
-            {
-                Console.WriteLine("{0} ({1})", (int)response.StatusCode, response.ReasonPhrase);
-            }
-            */
-
-
         }
 
         // Get a JSON object based on an uri and an open client connection
@@ -209,6 +203,75 @@ namespace Mirage
             return new AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes($"{apiUsername}:{ComputeSha256Hash(apiPassword)}")));
         }
         */
+
+        /*
+        void run()
+        {
+            CancellationTokenSource cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(80));
+            Console.WriteLine("==== Starting action loop ====");
+            RepeatActionEvery( () => Console.WriteLine("Action"), TimeSpan.FromSeconds(10), cancellation.Token ).Wait();
+            Console.WriteLine("==== Finished action loop ====");
+        }
+
+        public static async Task RepeatActionEvery(Action action, TimeSpan interval, CancellationToken cancellationToken)
+        {
+            while (true)
+            {
+                action();
+                Task task = Task.Delay(interval, cancellationToken);
+
+                try
+                {
+                    await task;
+                }
+                catch (TaskCanceledException)
+                {
+                    return;
+                }
+            }
+        }
+        */
+
+        private async static void OnTimedEvent(Object source, ElapsedEventArgs e)
+        {
+            Console.WriteLine("Polling @ {0}", e.SignalTime);
+
+            try
+            {
+                try
+                {
+                    // We're sending GET requests to the MiR servers
+                    // Saving them asynchronously as they come along
+
+                    Console.WriteLine("==== Getting Status ====");
+
+                    mirFleet.issueGetRequests("status");
+
+                    await mirFleet.saveFleetStatusAsync();
+
+                    Console.WriteLine("==== Getting Registers ====");
+
+                    mirFleet.issueGetRequests("registers");
+
+                    await mirFleet.saveFleetRegistersAsync();
+                }
+                catch (HttpRequestException exp)
+                {
+                    // TODO: Handle more exceptions
+                    // Remove the task which is causing the exception
+
+                    Console.WriteLine("Couldn't connect to the robot");
+                    Console.WriteLine("Check your network, dns settings, robot is up, etc.");
+                    Console.WriteLine("Please see error log (enter location here) for more details");
+                    // Store the detailed error in the error log
+                    Console.WriteLine(exp);
+                }
+            }
+            catch (WebException exp)
+            {
+                Console.WriteLine($"Connection Problems: '{exp}'");
+            }
+        }
     }
 }
 

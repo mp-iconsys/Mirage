@@ -5,8 +5,8 @@ namespace Mirage
 {
     class Fleet
     {
-        private Robot[] robots;
-        private Task<HttpResponseMessage>[] httpResponseTasks;
+        private Robot[] robots; // TODO: Make this a list so we can add and remove Robots on demand
+        private Task<HttpResponseMessage>[] httpResponseTasks; // TODO: ditto as above
 
         public Fleet() 
         {

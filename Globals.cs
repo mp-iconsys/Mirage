@@ -28,8 +28,10 @@ public static class Globals
 
     public static void readAllSettings()
     {
-        if (debugLevel > -1)
-            Console.WriteLine("==== Fetching App Settings From App.config ====");
+        Console.Clear();
+
+        Console.WriteLine("MiRage Data Harvester v0.01");
+        Console.WriteLine("Property of Iconsys");
 
         try
         {
@@ -44,7 +46,7 @@ public static class Globals
             {
                 // Need to cast vars as default type is string
                 debugLevel = int.Parse(ConfigurationManager.AppSettings["debugLevel"]);
-                pollInterval = int.Parse(ConfigurationManager.AppSettings["pollInterval"]);
+                pollInterval = int.Parse(ConfigurationManager.AppSettings["pollInterval"]) * 1000; // Convert to seconds
                 sizeOfFleet = int.Parse(ConfigurationManager.AppSettings["sizeOfFleet"]);
                 logFile = ConfigurationManager.AppSettings["logFile"];
                 emailAlert = ConfigurationManager.AppSettings["emailAlert"];
@@ -61,11 +63,15 @@ public static class Globals
                     Console.WriteLine("The answer must be either 'y' or 'n'");
                 // goto -> above
 
-                if (debugLevel > -1)
+                Console.WriteLine("The fleet has {0} robots", sizeOfFleet);
+                Console.WriteLine("Polling occurs every {0} seconds", int.Parse(ConfigurationManager.AppSettings["pollInterval"]));
+                Console.WriteLine("Debug Level is set to {0}", debugLevel);
+
+                if (debugLevel > 0)
                 {
                     foreach (var key in appSettings.AllKeys)
                     {
-                        Console.WriteLine("Key: {0} Value: {1}", key, appSettings[key]);
+                        Console.WriteLine("{0} is set to {1}", key, appSettings[key]);
                     }
                 }
             }
