@@ -95,7 +95,7 @@ namespace Mirage
                 // We've got a new session so input the details manually in the terminal
                 // Firstm fetch the details
 
-                Console.WriteLine("Please Enter The IP Address Of The Robot No" + id + ":");
+                Console.WriteLine("Please Enter The IP Address Of The Robot No " + id + ":");
                 ipAddress = Console.ReadLine();
                 // TODO: Check that the input is correct - length & type
 
