@@ -249,11 +249,11 @@ namespace Mirage
 
                     await mirFleet.saveFleetStatusAsync();
 
-                    Console.WriteLine("==== Getting Registers ====");
+                    //Console.WriteLine("==== Getting Registers ====");
 
-                    mirFleet.issueGetRequests("registers");
+                    //mirFleet.issueGetRequests("registers");
 
-                    await mirFleet.saveFleetRegistersAsync();
+                    //await mirFleet.saveFleetRegistersAsync();
                 }
                 catch (HttpRequestException exp)
                 {
