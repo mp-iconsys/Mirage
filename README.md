@@ -7,6 +7,7 @@ It does so using a standard REST API and the HttpClient class, as part of the .N
 ## Important Notes
 
 :warning: This project is in active development and so parameter names and behaviour will change without notice.
+
 :warning: As a Worker Service, the program does not require user input apart from specyfying initial parameters.
 
 ## Installation
