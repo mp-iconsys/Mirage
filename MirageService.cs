@@ -38,12 +38,13 @@ namespace Mirage
             pollingTimer.Enabled = true;
             */
         }
+
         public void Stop()
         {
             // write code here that runs when the Windows Service stops.  
             Globals.closeComms();
 
-            Console.WriteLine("==== Graceful Exit ====");
+            Logger.Info("==== Graceful Exit ====", "Exit");
 
             Environment.Exit(1);
         }

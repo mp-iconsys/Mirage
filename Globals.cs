@@ -1,9 +1,10 @@
-﻿using MySql.Data.MySqlClient;
-using System;
+﻿using System;
 using System.Configuration;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using Mirage;
+using MySql.Data.MySqlClient;
 
 /*  D E B U G    L E V E L S
  *  0 - No Debug, just standard messages 
@@ -28,10 +29,8 @@ public static class Globals
 
     public static void readAllSettings()
     {
-        Console.Clear();
-
-        Console.WriteLine("MiRage Data Harvester v0.01");
-        Console.WriteLine("Property of Iconsys");
+        // ==== First Initialize Logging ====
+        Logger.Info("Mirage Data Harvester Startup", "Startup");
 
         try
         {
@@ -39,7 +38,7 @@ public static class Globals
 
             if (appSettings.Count == 0)
             {
-                Console.WriteLine("AppSettings Branch Within App.config Is Empty.");
+                //Console.WriteLine("AppSettings Branch Within App.config Is Empty.");
                 // Send an email alert???
             }
             else
@@ -52,33 +51,34 @@ public static class Globals
                 emailAlert = ConfigurationManager.AppSettings["emailAlert"];
                 resumingSession = bool.Parse(ConfigurationManager.AppSettings["resumingSession"]);
 
-                Console.WriteLine("Do you want to start a new session? (y/n)");
-                string newSession = Console.ReadLine();
-
+                //Console.WriteLine("Do you want to start a new session? (y/n)");
+                //string newSession = Console.ReadLine();
+                /*
                 if (newSession == "y")
                     resumingSession = false;
                 else if (newSession == "n")
                     resumingSession = true;
                 else
                     Console.WriteLine("The answer must be either 'y' or 'n'");
+                */
                 // goto -> above
 
-                Console.WriteLine("The fleet has {0} robots", sizeOfFleet);
-                Console.WriteLine("Polling occurs every {0} seconds", int.Parse(ConfigurationManager.AppSettings["pollInterval"]));
-                Console.WriteLine("Debug Level is set to {0}", debugLevel);
+                //Console.WriteLine("The fleet has {0} robots", sizeOfFleet);
+                //Console.WriteLine("Polling occurs every {0} seconds", int.Parse(ConfigurationManager.AppSettings["pollInterval"]));
+                //Console.WriteLine("Debug Level is set to {0}", debugLevel);
 
                 if (debugLevel > 0)
                 {
                     foreach (var key in appSettings.AllKeys)
                     {
-                        Console.WriteLine("{0} is set to {1}", key, appSettings[key]);
+                        //Console.WriteLine("{0} is set to {1}", key, appSettings[key]);
                     }
                 }
             }
         }
         catch (ConfigurationErrorsException)
         {
-            Console.WriteLine("==== Error reading app settings ====");
+            //Console.WriteLine("==== Error reading app settings ====");
             // TODO: Use default values or send an email and terminate?
         }
     }
@@ -143,8 +143,7 @@ public static class Globals
 
     public static void closeComms()
     {
-        if (debugLevel > -1)
-            Console.WriteLine("==== Closing Socket Connections ====");
+        Logger.Info("==== Closing Socket Connections ====", "Closing Comms");
 
         comms.Dispose();
     }
