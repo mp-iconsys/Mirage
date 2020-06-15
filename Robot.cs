@@ -573,7 +573,7 @@ namespace Mirage
                 { 
                     query += Globals.addToDB(MySqlHelper.EscapeString(mission_text));
                 }
-                catch (System.ArgumentNullException e)
+                catch (ArgumentNullException e)
                 {
                     Console.WriteLine("Oh hey, obscure MySQL helper bug.");
                     Console.WriteLine("Actual Exception: ");

@@ -41,6 +41,27 @@ namespace Mirage
             }
         }
 
+        public async Task initialFleetSetUp()
+        {
+            issueGetRequests("/software/logs");
+
+            await saveSoftwareLogsAsync();
+
+            issueGetRequests("maps");
+
+            await saveMapsAsync();
+
+            issueGetRequests("settings");
+
+            await saveSettingsAsync();
+
+            issueGetRequests("settings/advanced");
+
+            await saveSettingsAsync();
+
+            // Download missions
+        }
+
         public async Task saveFleetStatusAsync()
         {
             for (int i = 0; i < Globals.sizeOfFleet; i++)
