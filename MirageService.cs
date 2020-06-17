@@ -46,7 +46,17 @@ namespace Mirage
 
             Logger.Info("==== Graceful Exit ====", "Exit");
 
-            Environment.Exit(1);
+            //Environment.Exit(1);
+        }
+
+        public void Pause()
+        {
+
+        }
+
+        public void Continue()
+        {
+
         }
 
         private async static void OnTimedEvent(Object source, ElapsedEventArgs e)

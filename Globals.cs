@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Configuration;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -27,8 +28,37 @@ public static class Globals
     public static MySqlConnection db;
     public static HttpClient comms;
 
+
     public static void readAllSettings()
     {
+        /*
+        string eventSourceName = "Mirage";
+        string logName = "Mirage";
+
+        EventLog eventLog1 = new EventLog();
+        EventLogTraceListener myTraceListener = new EventLogTraceListener("Mirage");
+        
+
+        if (!EventLog.SourceExists(eventSourceName))
+        {
+            EventLog.CreateEventSource(eventSourceName, logName);
+        }
+
+        eventLog1.Source = eventSourceName;
+        eventLog1.Log = "";
+
+        eventLog1.WriteEntry("Mirage Data Harvester Startup - manual event log :(");
+        */
+        // Create a trace listener for the event log.
+        Logger.ConfigureLogger();
+
+
+        // Add the event log trace listener to the collection.
+        //Trace.Listeners.Add(Logger.myTraceListener);
+
+        // Write output to the event log.
+        Trace.WriteLine("Mirage Data Harvester Startup");
+
         // ==== First Initialize Logging ====
         Logger.Info("Mirage Data Harvester Startup", "Startup");
 
@@ -47,8 +77,8 @@ public static class Globals
                 debugLevel = int.Parse(ConfigurationManager.AppSettings["debugLevel"]);
                 pollInterval = int.Parse(ConfigurationManager.AppSettings["pollInterval"]) * 1000; // Convert to seconds
                 sizeOfFleet = int.Parse(ConfigurationManager.AppSettings["sizeOfFleet"]);
-                logFile = ConfigurationManager.AppSettings["logFile"];
-                emailAlert = ConfigurationManager.AppSettings["emailAlert"];
+                //logFile = ConfigurationManager.AppSettings["logFile"];  // Depreciated Variable
+                //emailAlert = ConfigurationManager.AppSettings["emailAlert"]; // Depreciated Variable
                 resumingSession = bool.Parse(ConfigurationManager.AppSettings["resumingSession"]);
 
                 //Console.WriteLine("Do you want to start a new session? (y/n)");
@@ -145,7 +175,9 @@ public static class Globals
     {
         Logger.Info("==== Closing Socket Connections ====", "Closing Comms");
 
-        comms.Dispose();
+        // Only dispose if we've instantiated comms
+        if(comms != null)
+            comms.Dispose();
     }
 
     public static void logJSON(string json)
