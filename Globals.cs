@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Configuration;
-using System.Diagnostics;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -24,10 +23,9 @@ public static class Globals
     public static bool keepRunning = true;
     public static bool resumingSession = false;
     public static int debugLevel = 0, pollInterval, sizeOfFleet;
-    public static string logFile, emailAlert, baseURL;
+    public static string baseURL;
     public static MySqlConnection db;
     public static HttpClient comms;
-
 
     public static void readAllSettings()
     {
@@ -57,7 +55,7 @@ public static class Globals
         //Trace.Listeners.Add(Logger.myTraceListener);
 
         // Write output to the event log.
-        Trace.WriteLine("Mirage Data Harvester Startup");
+        //Trace.WriteLine("Mirage Data Harvester Startup");
 
         // ==== First Initialize Logging ====
         Logger.Info("Mirage Data Harvester Startup", "Startup");
@@ -99,15 +97,19 @@ public static class Globals
 
                 if (debugLevel > 0)
                 {
+                    string message = "";
+
                     foreach (var key in appSettings.AllKeys)
-                    {
-                        //Console.WriteLine("{0} is set to {1}", key, appSettings[key]);
-                    }
+                        message += key + " is set to " + appSettings[key];
+
+                    Logger.Warning(message, "Startup");
                 }
             }
         }
-        catch (ConfigurationErrorsException)
+        catch (ConfigurationErrorsException exception)
         {
+            Logger.Error("==== Error reading app settings ====", "Startup");
+            Logger.Error(exception, "Startup");
             //Console.WriteLine("==== Error reading app settings ====");
             // TODO: Use default values or send an email and terminate?
         }
@@ -160,15 +162,22 @@ public static class Globals
         // TODO: Set up httpClient as a service to make network debugging easier
 
         if (debugLevel > -1)
-            Console.WriteLine("==== Setting Up Default API Connection Details ====");
+            Logger.Info("==== Setting Up Default API Connection Details ====", "Startup");
 
         // TODO: Catch Exceptions if they exist (maybe a null exception?)
-        comms = new HttpClient();
-        comms.DefaultRequestVersion = HttpVersion.Version11;
-        comms.DefaultRequestHeaders.Accept.Clear();
-        comms.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        comms.DefaultRequestHeaders.Add("Accept-Language", "en_US");
-        comms.Timeout = TimeSpan.FromMinutes(10);
+        try
+        { 
+            comms = new HttpClient();
+            comms.DefaultRequestVersion = HttpVersion.Version11;
+            comms.DefaultRequestHeaders.Accept.Clear();
+            comms.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            comms.DefaultRequestHeaders.Add("Accept-Language", "en_US");
+            comms.Timeout = TimeSpan.FromMinutes(10);
+        }
+        catch (SystemException)
+        {
+
+        }
     }
 
     public static void closeComms()
