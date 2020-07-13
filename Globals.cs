@@ -4,6 +4,9 @@ using System.Configuration;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using Twilio;
+using Twilio.Rest.Api.V2010.Account;
+using Twilio.Types;
 
 /*  D E B U G    L E V E L S
  *  0 - No Debug, just standard messages 
@@ -81,6 +84,22 @@ public static class Globals
             Console.WriteLine("==== Error reading app settings ====");
             // TODO: Use default values or send an email and terminate?
         }
+
+        const string accountSid = "ACc9a9248dd2a1f6d6e673148e73cfc2f9";
+        const string authToken = "b57abe0211b4fde95bf7ae159eb75e2d";
+
+        string phone_rx = "+447583098757";
+        string phone_twilio = "+12512500577";
+        string msg_body = "Test Alert from Mirage";
+
+        // Initialize SMS communication for alerts
+        TwilioClient.Init(accountSid, authToken);
+
+        // Send Test SMS
+        //MessageResource.Create(
+        //    to: new PhoneNumber(phone_rx),
+        //    from: new PhoneNumber(phone_twilio),
+        //    body: msg_body);
     }
 
     public static void connectToDB()

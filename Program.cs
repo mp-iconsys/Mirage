@@ -150,10 +150,10 @@ namespace Mirage
                     Console.WriteLine("==== Loop " + ++i + " Starting ====");
 
                 // Poll PLC for status changes
-                int msg = SiemensPLC.poll();
+                SiemensPLC.poll();
 
                 // Act on PLC data
-                // This is a synchronous piece of code even though it involves http requests
+                // This is synchronous even though it involves http requests
                 if(SiemensPLC.newMsg)
                 {
                     Console.WriteLine("==== New Task From PLC ====");
@@ -166,59 +166,59 @@ namespace Mirage
                     {
                         case "Mission":
                             Console.WriteLine("==== Send Mission ====");
-                            status = sendRESTdata((testMission.send_mission(Int32.Parse(incomingMessage.Paramater))));
-                            outgoingMessage.saveMessage(incomingMessage.SerialNumber, "MISSION", incomingMessage.Paramater, status.ToString());
-                            Console.WriteLine(outgoingMessage.returnMsg());
+                            //status = sendRESTdata((testMission.send_mission(Int32.Parse(incomingMessage.Paramater))));
+                            //outgoingMessage.saveMessage(incomingMessage.SerialNumber, "MISSION", incomingMessage.Paramater, status.ToString());
+                            //Console.WriteLine(outgoingMessage.returnMsg());
                             break;
                         case "Status":
                             Console.WriteLine("==== Get Schedule Status ====");
-                            response = getRESTdata("mission_scheduler/" + incomingMessage.Paramater);
+                            //response = getRESTdata("mission_scheduler/" + incomingMessage.Paramater);
                             break;
                         case "NewMission":
                             Console.WriteLine("Create New Mission");
-                            status = sendRESTdata((testMission.create_mission(Int32.Parse(incomingMessage.Paramater))));
-                            string resp;
+                            //status = sendRESTdata((testMission.create_mission(Int32.Parse(incomingMessage.Paramater))));
+                            //string resp;
 
-                            if (status < 400)
-                                resp = "Success";
-                            else
-                                resp = status.ToString();
+                            //if (status < 400)
+                            //    resp = "Success";
+                            //else
+                            //    resp = status.ToString();
 
-                            outgoingMessage.saveMessage(incomingMessage.SerialNumber, resp, null, null);
+                            //outgoingMessage.saveMessage(incomingMessage.SerialNumber, resp, null, null);
 
-                            //outgoingMessage.saveMessage(incomingMessage.SerialNumber, "MISSION", incomingMessage.Paramater, status.ToString());
-                            Console.WriteLine(outgoingMessage.returnMsg());
+                            ////outgoingMessage.saveMessage(incomingMessage.SerialNumber, "MISSION", incomingMessage.Paramater, status.ToString());
+                            //Console.WriteLine(outgoingMessage.returnMsg());
 
                             break;
                         case "ClearSchedule":
                             Console.WriteLine("==== Clear Mission Schedule ====");
-                            status = sendRESTdata((testMission.clear_mission_schedule()));
-                            outgoingMessage.saveMessage(incomingMessage.SerialNumber, "POLL", incomingMessage.Paramater, status.ToString());
-                            Console.WriteLine(outgoingMessage.returnMsg());
+                            //status = sendRESTdata((testMission.clear_mission_schedule()));
+                            //outgoingMessage.saveMessage(incomingMessage.SerialNumber, "POLL", incomingMessage.Paramater, status.ToString());
+                            //Console.WriteLine(outgoingMessage.returnMsg());
                             break;
                         case "Battery":
                             Console.WriteLine("==== Get Battery Life ====");
-                            response = getRESTdata("status");
-                            float battery = robotStatus.saveStatus(response).battery_percentage;
-                            Console.WriteLine("Battery: " + battery);
-                            outgoingMessage.saveMessage(incomingMessage.SerialNumber, "BATTERY", "BATTERY", battery.ToString());
-                            Console.WriteLine(outgoingMessage.returnMsg());
+                            //response = getRESTdata("status");
+                            //float battery = robotStatus.saveStatus(response).battery_percentage;
+                            //Console.WriteLine("Battery: " + battery);
+                            //outgoingMessage.saveMessage(incomingMessage.SerialNumber, "BATTERY", "BATTERY", battery.ToString());
+                            //Console.WriteLine(outgoingMessage.returnMsg());
                             break;
                         case "Distance":
                             Console.WriteLine("==== Get Distance Travelled ====");
-                            response = getRESTdata("status");
-                            float distance_moved = robotStatus.saveStatus(response).moved;
-                            Console.WriteLine("Distance Moved: " + distance_moved);
-                            outgoingMessage.saveMessage(incomingMessage.SerialNumber, "DISTANCE", "DISTANCE", distance_moved.ToString());
-                            Console.WriteLine(outgoingMessage.returnMsg());
+                            //response = getRESTdata("status");
+                            //float distance_moved = robotStatus.saveStatus(response).moved;
+                            //Console.WriteLine("Distance Moved: " + distance_moved);
+                            //outgoingMessage.saveMessage(incomingMessage.SerialNumber, "DISTANCE", "DISTANCE", distance_moved.ToString());
+                            //Console.WriteLine(outgoingMessage.returnMsg());
                             break;
                         case "robot_status":
                             Console.WriteLine("==== Get Mission Status ====");
-                            response = getRESTdata("status");
-                            string mission_text = robotStatus.saveStatus(response).mission_text;
-                            Console.WriteLine("Mission Text: " + mission_text);
-                            outgoingMessage.saveMessage(incomingMessage.SerialNumber, "STATUS", "robot_status", mission_text);
-                            Console.WriteLine(outgoingMessage.returnMsg());
+                            //response = getRESTdata("status");
+                            //string mission_text = robotStatus.saveStatus(response).mission_text;
+                            //Console.WriteLine("Mission Text: " + mission_text);
+                            //outgoingMessage.saveMessage(incomingMessage.SerialNumber, "STATUS", "robot_status", mission_text);
+                            //Console.WriteLine(outgoingMessage.returnMsg());
                             break;
                         default:
                             Console.WriteLine("Idling");
@@ -229,7 +229,7 @@ namespace Mirage
                     SiemensPLC.checkResponse();
                 }
 
-                // Poll MiR Fleet
+                // Poll MiR Fleet - async
                 try
                 {
                     try 
@@ -279,8 +279,9 @@ namespace Mirage
                 //Thread.Sleep(Globals.pollInterval*1000); // Ugly as fuck but will change to event based stuff once I add a GUI
             }
             
-            
             Globals.closeComms();
+
+            SiemensPLC.disconnect();
 
             Console.WriteLine("==== Graceful Exit ====");
 
@@ -442,34 +443,34 @@ namespace Mirage
         // This sends an async API get request to the robot to fetch data at the specified uri
         // It does not return data straight away. This allows us to make a bunch of calls
         // For all of the robots and then wait for the data to get to us as it comes through.
-        public static HttpResponseMessage getRESTdata(string uri)
-        {
-            return comms.GetAsync(uri).Result;
-        }
+        //public static HttpResponseMessage getRESTdata(string uri)
+        //{
+        //    //return comms.GetAsync(uri).Result;
+        //}
 
         public static int sendRESTdata(HttpRequestMessage request)
         {
             int statusCode = 0;
 
-            HttpResponseMessage result = comms.SendAsync(request).Result;
+            //HttpResponseMessage result = comms.SendAsync(request).Result;
 
-            if (result.IsSuccessStatusCode)
-            {
-                statusCode = (int)result.StatusCode;
+            //if (result.IsSuccessStatusCode)
+            //{
+            //    statusCode = (int)result.StatusCode;
 
-                if (statusCode > 199 && statusCode < 400)
-                {
-                    Console.WriteLine("Data Sent Successfully");
-                }
-                else if (statusCode > 399)
-                {
-                    Console.WriteLine("Data send did not succeed");
-                }
-                else
-                {
-                    Console.WriteLine("Unknown Error");
-                }
-            }
+            //    if (statusCode > 199 && statusCode < 400)
+            //    {
+            //        Console.WriteLine("Data Sent Successfully");
+            //    }
+            //    else if (statusCode > 399)
+            //    {
+            //        Console.WriteLine("Data send did not succeed");
+            //    }
+            //    else
+            //    {
+            //        Console.WriteLine("Unknown Error");
+            //    }
+            //}
 
             return statusCode;
         }

@@ -2,7 +2,10 @@
 using Renci.SshNet.Messages.Transport;
 using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Text;
+using Twilio.Rest.Taskrouter.V1.Workspace.TaskQueue;
+using Twilio.TwiML.Voice;
 
 namespace Mirage.plc
 {
@@ -15,7 +18,10 @@ namespace Mirage.plc
         public static int res;
         public static byte plcValue;
         public static int memoryres;
-        public static byte[] memoryBuffer = new byte[10];
+        public static byte[] memoryBuffer = new byte[16];
+        public static int plcConnectionErrors = 0;
+        public static int serialNumber = 0;
+        public static int task = 0;
 
         //
         // Remember that the PLC data blocks can't be optimized
@@ -25,6 +31,7 @@ namespace Mirage.plc
         //
         public static void establishConnection()
         {
+            // IP ADDRESS HERE
             fds.rfd = libnodave.openSocket(102, "10.6.1.16");
             fds.wfd = fds.rfd;
             di = new libnodave.daveInterface(fds, "IF1", 0, libnodave.daveProtoISOTCP, libnodave.daveSpeed187k);
@@ -36,11 +43,8 @@ namespace Mirage.plc
             dc = new libnodave.daveConnection(di, 0, rack, slot);
             res = dc.connectPLC();
             // memoryres = dc.readBytes(libnodave.daveFlags, 0, 0, 1, memoryBuffer);
-            memoryres = dc.readBytes(libnodave.daveFlags, 0, 0, 1, memoryBuffer);
-            plcValue = memoryBuffer[0];
-            dc.disconnectPLC();
-            di.disconnectAdapter();
-            libnodave.closePort(fds.rfd);
+            //memoryres = dc.readBytes(libnodave.daveFlags, 0, 0, 16, memoryBuffer);
+            //plcValue = memoryBuffer[0];
         }
 
         // Polls the PLC to check if it needs to issue any new missions
@@ -48,12 +52,44 @@ namespace Mirage.plc
         // - the first designates the mission type
         // - the second is a serial number
         //
-        public static int poll()
+        public static void poll()
         {
-            int i = 0;
+            int serial, task;
 
+            // Get the data from the PLC
+            memoryres = dc.readBytes(libnodave.daveFlags, 0, 0, 1, memoryBuffer);
 
-            return i;
+            if(memoryres == 0)
+            {
+                byte[] serialInBytes = new byte[4] { memoryBuffer[0], memoryBuffer[1], memoryBuffer[2], memoryBuffer[3] };
+
+                // Convert memory buffer from bytes to ints
+                // 32 Bit int is 4 bytes
+                serial = BitConverter.ToInt32(serialInBytes, 0);
+
+                // Only change memory if the PLC is making a new request
+                if(serial != serialNumber)
+                {
+                    // Populate Task Number
+
+                    // Which MiR to affect?
+
+                    // Other stuff
+
+                    newMsg = true;
+                }
+                else
+                {
+                    newMsg = false;
+                }
+            }
+            else
+            {
+                // Couldn't read the PLC bytes
+                // Write as error to DB
+                // Iterate the PLC connectivity counter
+                plcConnectionErrors++;
+            }
         }
 
         //
@@ -80,6 +116,13 @@ namespace Mirage.plc
 
 
             return i;
+        }
+
+        public static void disconnect()
+        {
+            dc.disconnectPLC();
+            di.disconnectAdapter();
+            libnodave.closePort(fds.rfd);
         }
 
     }
