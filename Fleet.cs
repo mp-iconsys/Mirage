@@ -1,4 +1,5 @@
-﻿using System.Net.Http;
+﻿using System;
+using System.Net.Http;
 using System.Threading.Tasks;
 
 namespace Mirage
@@ -37,7 +38,28 @@ namespace Mirage
         {
             for(int i = 0; i < Globals.sizeOfFleet; i++)
             {
-                httpResponseTasks[i] = robots[i].sendGetRequest(type);
+                try
+                {
+                    try
+                    {
+                        httpResponseTasks[i] = robots[i].sendGetRequest(type);
+                    }
+                    catch (HttpRequestException e)
+                    {
+                        // TODO: Handle more exceptions
+                        // Remove the task which is causing the exception
+
+                        Console.WriteLine("Couldn't connect to the robot");
+                        Console.WriteLine("Check your network, dns settings, robot is up, etc.");
+                        Console.WriteLine("Please see error log (enter location here) for more details");
+                        // Store the detailed error in the error log
+                        Console.WriteLine(e);
+                    }
+                }
+                catch (System.Net.WebException e)
+                {
+                    Console.WriteLine($"Connection Problems: '{e}'");
+                }
             }
         }
 

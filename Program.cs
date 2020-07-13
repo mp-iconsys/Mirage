@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using System.Threading;
 using System.Timers;
+using Mirage.plc;
 
 namespace Mirage
 {
@@ -13,7 +14,7 @@ namespace Mirage
 
         public static async Task Main(string[] args)
         {
-            // Capture CTRL+C
+            // Capture CTRL+C for gracefull termination
             Console.CancelKeyPress += delegate (object sender, ConsoleCancelEventArgs e) 
             {
                 e.Cancel = true;
@@ -22,7 +23,7 @@ namespace Mirage
 
             // TODO: Capture seg faults 
 
-            // TODO: some sort of thread diagnostics???
+            // TODO: Thread diagnostics???
 
             Globals.readAllSettings();
 
@@ -33,21 +34,103 @@ namespace Mirage
             // Create the fleet which will contain out robot data
             mirFleet = new Fleet();
 
-            mirFleet.issueGetRequests("/software/logs");
+            SiemensPLC.establishConnection();
 
-            await mirFleet.saveSoftwareLogsAsync();
+            try
+            {
+                try
+                {
+                    mirFleet.issueGetRequests("/software/logs");
+                    await mirFleet.saveSoftwareLogsAsync();
+                }
+                catch (HttpRequestException e)
+                {
+                    // TODO: Handle more exceptions
+                    // Remove the task which is causing the exception
 
-            mirFleet.issueGetRequests("maps");
+                    Console.WriteLine("Couldn't connect to the robot");
+                    Console.WriteLine("Check your network, dns settings, robot is up, etc.");
+                    Console.WriteLine("Please see error log (enter location here) for more details");
+                    // Store the detailed error in the error log
+                    Console.WriteLine(e);
+                }
+            }
+            catch (WebException e)
+            {
+                Console.WriteLine($"Connection Problems: '{e}'");
+            }
 
-            await mirFleet.saveMapsAsync();
+            try
+            {
+                try
+                {
+                    mirFleet.issueGetRequests("maps");
+                    await mirFleet.saveMapsAsync();
+                }
+                catch (HttpRequestException e)
+                {
+                    // TODO: Handle more exceptions
+                    // Remove the task which is causing the exception
 
-            mirFleet.issueGetRequests("settings");
+                    Console.WriteLine("Couldn't connect to the robot");
+                    Console.WriteLine("Check your network, dns settings, robot is up, etc.");
+                    Console.WriteLine("Please see error log (enter location here) for more details");
+                    // Store the detailed error in the error log
+                    Console.WriteLine(e);
+                }
+            }
+            catch (WebException e)
+            {
+                Console.WriteLine($"Connection Problems: '{e}'");
+            }
 
-            await mirFleet.saveSettingsAsync();
+            try
+            {
+                try
+                {
+                    mirFleet.issueGetRequests("settings");
+                    await mirFleet.saveSettingsAsync();
+                }
+                catch (HttpRequestException e)
+                {
+                    // TODO: Handle more exceptions
+                    // Remove the task which is causing the exception
 
-            mirFleet.issueGetRequests("settings/advanced");
+                    Console.WriteLine("Couldn't connect to the robot");
+                    Console.WriteLine("Check your network, dns settings, robot is up, etc.");
+                    Console.WriteLine("Please see error log (enter location here) for more details");
+                    // Store the detailed error in the error log
+                    Console.WriteLine(e);
+                }
+            }
+            catch (WebException e)
+            {
+                Console.WriteLine($"Connection Problems: '{e}'");
+            }
 
-            await mirFleet.saveSettingsAsync();
+            try
+            {
+                try
+                {   
+                    mirFleet.issueGetRequests("settings/advanced");
+                    await mirFleet.saveSettingsAsync();
+                }
+                catch (HttpRequestException e)
+                {
+                    // TODO: Handle more exceptions
+                    // Remove the task which is causing the exception
+
+                    Console.WriteLine("Couldn't connect to the robot");
+                    Console.WriteLine("Check your network, dns settings, robot is up, etc.");
+                    Console.WriteLine("Please see error log (enter location here) for more details");
+                    // Store the detailed error in the error log
+                    Console.WriteLine(e);
+                }
+            }
+            catch (WebException e)
+            {
+                Console.WriteLine($"Connection Problems: '{e}'");
+            }
 
             // Download missions
 
@@ -56,24 +139,97 @@ namespace Mirage
             if (Globals.debugLevel > -1)
                 Console.WriteLine("==== Starting Main Loop ====");
 
+            int i = 0;
+
             //============================================= 
             // M A I N      L O O P
             //============================================= 
-            System.Timers.Timer aTimer = new System.Timers.Timer();
-            aTimer.Elapsed += new ElapsedEventHandler(OnTimedEvent);
-            aTimer.Interval = Globals.pollInterval;
-            aTimer.Enabled = true;
-
-            Console.WriteLine("Press the Enter key to exit anytime... ");
-            Console.ReadLine();
-
-
-            /*
             while (Globals.keepRunning)
             {
                 if(Globals.debugLevel > -1)
                     Console.WriteLine("==== Loop " + ++i + " Starting ====");
 
+                // Poll PLC for status changes
+                int msg = SiemensPLC.poll();
+
+                // Act on PLC data
+                // This is a synchronous piece of code even though it involves http requests
+                if(SiemensPLC.newMsg)
+                {
+                    Console.WriteLine("==== New Task From PLC ====");
+
+                    string mission = "boo";
+
+                    // Check which task we've got to do & do it
+                    // Save any response to predefined PLC registers
+                    switch (mission)
+                    {
+                        case "Mission":
+                            Console.WriteLine("==== Send Mission ====");
+                            status = sendRESTdata((testMission.send_mission(Int32.Parse(incomingMessage.Paramater))));
+                            outgoingMessage.saveMessage(incomingMessage.SerialNumber, "MISSION", incomingMessage.Paramater, status.ToString());
+                            Console.WriteLine(outgoingMessage.returnMsg());
+                            break;
+                        case "Status":
+                            Console.WriteLine("==== Get Schedule Status ====");
+                            response = getRESTdata("mission_scheduler/" + incomingMessage.Paramater);
+                            break;
+                        case "NewMission":
+                            Console.WriteLine("Create New Mission");
+                            status = sendRESTdata((testMission.create_mission(Int32.Parse(incomingMessage.Paramater))));
+                            string resp;
+
+                            if (status < 400)
+                                resp = "Success";
+                            else
+                                resp = status.ToString();
+
+                            outgoingMessage.saveMessage(incomingMessage.SerialNumber, resp, null, null);
+
+                            //outgoingMessage.saveMessage(incomingMessage.SerialNumber, "MISSION", incomingMessage.Paramater, status.ToString());
+                            Console.WriteLine(outgoingMessage.returnMsg());
+
+                            break;
+                        case "ClearSchedule":
+                            Console.WriteLine("==== Clear Mission Schedule ====");
+                            status = sendRESTdata((testMission.clear_mission_schedule()));
+                            outgoingMessage.saveMessage(incomingMessage.SerialNumber, "POLL", incomingMessage.Paramater, status.ToString());
+                            Console.WriteLine(outgoingMessage.returnMsg());
+                            break;
+                        case "Battery":
+                            Console.WriteLine("==== Get Battery Life ====");
+                            response = getRESTdata("status");
+                            float battery = robotStatus.saveStatus(response).battery_percentage;
+                            Console.WriteLine("Battery: " + battery);
+                            outgoingMessage.saveMessage(incomingMessage.SerialNumber, "BATTERY", "BATTERY", battery.ToString());
+                            Console.WriteLine(outgoingMessage.returnMsg());
+                            break;
+                        case "Distance":
+                            Console.WriteLine("==== Get Distance Travelled ====");
+                            response = getRESTdata("status");
+                            float distance_moved = robotStatus.saveStatus(response).moved;
+                            Console.WriteLine("Distance Moved: " + distance_moved);
+                            outgoingMessage.saveMessage(incomingMessage.SerialNumber, "DISTANCE", "DISTANCE", distance_moved.ToString());
+                            Console.WriteLine(outgoingMessage.returnMsg());
+                            break;
+                        case "robot_status":
+                            Console.WriteLine("==== Get Mission Status ====");
+                            response = getRESTdata("status");
+                            string mission_text = robotStatus.saveStatus(response).mission_text;
+                            Console.WriteLine("Mission Text: " + mission_text);
+                            outgoingMessage.saveMessage(incomingMessage.SerialNumber, "STATUS", "robot_status", mission_text);
+                            Console.WriteLine(outgoingMessage.returnMsg());
+                            break;
+                        default:
+                            Console.WriteLine("Idling");
+                            break;
+                    }
+
+                    // Check PLC parsed the data alright
+                    SiemensPLC.checkResponse();
+                }
+
+                // Poll MiR Fleet
                 try
                 {
                     try 
@@ -112,9 +268,17 @@ namespace Mirage
                     Console.WriteLine($"Connection Problems: '{e}'");
                 }
 
+
+                // Perform calcs + reporting
+
+
+                // Alert and error check
+
+
+
                 //Thread.Sleep(Globals.pollInterval*1000); // Ugly as fuck but will change to event based stuff once I add a GUI
             }
-            */
+            
             
             Globals.closeComms();
 
@@ -232,6 +396,7 @@ namespace Mirage
         }
         */
 
+        /*
         private async static void OnTimedEvent(Object source, ElapsedEventArgs e)
         {
             Console.WriteLine("Polling @ {0}", e.SignalTime);
@@ -243,7 +408,7 @@ namespace Mirage
                     // We're sending GET requests to the MiR servers
                     // Saving them asynchronously as they come along
 
-                    Console.WriteLine("==== Getting Status ====");
+                    //Console.WriteLine("==== Getting Status ====");
 
                     mirFleet.issueGetRequests("status");
 
@@ -272,6 +437,43 @@ namespace Mirage
                 Console.WriteLine($"Connection Problems: '{exp}'");
             }
         }
+        */
+
+        // This sends an async API get request to the robot to fetch data at the specified uri
+        // It does not return data straight away. This allows us to make a bunch of calls
+        // For all of the robots and then wait for the data to get to us as it comes through.
+        public static HttpResponseMessage getRESTdata(string uri)
+        {
+            return comms.GetAsync(uri).Result;
+        }
+
+        public static int sendRESTdata(HttpRequestMessage request)
+        {
+            int statusCode = 0;
+
+            HttpResponseMessage result = comms.SendAsync(request).Result;
+
+            if (result.IsSuccessStatusCode)
+            {
+                statusCode = (int)result.StatusCode;
+
+                if (statusCode > 199 && statusCode < 400)
+                {
+                    Console.WriteLine("Data Sent Successfully");
+                }
+                else if (statusCode > 399)
+                {
+                    Console.WriteLine("Data send did not succeed");
+                }
+                else
+                {
+                    Console.WriteLine("Unknown Error");
+                }
+            }
+
+            return statusCode;
+        }
+
     }
 }
 

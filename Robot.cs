@@ -115,7 +115,7 @@ namespace Mirage
                 }
 
                 // Store the data in the DB
-                string query = "INSERT INTO robot (`ROBOT_ID`, `IP`, `AUTH`) VALUES ('" + id + "', '" + ipAddress + "', '" + Convert.ToBase64String(Encoding.UTF8.GetBytes($"{apiUsername}:{ComputeSha256Hash(apiPassword)}")) + "');";
+                string query = "REPLACE INTO robot (`ROBOT_ID`, `IP`, `AUTH`) VALUES ('" + id + "', '" + ipAddress + "', '" + Convert.ToBase64String(Encoding.UTF8.GetBytes($"{apiUsername}:{ComputeSha256Hash(apiPassword)}")) + "');";
                 Globals.issueInsertQuery(query);
 
                 // Change the App.config setting so that we load an existing config next time
@@ -248,10 +248,10 @@ namespace Mirage
 
         public void saveMaps(HttpResponseMessage response)
         {
-            Maps = JsonConvert.DeserializeObject<List<Map>>(response.Content.ReadAsStringAsync().Result);
-
             if (Globals.debugLevel > 2)
                 Globals.logJSON(response.Content.ReadAsStringAsync().Result);
+
+            Maps = JsonConvert.DeserializeObject<List<Map>>(response.Content.ReadAsStringAsync().Result);
 
                 for(int i = 0; i < Maps.Count; i++)
                 {
