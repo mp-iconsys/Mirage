@@ -1,7 +1,5 @@
 ﻿using DotNetSiemensPLCToolBoxLibrary.Communication.LibNoDave;
 using System;
-using System.Net;
-using Twilio.Rest.Api.V2010.Account.Usage.Record;
 
 namespace Mirage.plc
 {
@@ -16,7 +14,6 @@ namespace Mirage.plc
         public static int memoryres;
         public static byte[] memoryBuffer = new byte[16];
         public static int plcConnectionErrors = 0;
-
 
         //=========================================================|
         //  PLC Task Control Block                                 |
@@ -114,10 +111,17 @@ namespace Mirage.plc
         // - the serial number of the task
         // - data to be used for the PLC (batter life, etc)
         //
-        public static void writeTo()
+        public static void writeData()
         {
 
         }
+
+
+        public static void updateTaskStatus(int status)
+        {
+
+        }
+
 
         //
         // Checks to make sure PLC processed and parsed the reponse
@@ -131,6 +135,8 @@ namespace Mirage.plc
 
 
             return i;
+
+            // Time-out if couldn't find the status
         }
 
         public static void disconnect()

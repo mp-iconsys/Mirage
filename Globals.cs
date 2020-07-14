@@ -1,4 +1,5 @@
-﻿using MySql.Data.MySqlClient;
+﻿using Mirage.plc;
+using MySql.Data.MySqlClient;
 using System;
 using System.Configuration;
 using System.Net;
@@ -41,6 +42,19 @@ public static class Globals
         public const int Battery = 200;
         public const int Distance = 201;
         public const int RobotStatus = 202;
+    }
+
+    // Status codes for PLC
+    public static class Status
+    {
+        public const int Awaiting = 0;
+        public const int StartedProcessing = 1;
+        public const int CompletedNoErrors = 20;
+        public const int CompletedPartially = 21;
+        public const int PlcOK = 30;
+        public const int PlcError = 31;
+        public const int UnknownRequest = 40;
+        public const int FatalError = 41;
     }
 
     public static void readAllSettings()
@@ -172,6 +186,9 @@ public static class Globals
         comms.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         comms.DefaultRequestHeaders.Add("Accept-Language", "en_US");
         comms.Timeout = TimeSpan.FromMinutes(10);
+
+        // Establish PLC Connection TODO: add error handling
+        SiemensPLC.establishConnection();
     }
 
     public static void closeComms()
@@ -180,6 +197,7 @@ public static class Globals
             Console.WriteLine("==== Closing Socket Connections ====");
 
         comms.Dispose();
+        SiemensPLC.disconnect();
     }
 
     public static void logJSON(string json)

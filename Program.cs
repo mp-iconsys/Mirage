@@ -17,7 +17,7 @@ namespace Mirage
             Console.CancelKeyPress += delegate (object sender, ConsoleCancelEventArgs e) 
             {
                 e.Cancel = true;
-                Globals.keepRunning = false;
+                keepRunning = false;
             };
 
             // TODO: Capture seg faults 
@@ -33,107 +33,7 @@ namespace Mirage
             // Create the fleet which will contain out robot data
             mirFleet = new Fleet();
 
-            SiemensPLC.establishConnection();
-
-            try
-            {
-                try
-                {
-                    mirFleet.issueGetRequests("/software/logs");
-                    await mirFleet.saveSoftwareLogsAsync();
-                }
-                catch (HttpRequestException e)
-                {
-                    // TODO: Handle more exceptions
-                    // Remove the task which is causing the exception
-
-                    Console.WriteLine("Couldn't connect to the robot");
-                    Console.WriteLine("Check your network, dns settings, robot is up, etc.");
-                    Console.WriteLine("Please see error log (enter location here) for more details");
-                    // Store the detailed error in the error log
-                    Console.WriteLine(e);
-                }
-            }
-            catch (WebException e)
-            {
-                Console.WriteLine($"Connection Problems: '{e}'");
-            }
-
-            try
-            {
-                try
-                {
-                    mirFleet.issueGetRequests("maps");
-                    await mirFleet.saveMapsAsync();
-                }
-                catch (HttpRequestException e)
-                {
-                    // TODO: Handle more exceptions
-                    // Remove the task which is causing the exception
-
-                    Console.WriteLine("Couldn't connect to the robot");
-                    Console.WriteLine("Check your network, dns settings, robot is up, etc.");
-                    Console.WriteLine("Please see error log (enter location here) for more details");
-                    // Store the detailed error in the error log
-                    Console.WriteLine(e);
-                }
-            }
-            catch (WebException e)
-            {
-                Console.WriteLine($"Connection Problems: '{e}'");
-            }
-
-            try
-            {
-                try
-                {
-                    mirFleet.issueGetRequests("settings");
-                    await mirFleet.saveSettingsAsync();
-                }
-                catch (HttpRequestException e)
-                {
-                    // TODO: Handle more exceptions
-                    // Remove the task which is causing the exception
-
-                    Console.WriteLine("Couldn't connect to the robot");
-                    Console.WriteLine("Check your network, dns settings, robot is up, etc.");
-                    Console.WriteLine("Please see error log (enter location here) for more details");
-                    // Store the detailed error in the error log
-                    Console.WriteLine(e);
-                }
-            }
-            catch (WebException e)
-            {
-                Console.WriteLine($"Connection Problems: '{e}'");
-            }
-
-            try
-            {
-                try
-                {   
-                    mirFleet.issueGetRequests("settings/advanced");
-                    await mirFleet.saveSettingsAsync();
-                }
-                catch (HttpRequestException e)
-                {
-                    // TODO: Handle more exceptions
-                    // Remove the task which is causing the exception
-
-                    Console.WriteLine("Couldn't connect to the robot");
-                    Console.WriteLine("Check your network, dns settings, robot is up, etc.");
-                    Console.WriteLine("Please see error log (enter location here) for more details");
-                    // Store the detailed error in the error log
-                    Console.WriteLine(e);
-                }
-            }
-            catch (WebException e)
-            {
-                Console.WriteLine($"Connection Problems: '{e}'");
-            }
-
-            // Download missions
-
-            // Load robot data from DB if we've already configured a session
+            getInitialFleetData();
 
             if (debugLevel > -1)
                 Console.WriteLine("==== Starting Main Loop ====");
@@ -145,6 +45,8 @@ namespace Mirage
             //============================================= 
             while (keepRunning)
             {
+                int currentTimer = 0;
+
                 if(debugLevel > -1)
                     Console.WriteLine("==== Loop " + ++i + " Starting ====");
 
@@ -158,25 +60,24 @@ namespace Mirage
                     Console.WriteLine("==== New Task From PLC ====");
 
                     // Set PLC status to Mirage processing
-
-                    string mission = "boo";
+                    SiemensPLC.updateTaskStatus(Status.StartedProcessing);
 
                     // Check which task we've got to do & do it
                     // Save any response to predefined PLC registers
                     switch (SiemensPLC.task)
                     {
-                        case Tasks.SchedulerSendMission:
-                            Console.WriteLine("==== Send Mission ====");
-                            //status = sendRESTdata((testMission.send_mission(Int32.Parse(incomingMessage.Paramater))));
-                            //outgoingMessage.saveMessage(incomingMessage.SerialNumber, "MISSION", incomingMessage.Paramater, status.ToString());
-                            //Console.WriteLine(outgoingMessage.returnMsg());
-                            break;
                         case Tasks.SchedulerStatus:
                             Console.WriteLine("==== Get Schedule Status ====");
                             //response = getRESTdata("mission_scheduler/" + incomingMessage.Paramater);
                             break;
+                        case Tasks.SchedulerSendMission:
+                            Console.WriteLine("==== Send Mission To Scheduler ====");
+                            //status = sendRESTdata((testMission.send_mission(Int32.Parse(incomingMessage.Paramater))));
+                            //outgoingMessage.saveMessage(incomingMessage.SerialNumber, "MISSION", incomingMessage.Paramater, status.ToString());
+                            //Console.WriteLine(outgoingMessage.returnMsg());
+                            break;
                         case Tasks.SchedulerCreateMission:
-                            Console.WriteLine("Create New Mission");
+                            Console.WriteLine("==== Create New Mission In Scheduler ====");
                             //status = sendRESTdata((testMission.create_mission(Int32.Parse(incomingMessage.Paramater))));
                             //string resp;
 
@@ -223,7 +124,7 @@ namespace Mirage
                             break;
                         default:
                             Console.WriteLine("==== Unknown Mission ====");
-                            // Send Code 40 to PLC
+                            SiemensPLC.updateTaskStatus(Status.UnknownRequest);
                             // Issue an alert
                             break;
                     }
@@ -233,39 +134,43 @@ namespace Mirage
                     SiemensPLC.checkResponse();
                 }
 
-                // Poll MiR Fleet - async
-                try
+                // Poll MiR Fleet - async operation
+                // happens every pollInterval
+                if (currentTimer < pollInterval)
                 {
-                    try 
+                    try
                     {
-                        // We're sending GET requests to the MiR servers
-                        // Saving them asynchronously as they come along
+                        try
+                        {
+                            // We're sending GET requests to the MiR servers
+                            // Saving them asynchronously as they come along
 
-                        Console.WriteLine("==== Getting Status ====");
-                        mirFleet.issueGetRequests("status");
-                        await mirFleet.saveFleetStatusAsync();
+                            Console.WriteLine("==== Getting Status ====");
+                            mirFleet.issueGetRequests("status");
+                            await mirFleet.saveFleetStatusAsync();
 
-                        Console.WriteLine("==== Getting Registers ====");
-                        mirFleet.issueGetRequests("registers");
-                        await mirFleet.saveFleetRegistersAsync();
+                            Console.WriteLine("==== Getting Registers ====");
+                            mirFleet.issueGetRequests("registers");
+                            await mirFleet.saveFleetRegistersAsync();
 
-                        Console.WriteLine("==== Loop " + i + " Finished ====");
+                            Console.WriteLine("==== Loop " + i + " Finished ====");
+                        }
+                        catch (HttpRequestException e)
+                        {
+                            // TODO: Handle more exceptions
+                            // Remove the task which is causing the exception
+
+                            Console.WriteLine("Couldn't connect to the robot");
+                            Console.WriteLine("Check your network, dns settings, robot is up, etc.");
+                            Console.WriteLine("Please see error log (enter location here) for more details");
+                            // Store the detailed error in the error log
+                            Console.WriteLine(e);
+                        }
                     }
-                    catch (HttpRequestException e)
+                    catch (WebException e)
                     {
-                        // TODO: Handle more exceptions
-                        // Remove the task which is causing the exception
-
-                        Console.WriteLine("Couldn't connect to the robot");
-                        Console.WriteLine("Check your network, dns settings, robot is up, etc.");
-                        Console.WriteLine("Please see error log (enter location here) for more details");
-                        // Store the detailed error in the error log
-                        Console.WriteLine(e);
+                        Console.WriteLine($"Connection Problems: '{e}'");
                     }
-                }
-                catch (WebException e)
-                {
-                    Console.WriteLine($"Connection Problems: '{e}'");
                 }
 
 
@@ -280,8 +185,6 @@ namespace Mirage
             }
             
             closeComms();
-
-            SiemensPLC.disconnect();
 
             Console.WriteLine("==== Graceful Exit ====");
 
@@ -447,6 +350,110 @@ namespace Mirage
         //{
         //    //return comms.GetAsync(uri).Result;
         //}
+
+        // Force the wait so we're doing things in order
+        // Synchronous initial fetch, so there'll be some delay on start-up
+        public static void getInitialFleetData()
+        {
+            try
+            {
+                try
+                {
+                    mirFleet.issueGetRequests("/software/logs");
+                    mirFleet.saveSoftwareLogsAsync().Wait();
+                }
+                catch (HttpRequestException e)
+                {
+                    // TODO: Handle more exceptions
+                    // Remove the task which is causing the exception
+
+                    Console.WriteLine("Couldn't connect to the robot");
+                    Console.WriteLine("Check your network, dns settings, robot is up, etc.");
+                    Console.WriteLine("Please see error log (enter location here) for more details");
+                    // Store the detailed error in the error log
+                    Console.WriteLine(e);
+                }
+            }
+            catch (WebException e)
+            {
+                Console.WriteLine($"Connection Problems: '{e}'");
+            }
+
+            try
+            {
+                try
+                {
+                    mirFleet.issueGetRequests("maps");
+                    mirFleet.saveMapsAsync().Wait();
+                }
+                catch (HttpRequestException e)
+                {
+                    // TODO: Handle more exceptions
+                    // Remove the task which is causing the exception
+
+                    Console.WriteLine("Couldn't connect to the robot");
+                    Console.WriteLine("Check your network, dns settings, robot is up, etc.");
+                    Console.WriteLine("Please see error log (enter location here) for more details");
+                    // Store the detailed error in the error log
+                    Console.WriteLine(e);
+                }
+            }
+            catch (WebException e)
+            {
+                Console.WriteLine($"Connection Problems: '{e}'");
+            }
+
+            try
+            {
+                try
+                {
+                    mirFleet.issueGetRequests("settings");
+                    mirFleet.saveSettingsAsync().Wait();
+                }
+                catch (HttpRequestException e)
+                {
+                    // TODO: Handle more exceptions
+                    // Remove the task which is causing the exception
+
+                    Console.WriteLine("Couldn't connect to the robot");
+                    Console.WriteLine("Check your network, dns settings, robot is up, etc.");
+                    Console.WriteLine("Please see error log (enter location here) for more details");
+                    // Store the detailed error in the error log
+                    Console.WriteLine(e);
+                }
+            }
+            catch (WebException e)
+            {
+                Console.WriteLine($"Connection Problems: '{e}'");
+            }
+
+            try
+            {
+                try
+                {
+                    mirFleet.issueGetRequests("settings/advanced");
+                    mirFleet.saveSettingsAsync().Wait();
+                }
+                catch (HttpRequestException e)
+                {
+                    // TODO: Handle more exceptions
+                    // Remove the task which is causing the exception
+
+                    Console.WriteLine("Couldn't connect to the robot");
+                    Console.WriteLine("Check your network, dns settings, robot is up, etc.");
+                    Console.WriteLine("Please see error log (enter location here) for more details");
+                    // Store the detailed error in the error log
+                    Console.WriteLine(e);
+                }
+            }
+            catch (WebException e)
+            {
+                Console.WriteLine($"Connection Problems: '{e}'");
+            }
+
+
+            // Download missions
+        }
 
         public static int sendRESTdata(HttpRequestMessage request)
         {
