@@ -2,9 +2,8 @@
 using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
-using System.Threading;
-using System.Timers;
 using Mirage.plc;
+using static Globals;
 
 namespace Mirage
 {
@@ -25,11 +24,11 @@ namespace Mirage
 
             // TODO: Thread diagnostics???
 
-            Globals.readAllSettings();
+            readAllSettings();
 
-            Globals.connectToDB();
+            connectToDB();
 
-            Globals.setUpDefaultComms();
+            setUpDefaultComms();
 
             // Create the fleet which will contain out robot data
             mirFleet = new Fleet();
@@ -136,7 +135,7 @@ namespace Mirage
 
             // Load robot data from DB if we've already configured a session
 
-            if (Globals.debugLevel > -1)
+            if (debugLevel > -1)
                 Console.WriteLine("==== Starting Main Loop ====");
 
             int i = 0;
@@ -144,9 +143,9 @@ namespace Mirage
             //============================================= 
             // M A I N      L O O P
             //============================================= 
-            while (Globals.keepRunning)
+            while (keepRunning)
             {
-                if(Globals.debugLevel > -1)
+                if(debugLevel > -1)
                     Console.WriteLine("==== Loop " + ++i + " Starting ====");
 
                 // Poll PLC for status changes
@@ -158,23 +157,25 @@ namespace Mirage
                 {
                     Console.WriteLine("==== New Task From PLC ====");
 
+                    // Set PLC status to Mirage processing
+
                     string mission = "boo";
 
                     // Check which task we've got to do & do it
                     // Save any response to predefined PLC registers
-                    switch (mission)
+                    switch (SiemensPLC.task)
                     {
-                        case "Mission":
+                        case Tasks.SchedulerSendMission:
                             Console.WriteLine("==== Send Mission ====");
                             //status = sendRESTdata((testMission.send_mission(Int32.Parse(incomingMessage.Paramater))));
                             //outgoingMessage.saveMessage(incomingMessage.SerialNumber, "MISSION", incomingMessage.Paramater, status.ToString());
                             //Console.WriteLine(outgoingMessage.returnMsg());
                             break;
-                        case "Status":
+                        case Tasks.SchedulerStatus:
                             Console.WriteLine("==== Get Schedule Status ====");
                             //response = getRESTdata("mission_scheduler/" + incomingMessage.Paramater);
                             break;
-                        case "NewMission":
+                        case Tasks.SchedulerCreateMission:
                             Console.WriteLine("Create New Mission");
                             //status = sendRESTdata((testMission.create_mission(Int32.Parse(incomingMessage.Paramater))));
                             //string resp;
@@ -190,13 +191,13 @@ namespace Mirage
                             //Console.WriteLine(outgoingMessage.returnMsg());
 
                             break;
-                        case "ClearSchedule":
+                        case Tasks.SchedulerClear:
                             Console.WriteLine("==== Clear Mission Schedule ====");
                             //status = sendRESTdata((testMission.clear_mission_schedule()));
                             //outgoingMessage.saveMessage(incomingMessage.SerialNumber, "POLL", incomingMessage.Paramater, status.ToString());
                             //Console.WriteLine(outgoingMessage.returnMsg());
                             break;
-                        case "Battery":
+                        case Tasks.Battery:
                             Console.WriteLine("==== Get Battery Life ====");
                             //response = getRESTdata("status");
                             //float battery = robotStatus.saveStatus(response).battery_percentage;
@@ -204,7 +205,7 @@ namespace Mirage
                             //outgoingMessage.saveMessage(incomingMessage.SerialNumber, "BATTERY", "BATTERY", battery.ToString());
                             //Console.WriteLine(outgoingMessage.returnMsg());
                             break;
-                        case "Distance":
+                        case Tasks.Distance:
                             Console.WriteLine("==== Get Distance Travelled ====");
                             //response = getRESTdata("status");
                             //float distance_moved = robotStatus.saveStatus(response).moved;
@@ -212,7 +213,7 @@ namespace Mirage
                             //outgoingMessage.saveMessage(incomingMessage.SerialNumber, "DISTANCE", "DISTANCE", distance_moved.ToString());
                             //Console.WriteLine(outgoingMessage.returnMsg());
                             break;
-                        case "robot_status":
+                        case Tasks.RobotStatus:
                             Console.WriteLine("==== Get Mission Status ====");
                             //response = getRESTdata("status");
                             //string mission_text = robotStatus.saveStatus(response).mission_text;
@@ -221,11 +222,14 @@ namespace Mirage
                             //Console.WriteLine(outgoingMessage.returnMsg());
                             break;
                         default:
-                            Console.WriteLine("Idling");
+                            Console.WriteLine("==== Unknown Mission ====");
+                            // Send Code 40 to PLC
+                            // Issue an alert
                             break;
                     }
 
                     // Check PLC parsed the data alright
+                    // Times out after a while if no respose
                     SiemensPLC.checkResponse();
                 }
 
@@ -238,15 +242,11 @@ namespace Mirage
                         // Saving them asynchronously as they come along
 
                         Console.WriteLine("==== Getting Status ====");
-
                         mirFleet.issueGetRequests("status");
-
                         await mirFleet.saveFleetStatusAsync();
 
                         Console.WriteLine("==== Getting Registers ====");
-
                         mirFleet.issueGetRequests("registers");
-
                         await mirFleet.saveFleetRegistersAsync();
 
                         Console.WriteLine("==== Loop " + i + " Finished ====");
@@ -273,13 +273,13 @@ namespace Mirage
 
 
                 // Alert and error check
-
+                checkAlertsAndErrors();
 
 
                 //Thread.Sleep(Globals.pollInterval*1000); // Ugly as fuck but will change to event based stuff once I add a GUI
             }
             
-            Globals.closeComms();
+            closeComms();
 
             SiemensPLC.disconnect();
 

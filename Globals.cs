@@ -29,6 +29,20 @@ public static class Globals
     public static MySqlConnection db;
     public static HttpClient comms;
 
+    // Used for issuing tasks to the fleet or robots
+    // Based on PLC input
+    //public enum Tasks:int
+    public static class Tasks
+    {
+        public const int SchedulerStatus = 100;
+        public const int SchedulerSendMission = 101;
+        public const int SchedulerCreateMission = 102;
+        public const int SchedulerClear = 103;
+        public const int Battery = 200;
+        public const int Distance = 201;
+        public const int RobotStatus = 202;
+    }
+
     public static void readAllSettings()
     {
         Console.Clear();
@@ -264,6 +278,28 @@ public static class Globals
                 Console.WriteLine("Value is null");
 
             return "NULL,";
+        }
+    }
+
+    public static void checkAlertsAndErrors()
+    {
+        int alert = 0;
+        int fatal = 10;
+
+        if(alert < fatal)
+        {
+            // If a non-fatal alert, store in the log file (or DB) 
+            // and send an email (through Grafana?)
+        }
+        else if(alert > fatal)
+        {
+            // If we've got a fatal alert, we want to terminate the program
+            // still do it gracefully. Send an SMS alert, email, store in log
+
+
+
+
+            keepRunning = false;
         }
     }
 
