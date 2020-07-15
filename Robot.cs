@@ -30,7 +30,7 @@ namespace Mirage
         public List<SoftwareLog> SoftwareLogs { get; set; }
         public List<Map> Maps { get; set; }
         public List<Setting> Settings { get; set; }
-        private Status s;
+        public Status s;
 
         // Instantiate with connection details
         public Robot()
@@ -172,6 +172,17 @@ namespace Mirage
                 s.printStatus();
 
             s.saveStatusToDB(id, Maps);
+        }
+
+        public void saveStatusInMemory(HttpResponseMessage response)
+        {
+            s = JsonConvert.DeserializeObject<Status>(response.Content.ReadAsStringAsync().Result);
+
+            if (Globals.debugLevel > 2)
+                Globals.logJSON(response.Content.ReadAsStringAsync().Result);
+
+            if (Globals.debugLevel > 2)
+                s.printStatus();
         }
 
         public void saveRegisters(HttpResponseMessage response)

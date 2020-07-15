@@ -1,5 +1,7 @@
 ﻿using DotNetSiemensPLCToolBoxLibrary.Communication.LibNoDave;
 using System;
+using System.Net;
+using static Globals;
 
 namespace Mirage.plc
 {
@@ -9,11 +11,20 @@ namespace Mirage.plc
         public static libnodave.daveInterface di;
         public static libnodave.daveConnection dc;
 
-        public static int res;
-        public static byte plcValue;
-        public static int memoryres;
-        public static byte[] memoryBuffer = new byte[16];
-        public static int plcConnectionErrors = 0;
+        // For S7-1200 and 1500, use rack = 0, slot = 1
+        private static string IP = "10.6.1.16";
+        private static int port = 102;
+        private static int rack = 0;
+        private static int slot = 1;
+
+        //=========================================================|
+        // These should reflect the Data Block Nos in PLC          |
+        //                                                         |
+        // We're assuming that each block is completely dedicated  |
+        // to storing only this data, so they start at 0.          |    
+        //=========================================================|
+        private static int taskControlDB = 0;
+        private static int dataStorageDB = 1;
 
         //=========================================================|
         //  PLC Task Control Block                                 |
@@ -28,6 +39,18 @@ namespace Mirage.plc
         public static int status;
         public static bool newMsg;
 
+        public static int res;
+        public static byte plcValue;
+        public static int memoryres;
+        public static byte[] memoryBuffer = new byte[16];
+        public static int plcConnectionErrors = 0;
+
+
+        public static void initialize()
+        {
+
+        }
+
 
         //
         // Remember that the PLC data blocks can't be optimized
@@ -37,20 +60,16 @@ namespace Mirage.plc
         //
         public static void establishConnection()
         {
-            // IP ADDRESS HERE
-            fds.rfd = libnodave.openSocket(102, "10.6.1.16");
+            fds.rfd = libnodave.openSocket(port, IP);
             fds.wfd = fds.rfd;
             di = new libnodave.daveInterface(fds, "IF1", 0, libnodave.daveProtoISOTCP, libnodave.daveSpeed187k);
 
             res = di.initAdapter();
-            // For S7-1200 and 1500, use rack = 0, slot = 1
-            int rack = 0;
-            int slot = 1;
+            // check if initializing the adapter worked
+
             dc = new libnodave.daveConnection(di, 0, rack, slot);
             res = dc.connectPLC();
-            // memoryres = dc.readBytes(libnodave.daveFlags, 0, 0, 1, memoryBuffer);
-            //memoryres = dc.readBytes(libnodave.daveFlags, 0, 0, 16, memoryBuffer);
-            //plcValue = memoryBuffer[0];
+            // check if connectign to the plc worked
         }
 
         // Polls the PLC to check if it needs to issue any new missions
@@ -59,9 +78,17 @@ namespace Mirage.plc
             int serialNumber, task, robotID, status;
 
             // Get the data from the PLC
-            memoryres = dc.readBytes(libnodave.daveFlags, 0, 0, 1, memoryBuffer);
+            try
+            { 
+                // readBytes(Area, Data Block Number (in PLC), Start Byte, Length, Byte Container)
+                memoryres = dc.readBytes(libnodave.daveFlags, taskControlDB, 0, 16, memoryBuffer);
+            }
+            catch(Exception e)
+            {
 
-            if(memoryres == 0)
+            }
+
+            if (memoryres == 0)
             {
                 byte[] tempBytesForConversion = new byte[4] { memoryBuffer[0], memoryBuffer[1], memoryBuffer[2], memoryBuffer[3] };
 
@@ -97,6 +124,7 @@ namespace Mirage.plc
             }
             else
             {
+                // TODO: look at libnodave for better error codes
                 // Couldn't read the PLC bytes
                 // Write as error to DB
                 // Iterate the PLC connectivity counter
@@ -111,30 +139,153 @@ namespace Mirage.plc
         // - the serial number of the task
         // - data to be used for the PLC (batter life, etc)
         //
-        public static void writeData()
+        // Defined on generic types so it can take floats, ints, strings 
+        public static void writeFloatData(string type, int statusCode, float data)
         {
+            // First, check if the data response was successful
+            if(statusCode == Status.CompletedPartially || statusCode == Status.CompletedNoErrors)
+            {
+                byte[] tempBytes; 
+                int result = 0;
 
+                // TODO: This should really use an enum instead of strings
+                if (type == "moved")
+                {
+                    tempBytes = BitConverter.GetBytes(data);
+                    result = dc.writeBytes(libnodave.daveFlags, dataStorageDB, 12, 4, tempBytes); // location is incorrect atm
+                }
+                else if(type == "battery")
+                {
+                    tempBytes = BitConverter.GetBytes(data);
+                    result = dc.writeBytes(libnodave.daveFlags, dataStorageDB, 12, 4, tempBytes); // location is incorrect atm
+                }
+
+                if (result != 0)
+                {
+                    // Flag error
+
+                }
+            }
+            else if(statusCode == Status.CouldntProcessRequest)
+            {
+                updateTaskStatus(Status.CouldntProcessRequest);
+                // Send alert
+            }
+            else if(statusCode == Status.FatalError)
+            {
+                updateTaskStatus(Status.FatalError);
+                // Send alert
+            }
+            else
+            {
+                // Unknown Status ??? - > Treat like a fatal error
+                updateTaskStatus(Status.FatalError);
+                // Send alert
+            }
+        }
+
+        public static void writeStringData(string type, int statusCode, string data)
+        {
+            // First, check if the data response was successful
+            if (statusCode == Status.CompletedPartially || statusCode == Status.CompletedNoErrors)
+            {
+                byte[] tempBytes;
+                int result = 0;
+
+                if (type == "mission_text")
+                {
+                    tempBytes = System.Text.Encoding.ASCII.GetBytes(data);
+                    result = dc.writeBytes(libnodave.daveFlags, dataStorageDB, 12, 4, tempBytes); // location is incorrect atm
+                }
+
+                if(result != 0)
+                {
+                    // Flag error
+
+                }
+            }
+            else if (statusCode == Status.CouldntProcessRequest)
+            {
+                updateTaskStatus(Status.CouldntProcessRequest);
+                // Send alert
+            }
+            else if (statusCode == Status.FatalError)
+            {
+                updateTaskStatus(Status.FatalError);
+                // Send alert
+            }
+            else
+            {
+                // Unknown Status ??? - > Treat like a fatal error
+                updateTaskStatus(Status.FatalError);
+                // Send alert
+            }
         }
 
 
         public static void updateTaskStatus(int status)
         {
+            try
+            {
+                byte[] tempBytes = BitConverter.GetBytes(status);
 
+                int result = dc.writeBytes(libnodave.daveFlags, taskControlDB, 12, 4, tempBytes);
+
+                if(result != 0)
+                {
+                    // Log error here
+                }
+            }
+            catch(Exception e)
+            {
+
+            }
         }
-
 
         //
         // Checks to make sure PLC processed and parsed the reponse
         //
         // INPUT:   None
-        // OUTPUT:  PLC Response (success or fail)
+        // OUTPUT:  Send Alert, or nothing
         //
-        public static int checkResponse()
+        public static void checkResponse()
         {
             int i = 0;
+            byte[] tempByteBuffer = new byte[4];
 
+            try
+            {
+                // readBytes(Area, Data Block Number (in PLC), Start Byte, Length, Byte Container)
+                memoryres = dc.readBytes(libnodave.daveFlags, taskControlDB, 12, 4, tempByteBuffer);
+            }
+            catch (Exception e)
+            {
 
-            return i;
+            }
+
+            // PLC read was successful
+            if (memoryres == 0)
+            {
+                status = BitConverter.ToInt32(tempByteBuffer, 0);
+
+                if(status == Status.PlcOK)
+                {
+                    // Do nothing
+                }
+                else if(status == Status.PlcError)
+                {
+                    // Send error
+                }
+                else
+                {
+
+                }               
+            }
+            else
+            {
+                // Failed to get the status data from PLC
+                // Send error
+            }
 
             // Time-out if couldn't find the status
         }
@@ -145,6 +296,5 @@ namespace Mirage.plc
             di.disconnectAdapter();
             libnodave.closePort(fds.rfd);
         }
-
     }
 }

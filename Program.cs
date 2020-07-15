@@ -61,6 +61,7 @@ namespace Mirage
 
                     // Set PLC status to Mirage processing
                     SiemensPLC.updateTaskStatus(Status.StartedProcessing);
+                    int restStatus = Status.CompletedNoErrors;
 
                     // Check which task we've got to do & do it
                     // Save any response to predefined PLC registers
@@ -99,32 +100,23 @@ namespace Mirage
                             //Console.WriteLine(outgoingMessage.returnMsg());
                             break;
                         case Tasks.Battery:
-                            Console.WriteLine("==== Get Battery Life ====");
-                            //response = getRESTdata("status");
-                            //float battery = robotStatus.saveStatus(response).battery_percentage;
-                            //Console.WriteLine("Battery: " + battery);
-                            //outgoingMessage.saveMessage(incomingMessage.SerialNumber, "BATTERY", "BATTERY", battery.ToString());
-                            //Console.WriteLine(outgoingMessage.returnMsg());
+                            Console.WriteLine("==== Get Battery Life ====");    // "battery_percentage" from robot status
+                            restStatus = mirFleet.issueGetRequest("status", SiemensPLC.robotID);
+                            SiemensPLC.writeFloatData("battery", restStatus, mirFleet.robots[SiemensPLC.robotID].s.battery_percentage);
                             break;
                         case Tasks.Distance:
-                            Console.WriteLine("==== Get Distance Travelled ====");
-                            //response = getRESTdata("status");
-                            //float distance_moved = robotStatus.saveStatus(response).moved;
-                            //Console.WriteLine("Distance Moved: " + distance_moved);
-                            //outgoingMessage.saveMessage(incomingMessage.SerialNumber, "DISTANCE", "DISTANCE", distance_moved.ToString());
-                            //Console.WriteLine(outgoingMessage.returnMsg());
+                            Console.WriteLine("==== Get Distance Travelled ====");  // "moved" from robot status
+                            restStatus = mirFleet.issueGetRequest("status", SiemensPLC.robotID);
+                            SiemensPLC.writeFloatData("moved", restStatus, mirFleet.robots[SiemensPLC.robotID].s.moved);
                             break;
                         case Tasks.RobotStatus:
-                            Console.WriteLine("==== Get Mission Status ====");
-                            //response = getRESTdata("status");
-                            //string mission_text = robotStatus.saveStatus(response).mission_text;
-                            //Console.WriteLine("Mission Text: " + mission_text);
-                            //outgoingMessage.saveMessage(incomingMessage.SerialNumber, "STATUS", "robot_status", mission_text);
-                            //Console.WriteLine(outgoingMessage.returnMsg());
+                            Console.WriteLine("==== Get Mission Status ====");  // "mission_text" from robot status
+                            restStatus = mirFleet.issueGetRequest("status", SiemensPLC.robotID);
+                            SiemensPLC.writeStringData("mission_text", restStatus, mirFleet.robots[SiemensPLC.robotID].s.mission_text);
                             break;
                         default:
                             Console.WriteLine("==== Unknown Mission ====");
-                            SiemensPLC.updateTaskStatus(Status.UnknownRequest);
+                            SiemensPLC.updateTaskStatus(Status.CouldntProcessRequest);
                             // Issue an alert
                             break;
                     }
@@ -152,8 +144,6 @@ namespace Mirage
                             Console.WriteLine("==== Getting Registers ====");
                             mirFleet.issueGetRequests("registers");
                             await mirFleet.saveFleetRegistersAsync();
-
-                            Console.WriteLine("==== Loop " + i + " Finished ====");
                         }
                         catch (HttpRequestException e)
                         {
@@ -180,7 +170,7 @@ namespace Mirage
                 // Alert and error check
                 checkAlertsAndErrors();
 
-
+                Console.WriteLine("==== Loop " + i + " Finished ====");
                 //Thread.Sleep(Globals.pollInterval*1000); // Ugly as fuck but will change to event based stuff once I add a GUI
             }
             

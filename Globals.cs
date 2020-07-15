@@ -53,7 +53,7 @@ public static class Globals
         public const int CompletedPartially = 21;
         public const int PlcOK = 30;
         public const int PlcError = 31;
-        public const int UnknownRequest = 40;
+        public const int CouldntProcessRequest = 40;
         public const int FatalError = 41;
     }
 
