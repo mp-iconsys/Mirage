@@ -69,16 +69,21 @@ namespace Mirage
                     {
                         case Tasks.SchedulerStatus:
                             Console.WriteLine("==== Get Schedule Status ====");
-                            //response = getRESTdata("mission_scheduler/" + incomingMessage.Paramater);
+                            // response = getRESTdata("mission_scheduler/" + incomingMessage.Paramater);
+                            // obtained from the fleet
                             break;
                         case Tasks.SchedulerSendMission:
                             Console.WriteLine("==== Send Mission To Scheduler ====");
+                            // done to the fleet
                             //status = sendRESTdata((testMission.send_mission(Int32.Parse(incomingMessage.Paramater))));
                             //outgoingMessage.saveMessage(incomingMessage.SerialNumber, "MISSION", incomingMessage.Paramater, status.ToString());
                             //Console.WriteLine(outgoingMessage.returnMsg());
                             break;
                         case Tasks.SchedulerCreateMission:
                             Console.WriteLine("==== Create New Mission In Scheduler ====");
+                            // create mission using /v2.0.0/missions + guuid
+                            // uses POST
+
                             //status = sendRESTdata((testMission.create_mission(Int32.Parse(incomingMessage.Paramater))));
                             //string resp;
 
@@ -95,6 +100,8 @@ namespace Mirage
                             break;
                         case Tasks.SchedulerClear:
                             Console.WriteLine("==== Clear Mission Schedule ====");
+                            restStatus = mirFleet.clearSchedule();
+                            // done to the fleet mission_scheduler
                             //status = sendRESTdata((testMission.clear_mission_schedule()));
                             //outgoingMessage.saveMessage(incomingMessage.SerialNumber, "POLL", incomingMessage.Paramater, status.ToString());
                             //Console.WriteLine(outgoingMessage.returnMsg());

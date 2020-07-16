@@ -10,6 +10,10 @@ namespace Mirage
         public Robot[] robots; // TODO: Make this a list so we can add and remove Robots on demand
         private Task<HttpResponseMessage>[] httpResponseTasks; // TODO: ditto as above
 
+        // Fleet manager is essentially a robot
+        // keep it separate from the robot array for cleaner code
+        public Robot fleetManager;  
+
         public Fleet() 
         {
             robots = new Robot[Globals.sizeOfFleet];
@@ -28,6 +32,8 @@ namespace Mirage
 
         public void instantiateRobots(int sizeOfFleet)
         {
+            fleetManager = new Robot();
+
             for (int i = 0; i < sizeOfFleet; i++)
             {
                 // Instantiate the robots - Don't touch the tasks yet

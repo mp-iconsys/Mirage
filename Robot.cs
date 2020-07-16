@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 using MySql.Data.MySqlClient;
 using System.Linq;
+using Mirage.rest;
 
 namespace Mirage
 {
@@ -31,6 +32,7 @@ namespace Mirage
         public List<Map> Maps { get; set; }
         public List<Setting> Settings { get; set; }
         public Status s;
+        public Mission m;
 
         // Instantiate with connection details
         public Robot()
@@ -159,6 +161,34 @@ namespace Mirage
         {
             formConnection();
             return await Globals.comms.GetAsync(getBaseURI() + uri);
+        }
+
+        // Send a REST Request, either Post, Put or DELETE
+        public static int sendRESTdata(HttpRequestMessage request)
+        {
+            int statusCode = 0;
+
+            HttpResponseMessage result = Globals.comms.SendAsync(request).Result;
+
+            if (result.IsSuccessStatusCode)
+            {
+                statusCode = (int)result.StatusCode;
+
+                if (statusCode > 199 && statusCode < 400)
+                {
+                    Console.WriteLine("Data Sent Successfully");
+                }
+                else if (statusCode > 399)
+                {
+                    Console.WriteLine("Data send did not succeed");
+                }
+                else
+                {
+                    Console.WriteLine("Unknown Error");
+                }
+            }
+
+            return statusCode;
         }
 
         public void saveStatus(HttpResponseMessage response)
