@@ -164,7 +164,7 @@ namespace Mirage
         }
 
         // Send a REST Request, either Post, Put or DELETE
-        public static int sendRESTdata(HttpRequestMessage request)
+        public int sendRESTdata(HttpRequestMessage request)
         {
             int statusCode = 0;
 
@@ -177,14 +177,17 @@ namespace Mirage
                 if (statusCode > 199 && statusCode < 400)
                 {
                     Console.WriteLine("Data Sent Successfully");
+                    statusCode = Globals.Status.CompletedNoErrors;
                 }
                 else if (statusCode > 399)
                 {
                     Console.WriteLine("Data send did not succeed");
+                    statusCode = Globals.Status.CouldntProcessRequest;
                 }
                 else
                 {
                     Console.WriteLine("Unknown Error");
+                    statusCode = Globals.Status.FatalError;
                 }
             }
 

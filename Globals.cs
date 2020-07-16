@@ -30,6 +30,9 @@ public static class Globals
     public static MySqlConnection db;
     public static HttpClient comms;
 
+    public static string fleetManagerIP;
+    public static AuthenticationHeaderValue fleetManagerAuthToken;
+
     // Used for issuing tasks to the fleet or robots
     // Based on PLC input
     //public enum Tasks:int
@@ -66,6 +69,9 @@ public static class Globals
 
         try
         {
+            fleetManagerAuthToken = new AuthenticationHeaderValue("Basic", "moo");
+            fleetManagerIP = "192.168.0.1";
+
             var appSettings = ConfigurationManager.AppSettings;
 
             if (appSettings.Count == 0)

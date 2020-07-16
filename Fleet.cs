@@ -12,6 +12,7 @@ namespace Mirage
 
         // Fleet manager is essentially a robot
         // keep it separate from the robot array for cleaner code
+        private Task<HttpResponseMessage> fleetResponseTask;
         public Robot fleetManager;  
 
         public Fleet() 
@@ -32,7 +33,7 @@ namespace Mirage
 
         public void instantiateRobots(int sizeOfFleet)
         {
-            fleetManager = new Robot();
+            fleetManager = new Robot(fleetManagerIP, fleetManagerAuthToken);
 
             for (int i = 0; i < sizeOfFleet; i++)
             {
@@ -79,7 +80,14 @@ namespace Mirage
             {
                 try
                 {
-                    httpResponseTasks[robotID] = robots[robotID].sendGetRequest(type);
+                    if(type == "mission_scheduler" || robotID == 666)
+                    {
+                        fleetResponseTask = fleetManager.sendGetRequest(type);
+                    }
+                    else
+                    {
+                        httpResponseTasks[robotID] = robots[robotID].sendGetRequest(type);
+                    }
                 }
                 catch (HttpRequestException e)
                 {
@@ -104,7 +112,14 @@ namespace Mirage
 
             try
             { 
-                httpResponseTasks[robotID].Wait();
+                if (type == "mission_scheduler" || robotID == 666)
+                {
+                    fleetResponseTask.Wait();
+                }
+                else
+                {
+                    httpResponseTasks[robotID].Wait();
+                }
             }
             catch (Exception e)
             {
@@ -114,6 +129,10 @@ namespace Mirage
             if (type == "status")
             {
                 robots[robotID].saveStatusInMemory(httpResponseTasks[robotID].Result);
+            }
+            else if (type === "mission_scheduler")
+            {
+                fleetManager.m.saveToMemory(fleetResponseTask.Result);
             }
 
             return functionStatus;
