@@ -37,6 +37,7 @@ namespace Mirage.plc
         public static int robotID;
         public static int task;
         public static int status;
+        public static int parameter;
         public static bool newMsg;
 
         public static int res;

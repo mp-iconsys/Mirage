@@ -34,12 +34,6 @@ namespace Mirage.rest
                 return missionNumber.ToString();
         }
 
-        public string getPayload(int missionNumber)
-        {
-            string payload = "{\r\n  \"guid\": \"" + guid + stringyfyMission(missionNumber) + "\",\r\n  \"name\": \"Mission" + stringyfyMission(missionNumber) + "\",\r\n  \"description\": \"template_mission_" + stringyfyMission(missionNumber) + "\",\r\n  \"hidden\": false,\r\n  \"group_id\": \"mirconst-guid-0000-0011-missiongroup\",\r\n  \"session_id\": \"caa94ad9-65cc-11e9-abc1-94c691a7361d\",\r\n  \"created_by_id\": \"mirconst-guid-0000-0004-users0000000\"\r\n}";
-            return payload;
-        }
-
         public void print()
         {
 
@@ -63,9 +57,11 @@ namespace Mirage.rest
         // Create mission
         public HttpRequestMessage createMission(int missionNumber)
         {
+            string payload = "{\r\n  \"guid\": \"" + guid + stringyfyMission(missionNumber) + "\",\r\n  \"name\": \"Mission" + stringyfyMission(missionNumber) + "\",\r\n  \"description\": \"template_mission_" + stringyfyMission(missionNumber) + "\",\r\n  \"hidden\": false,\r\n  \"group_id\": \"mirconst-guid-0000-0011-missiongroup\",\r\n  \"session_id\": \"caa94ad9-65cc-11e9-abc1-94c691a7361d\",\r\n  \"created_by_id\": \"mirconst-guid-0000-0004-users0000000\"\r\n}";
+
             HttpRequestMessage request = new HttpRequestMessage
             {
-                Content = new StringContent(getPayload(missionNumber), Encoding.UTF8, "application/json"),
+                Content = new StringContent(payload, Encoding.UTF8, "application/json"),
                 Method = HttpMethod.Post,
                 RequestUri = new Uri("mission_scheduler")
             };

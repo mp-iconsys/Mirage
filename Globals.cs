@@ -38,13 +38,13 @@ public static class Globals
     //public enum Tasks:int
     public static class Tasks
     {
-        public const int SchedulerStatus = 100;
-        public const int SchedulerSendMission = 101;
-        public const int SchedulerCreateMission = 102;
-        public const int SchedulerClear = 103;
-        public const int Battery = 200;
-        public const int Distance = 201;
-        public const int RobotStatus = 202;
+        public const int GetScheduleStatus = 100;
+        public const int SendMissionToScheduler = 101;
+        public const int CreateMission = 102;
+        public const int ClearScheduler = 103;
+        public const int GetBattery = 200;
+        public const int GetDistance = 201;
+        public const int GetRobotStatus = 202;
     }
 
     // Status codes for PLC

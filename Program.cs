@@ -30,9 +30,6 @@ namespace Mirage
 
             setUpDefaultComms();
 
-            // Create the fleet which will contain out robot data
-            mirFleet = new Fleet();
-
             getInitialFleetData();
 
             if (debugLevel > -1)
@@ -57,68 +54,39 @@ namespace Mirage
                 // This is synchronous even though it involves http requests
                 if(SiemensPLC.newMsg)
                 {
-                    Console.WriteLine("==== New Task From PLC ====");
+                    if (debugLevel > -1)
+                        Console.WriteLine("==== New Task From PLC ====");
 
                     // Set PLC status to Mirage processing
                     SiemensPLC.updateTaskStatus(Status.StartedProcessing);
-                    int restStatus = Status.CompletedNoErrors;
 
                     // Check which task we've got to do & do it
                     // Save any response to predefined PLC registers
                     switch (SiemensPLC.task)
                     {
-                        case Tasks.SchedulerStatus:
-                            Console.WriteLine("==== Get Schedule Status ===="); // obtained from the fleet
-                            restStatus = mirFleet.issueGetRequest("mission_scheduler/" + SiemensPLC.robotID, SiemensPLC.robotID);
-                            SiemensPLC.writeStringData("mission_text", restStatus, mirFleet.robots[SiemensPLC.robotID].s.mission_text);
+                        case Tasks.GetScheduleStatus:
+                            getScheduleStatus();
                             break;
-                        case Tasks.SchedulerSendMission:
-                            Console.WriteLine("==== Send Mission To Scheduler ====");
-                            restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.m.postRequest());
-                            SiemensPLC.updateTaskStatus(restStatus);
+                        case Tasks.SendMissionToScheduler:
+                            sendMissionToScheduler();
                             break;
-                        case Tasks.SchedulerCreateMission:
-                            Console.WriteLine("==== Create New Mission In Scheduler ====");
-                            // create mission using /v2.0.0/missions + guuid
-                            // uses POST
-
-                            //status = sendRESTdata((testMission.create_mission(Int32.Parse(incomingMessage.Paramater))));
-                            //string resp;
-
-                            //if (status < 400)
-                            //    resp = "Success";
-                            //else
-                            //    resp = status.ToString();
-
-                            //outgoingMessage.saveMessage(incomingMessage.SerialNumber, resp, null, null);
-
-                            ////outgoingMessage.saveMessage(incomingMessage.SerialNumber, "MISSION", incomingMessage.Paramater, status.ToString());
-                            //Console.WriteLine(outgoingMessage.returnMsg());
+                        case Tasks.CreateMission:
+                            createMission();
                             break;
-                        case Tasks.SchedulerClear:
-                            Console.WriteLine("==== Clear Mission Schedule ====");
-                            restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.m.deleteRequest());
-                            SiemensPLC.updateTaskStatus(restStatus);
+                        case Tasks.ClearScheduler:
+                            clearScheduler();
                             break;
-                        case Tasks.Battery:
-                            Console.WriteLine("==== Get Battery Life ====");    // "battery_percentage" from robot status
-                            restStatus = mirFleet.issueGetRequest("status", SiemensPLC.robotID);
-                            SiemensPLC.writeFloatData("battery", restStatus, mirFleet.robots[SiemensPLC.robotID].s.battery_percentage);
+                        case Tasks.GetBattery:
+                            getBattery();
                             break;
-                        case Tasks.Distance:
-                            Console.WriteLine("==== Get Distance Travelled ====");  // "moved" from robot status
-                            restStatus = mirFleet.issueGetRequest("status", SiemensPLC.robotID);
-                            SiemensPLC.writeFloatData("moved", restStatus, mirFleet.robots[SiemensPLC.robotID].s.moved);
+                        case Tasks.GetDistance:
+                            getDistance();
                             break;
-                        case Tasks.RobotStatus:
-                            Console.WriteLine("==== Get Mission Status ====");  // "mission_text" from robot status
-                            restStatus = mirFleet.issueGetRequest("status", SiemensPLC.robotID);
-                            SiemensPLC.writeStringData("mission_text", restStatus, mirFleet.robots[SiemensPLC.robotID].s.mission_text);
+                        case Tasks.GetRobotStatus:
+                            getRobotStatus();
                             break;
                         default:
-                            Console.WriteLine("==== Unknown Mission ====");
-                            SiemensPLC.updateTaskStatus(Status.CouldntProcessRequest);
-                            // Issue an alert
+                            unknownMission();
                             break;
                     }
 
@@ -127,8 +95,7 @@ namespace Mirage
                     SiemensPLC.checkResponse();
                 }
 
-                // Poll MiR Fleet - async operation
-                // happens every pollInterval
+                // Poll MiR Fleet - async operation that happens every pollInterval
                 if (currentTimer < pollInterval)
                 {
                     try
@@ -137,12 +104,15 @@ namespace Mirage
                         {
                             // We're sending GET requests to the MiR servers
                             // Saving them asynchronously as they come along
+                            if (debugLevel > -1)
+                                Console.WriteLine("==== Getting Status ====");
 
-                            Console.WriteLine("==== Getting Status ====");
                             mirFleet.issueGetRequests("status");
                             await mirFleet.saveFleetStatusAsync();
 
-                            Console.WriteLine("==== Getting Registers ====");
+                            if (debugLevel > -1)
+                                Console.WriteLine("==== Getting Registers ====");
+
                             mirFleet.issueGetRequests("registers");
                             await mirFleet.saveFleetRegistersAsync();
                         }
@@ -164,9 +134,8 @@ namespace Mirage
                     }
                 }
 
-
                 // Perform calcs + reporting
-
+                calculationsAndReporting();
 
                 // Alert and error check
                 checkAlertsAndErrors();
@@ -177,15 +146,19 @@ namespace Mirage
             
             closeComms();
 
-            Console.WriteLine("==== Graceful Exit ====");
+            if (debugLevel > -1)
+                Console.WriteLine("==== Graceful Exit ====");
 
             Environment.Exit(1);
         }
 
         // Force the wait so we're doing things in order
         // Synchronous initial fetch, so there'll be some delay on start-up
-        public static void getInitialFleetData()
+        private static void getInitialFleetData()
         {
+            // Create the fleet which will contain out robot data
+            mirFleet = new Fleet();
+
             try
             {
                 try
@@ -286,6 +259,89 @@ namespace Mirage
             // Download missions
         }
 
+        private static void getScheduleStatus()
+        {
+            Console.WriteLine("==== Get Schedule Status ====");
+
+            int restStatus = Status.CompletedNoErrors;
+                restStatus = mirFleet.issueGetRequest("mission_scheduler/" + SiemensPLC.robotID, SiemensPLC.robotID);
+
+            SiemensPLC.writeStringData("mission_text", restStatus, mirFleet.robots[SiemensPLC.robotID].s.mission_text);
+        }
+
+        private static void sendMissionToScheduler()
+        {
+            Console.WriteLine("==== Send Mission To Scheduler ====");
+
+            int restStatus = Status.CompletedNoErrors;
+                restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.m.postRequest());
+
+            SiemensPLC.updateTaskStatus(restStatus);
+        }
+
+        private static void createMission()
+        {
+            Console.WriteLine("==== Create New Mission In Robot " + SiemensPLC.robotID + " ====");
+
+            int restStatus = Status.CompletedNoErrors;
+                restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.m.createMission(SiemensPLC.parameter));
+
+            SiemensPLC.updateTaskStatus(restStatus);
+        }
+
+        private static void clearScheduler()
+        {
+            Console.WriteLine("==== Clear Mission Schedule ====");
+
+            int restStatus = Status.CompletedNoErrors;
+                restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.m.deleteRequest());
+
+            SiemensPLC.updateTaskStatus(restStatus);
+        }
+
+        private static void getBattery()
+        {
+            Console.WriteLine("==== Get Battery Life ====");
+
+            int restStatus = Status.CompletedNoErrors;
+                restStatus = mirFleet.issueGetRequest("status", SiemensPLC.robotID);
+
+            SiemensPLC.writeFloatData("battery", restStatus, mirFleet.robots[SiemensPLC.robotID].s.battery_percentage);
+        }
+
+        private static void getDistance()
+        {
+            Console.WriteLine("==== Get Distance Travelled ====");
+
+            int restStatus = Status.CompletedNoErrors;
+                restStatus = mirFleet.issueGetRequest("status", SiemensPLC.robotID);
+
+            SiemensPLC.writeFloatData("moved", restStatus, mirFleet.robots[SiemensPLC.robotID].s.moved);
+        }
+
+        private static void getRobotStatus()
+        {
+            Console.WriteLine("==== Get Mission Status ====");
+
+            int restStatus = Status.CompletedNoErrors;
+                restStatus = mirFleet.issueGetRequest("status", SiemensPLC.robotID);
+
+            SiemensPLC.writeStringData("mission_text", restStatus, mirFleet.robots[SiemensPLC.robotID].s.mission_text);
+        }
+
+        private static void unknownMission()
+        {
+            Console.WriteLine("==== Unknown Mission ====");
+            SiemensPLC.updateTaskStatus(Status.CouldntProcessRequest);
+
+            // Issue an alert
+        }
+
+
+        private static void calculationsAndReporting()
+        {
+
+        }
     }
 }
 

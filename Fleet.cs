@@ -130,7 +130,7 @@ namespace Mirage
             {
                 robots[robotID].saveStatusInMemory(httpResponseTasks[robotID].Result);
             }
-            else if (type === "mission_scheduler")
+            else if (type == "mission_scheduler")
             {
                 fleetManager.m.saveToMemory(fleetResponseTask.Result);
             }
