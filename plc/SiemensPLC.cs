@@ -1,19 +1,31 @@
-﻿using DotNetSiemensPLCToolBoxLibrary.Communication.LibNoDave;
-using System;
-using System.Net;
+﻿using System;
+using System.Xml;
 using static Globals;
+using DotNetSiemensPLCToolBoxLibrary.Communication.LibNoDave;
 
 namespace Mirage.plc
 {
+    /// <summary>
+    /// Contains all the methods and data related to a Siemens PLC.
+    /// </summary>
+    /// <remarks>
+    /// The data is divided into three parts: connection details,
+    /// storage of the task control and storage of data itself.
+    /// The methods are primarily for establishing a connection,
+    /// writing and reading from a PLC.
+    /// </remarks>
     class SiemensPLC
     {
-        public static libnodave.daveOSserialType fds;
-        public static libnodave.daveInterface di;
-        public static libnodave.daveConnection dc;
+        private static libnodave.daveOSserialType fds;
+        private static libnodave.daveInterface di;
+        private static libnodave.daveConnection dc;
 
-        // For S7-1200 and 1500, use rack = 0, slot = 1
-        private static string IP = "10.6.1.16";
-        private static int port = 102;
+        //=========================================================|
+        // For S7-1200 and 1500, use rack = 0, slot = 1            |
+        // IP and port are fetched at initialization, from config  |
+        //=========================================================|
+        private static string IP;
+        private static int port;
         private static int rack = 0;
         private static int slot = 1;
 
@@ -21,10 +33,10 @@ namespace Mirage.plc
         // These should reflect the Data Block Nos in PLC          |
         //                                                         |
         // We're assuming that each block is completely dedicated  |
-        // to storing only this data, so they start at 0.          |    
+        // to storing only this data, so they start at offset 0.   |    
         //=========================================================|
-        private static int taskControlDB = 0;
-        private static int dataStorageDB = 1;
+        private static int taskControlDB;
+        private static int dataStorageDB;
 
         //=========================================================|
         //  PLC Task Control Block                                 |
@@ -46,19 +58,48 @@ namespace Mirage.plc
         public static byte[] memoryBuffer = new byte[16];
         public static int plcConnectionErrors = 0;
 
-
+        /// <summary>
+        /// Opens the plc_config file and sets static variables such as IP.
+        /// </summary>
         public static void initialize()
         {
+            logger(typeof(SiemensPLC), DebugLevel.DEBUG, "==== Starting Initialization ====");
 
+            try
+            {
+                XmlDocument doc = new XmlDocument();
+                            doc.Load(@"plc_config.xml");
+
+                IP = doc.DocumentElement.SelectSingleNode("/plc/connectionString/ip").InnerText;
+                port = Int16.Parse(doc.DocumentElement.SelectSingleNode("/plc/connectionString/port").InnerText);
+                rack = Int16.Parse(doc.DocumentElement.SelectSingleNode("/plc/connectionString/rack").InnerText);
+                slot = Int16.Parse(doc.DocumentElement.SelectSingleNode("/plc/connectionString/slot").InnerText);
+                taskControlDB = Int16.Parse(doc.DocumentElement.SelectSingleNode("/plc/data/taskControlDB").InnerText);
+                dataStorageDB = Int16.Parse(doc.DocumentElement.SelectSingleNode("/plc/data/dataStorageDB").InnerText);
+
+                logger(typeof(SiemensPLC), DebugLevel.DEBUG, "IP : " + IP);
+                logger(typeof(SiemensPLC), DebugLevel.DEBUG, "Port : " + port);
+                logger(typeof(SiemensPLC), DebugLevel.DEBUG, "Rack : " + rack);
+                logger(typeof(SiemensPLC), DebugLevel.DEBUG, "Slot : " + slot);
+                logger(typeof(SiemensPLC), DebugLevel.DEBUG, "Task Control DB No : " + taskControlDB);
+                logger(typeof(SiemensPLC), DebugLevel.DEBUG, "Data Storage DB No : " + dataStorageDB);
+            }
+            catch (Exception e)
+            {
+                keepRunning = false;
+
+                logger(typeof(SiemensPLC), DebugLevel.ERROR, "Siemens PLC failed to load configuration file. Mirage will terminate.");
+                log.Error(e);
+                logger(typeof(SiemensPLC), DebugLevel.ERROR, "Error : {e}");
+            }
+
+            logger(typeof(SiemensPLC), DebugLevel.DEBUG, "==== Initialization Completed ====");
         }
 
 
-        //
-        // Remember that the PLC data blocks can't be optimized
-        // in order for the program to establish connection.
-        //
-        // See 
-        //
+        /// <summary>
+        /// Connects to a Siemens PLC. Based on information obtained through the initialize function.
+        /// </summary>
         public static void establishConnection()
         {
             fds.rfd = libnodave.openSocket(port, IP);
@@ -76,7 +117,7 @@ namespace Mirage.plc
         // Polls the PLC to check if it needs to issue any new missions
         public static void poll()
         {
-            int serialNumber, task, robotID, status;
+            int serialNumber, task, robotID, status, parameter;
 
             // Get the data from the PLC
             try
@@ -112,11 +153,22 @@ namespace Mirage.plc
                     tempBytesForConversion = new byte[4] { memoryBuffer[12], memoryBuffer[13], memoryBuffer[14], memoryBuffer[15] };
                     status = BitConverter.ToInt32(tempBytesForConversion, 0);
 
+                    // This is the status of the request - should be 0 stuff
+                    tempBytesForConversion = new byte[4] { memoryBuffer[16], memoryBuffer[17], memoryBuffer[18], memoryBuffer[19] };
+                    parameter = BitConverter.ToInt32(tempBytesForConversion, 0);
+
                     newMsg = true;
                     SiemensPLC.status = status;
                     SiemensPLC.task = task;
                     SiemensPLC.robotID = robotID;
                     SiemensPLC.serialNumber = serialNumber;
+                    SiemensPLC.parameter = parameter;
+
+                    logger(typeof(SiemensPLC), DebugLevel.DEBUG, "Status : " + status);
+                    logger(typeof(SiemensPLC), DebugLevel.DEBUG, "Task : " + task);
+                    logger(typeof(SiemensPLC), DebugLevel.DEBUG, "Robot ID : " + robotID);
+                    logger(typeof(SiemensPLC), DebugLevel.DEBUG, "Serial No : " + serialNumber);
+                    logger(typeof(SiemensPLC), DebugLevel.DEBUG, "Parameter : " + parameter);
                 }
                 else
                 {

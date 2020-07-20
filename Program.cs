@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Net;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using Mirage.plc;
 using static Globals;
+using static Globals.DebugLevel;
 
 namespace Mirage
 {
@@ -26,6 +28,8 @@ namespace Mirage
 
             readAllSettings();
 
+            Environment.Exit(1);
+
             connectToDB();
 
             setUpDefaultComms();
@@ -33,7 +37,10 @@ namespace Mirage
             getInitialFleetData();
 
             if (debugLevel > -1)
+            { 
                 Console.WriteLine("==== Starting Main Loop ====");
+                logger(typeof(Program), INFO, "==== Starting Main Loop ====");
+            }
 
             int i = 0;
 
@@ -141,7 +148,8 @@ namespace Mirage
                 checkAlertsAndErrors();
 
                 Console.WriteLine("==== Loop " + i + " Finished ====");
-                //Thread.Sleep(Globals.pollInterval*1000); // Ugly as fuck but will change to event based stuff once I add a GUI
+
+                Thread.Sleep(Globals.pollInterval*1000); // Ugly as fuck but will change to event based stuff once I add a GUI
             }
             
             closeComms();

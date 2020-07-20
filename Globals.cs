@@ -6,8 +6,9 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using Twilio;
-using Twilio.Rest.Api.V2010.Account;
-using Twilio.Types;
+using log4net;
+using log4net.Config;
+using System.IO;
 
 /*  D E B U G    L E V E L S
  *  0 - No Debug, just standard messages 
@@ -32,6 +33,17 @@ public static class Globals
 
     public static string fleetManagerIP;
     public static AuthenticationHeaderValue fleetManagerAuthToken;
+
+    public static ILog log = LogManager.GetLogger(typeof(Globals));
+    
+
+    public enum DebugLevel
+    {
+        INFO = 1,
+        DEBUG = 2,
+        WARNING = 3,
+        ERROR = 4
+    }
 
     // Used for issuing tasks to the fleet or robots
     // Based on PLC input
@@ -62,10 +74,10 @@ public static class Globals
 
     public static void readAllSettings()
     {
-        Console.Clear();
+        var logRepository = LogManager.GetRepository(System.Reflection.Assembly.GetEntryAssembly());
+        XmlConfigurator.Configure(logRepository, new FileInfo("log4net.config"));
 
-        Console.WriteLine("MiRage Data Harvester v0.01");
-        Console.WriteLine("Property of Iconsys");
+        logger(typeof(Globals), DebugLevel.INFO, "==== Starting Mirage Data Harvester v0.01 ====");
 
         try
         {
@@ -76,8 +88,10 @@ public static class Globals
 
             if (appSettings.Count == 0)
             {
-                Console.WriteLine("AppSettings Branch Within App.config Is Empty.");
+                logger(typeof(Globals), DebugLevel.ERROR, "AppSettings Branch Within App.config Is Empty");
                 // Send an email alert???
+                // Send an SMS message
+                keepRunning = false;
             }
             else
             {
@@ -104,12 +118,9 @@ public static class Globals
                 Console.WriteLine("Polling occurs every {0} seconds", int.Parse(ConfigurationManager.AppSettings["pollInterval"]));
                 Console.WriteLine("Debug Level is set to {0}", debugLevel);
 
-                if (debugLevel > 0)
+                foreach (var key in appSettings.AllKeys)
                 {
-                    foreach (var key in appSettings.AllKeys)
-                    {
-                        Console.WriteLine("{0} is set to {1}", key, appSettings[key]);
-                    }
+                    logger(typeof(Globals), DebugLevel.DEBUG, key + " is set to " + appSettings[key]);
                 }
             }
         }
@@ -118,6 +129,11 @@ public static class Globals
             Console.WriteLine("==== Error reading app settings ====");
             // TODO: Use default values or send an email and terminate?
         }
+
+        SiemensPLC.initialize();
+        SiemensPLC.establishConnection();
+        SiemensPLC.poll();
+
 
         const string accountSid = "ACc9a9248dd2a1f6d6e673148e73cfc2f9";
         const string authToken = "b57abe0211b4fde95bf7ae159eb75e2d";
@@ -203,6 +219,7 @@ public static class Globals
             Console.WriteLine("==== Closing Socket Connections ====");
 
         comms.Dispose();
+
         SiemensPLC.disconnect();
     }
 
@@ -327,28 +344,28 @@ public static class Globals
         }
     }
 
-    public static void AddUpdateAppSettings(string key, string value)
+    public static void logger(Type type, DebugLevel debug, string message)
     {
-        try
-        {
-            var configFile = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
-            var settings = configFile.AppSettings.Settings;
+        log = LogManager.GetLogger(type);
 
-            if (settings[key] == null)
-            {
-                settings.Add(key, value);
-            }
-            else
-            {
-                settings[key].Value = value;
-            }
-
-            configFile.Save(ConfigurationSaveMode.Modified);
-            ConfigurationManager.RefreshSection(configFile.AppSettings.SectionInformation.Name);
-        }
-        catch (ConfigurationErrorsException)
+        switch (debug)
         {
-            Console.WriteLine("Error writing app settings");
+            case DebugLevel.INFO:
+                log.Info(message);
+                break;
+            case DebugLevel.DEBUG:
+                if(debugLevel > 0)
+                { 
+                    log.Debug(message);
+                }
+                break;
+            case DebugLevel.WARNING:
+                log.Warn(message);
+                break;
+            case DebugLevel.ERROR:
+                log.Error(message);
+                // Send an SMS message
+                break;
         }
     }
 }

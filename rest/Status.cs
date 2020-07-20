@@ -280,7 +280,7 @@ namespace Mirage.rest
             {
                 Content = new StringContent(payload, Encoding.UTF8, "application/json"),
                 Method = HttpMethod.Post,
-                RequestUri = new Uri("mission_scheduler")
+                RequestUri = new Uri("status/")
             };
 
             return request;

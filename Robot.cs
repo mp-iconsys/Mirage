@@ -121,7 +121,7 @@ namespace Mirage
                 Globals.issueInsertQuery(query);
 
                 // Change the App.config setting so that we load an existing config next time
-                Globals.AddUpdateAppSettings("resumingSession", "true");
+                //Globals.AddUpdateAppSettings("resumingSession", "true");
             }
         }
 
