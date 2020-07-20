@@ -2,6 +2,7 @@
 using System.Xml;
 using static Globals;
 using DotNetSiemensPLCToolBoxLibrary.Communication.LibNoDave;
+using static DotNetSiemensPLCToolBoxLibrary.Communication.LibNoDave.libnodave;
 
 namespace Mirage.plc
 {
@@ -16,9 +17,9 @@ namespace Mirage.plc
     /// </remarks>
     class SiemensPLC
     {
-        private static libnodave.daveOSserialType fds;
-        private static libnodave.daveInterface di;
-        private static libnodave.daveConnection dc;
+        private static daveOSserialType fds;
+        private static daveInterface di;
+        private static daveConnection dc;
 
         //=========================================================|
         // For S7-1200 and 1500, use rack = 0, slot = 1            |
@@ -56,7 +57,7 @@ namespace Mirage.plc
         public static byte plcValue;
         public static int memoryres;
         public static byte[] memoryBuffer = new byte[16];
-        public static int plcConnectionErrors = 0;
+        public static int plcConnectionErrors = 5;
 
         /// <summary>
         /// Opens the plc_config file and sets static variables such as IP.
@@ -102,16 +103,38 @@ namespace Mirage.plc
         /// </summary>
         public static void establishConnection()
         {
+            logger(typeof(SiemensPLC), DebugLevel.DEBUG, "==== Establishing A Connection ====");
+
             fds.rfd = libnodave.openSocket(port, IP);
             fds.wfd = fds.rfd;
-            di = new libnodave.daveInterface(fds, "IF1", 0, libnodave.daveProtoISOTCP, libnodave.daveSpeed187k);
 
-            res = di.initAdapter();
-            // check if initializing the adapter worked
+            if (fds.rfd != IntPtr.Zero)
+            {
+                logger(typeof(SiemensPLC), DebugLevel.DEBUG, "Socket Opened Successfully");
 
-            dc = new libnodave.daveConnection(di, 0, rack, slot);
-            res = dc.connectPLC();
-            // check if connectign to the plc worked
+                di = new libnodave.daveInterface(fds, "IF1", 0, libnodave.daveProtoISOTCP, libnodave.daveSpeed187k);
+                //res = di.initAdapter();
+                di.setTimeout(1000000);
+                dc = new libnodave.daveConnection(di, 0, rack, slot);
+
+                if (0 == dc.connectPLC())
+                {
+                    logger(typeof(SiemensPLC), DebugLevel.INFO, "Connected To The PLC");
+                }
+                else
+                {
+                    logger(typeof(SiemensPLC), DebugLevel.ERROR, "Failed To Connect. Trying again, with result " + dc.connectPLC());
+                    plcConnectionErrors--;
+                    // failure
+                    // terminate?
+                }
+            }
+            else
+            {
+                logger(typeof(SiemensPLC), DebugLevel.ERROR, "Socket Failed To Open. DaveOSserialType is initialized to " + fds.rfd);
+            }
+
+            logger(typeof(SiemensPLC), DebugLevel.DEBUG, "==== Finished Establishing A Connection ====");
         }
 
         // Polls the PLC to check if it needs to issue any new missions

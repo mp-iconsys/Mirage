@@ -30,6 +30,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Update="C:\Users\PaliszewskiM\.nuget\packages\dotnetprojects.dotnetsiemensplctoolboxlibrary\4.0.370\contentFiles\any\netstandard2.1\libnodave_jfkmod.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="log4net.config">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
