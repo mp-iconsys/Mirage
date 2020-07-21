@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Xml;
 using static Globals;
+using static Globals.DebugLevel;
 using DotNetSiemensPLCToolBoxLibrary.Communication.LibNoDave;
 using static DotNetSiemensPLCToolBoxLibrary.Communication.LibNoDave.libnodave;
 
@@ -31,7 +32,7 @@ namespace Mirage.plc
         private static int slot = 1;
 
         //=========================================================|
-        // These should reflect the Data Block Nos in PLC          |
+        // These should reflect the data blocks in the PLC         |
         //                                                         |
         // We're assuming that each block is completely dedicated  |
         // to storing only this data, so they start at offset 0.   |    
@@ -42,7 +43,6 @@ namespace Mirage.plc
         //=========================================================|
         //  PLC Task Control Block                                 |
         //=========================================================|
-
         // Start serial number on -1. The PLC value is unsigned
         // so this way we'll always pick up the first task, 
         // without risk of accidently having the same serial number in memory and in plc
@@ -51,20 +51,24 @@ namespace Mirage.plc
         public static int task;
         public static int status;
         public static int parameter;
+
         public static bool newMsg;
 
-        public static int res;
-        public static byte plcValue;
-        public static int memoryres;
-        public static byte[] memoryBuffer = new byte[16];
-        public static int plcConnectionErrors = 5;
+        private static int memoryres;
+        private static byte[] memoryBuffer = new byte[16];
+
+        //=========================================================|
+        //  Used For Debugging                                     |     
+        //=========================================================|
+        public static int plcConnectionErrors = 0;
+        private static readonly Type AREA = typeof(SiemensPLC);
 
         /// <summary>
         /// Opens the plc_config file and sets static variables such as IP.
         /// </summary>
         public static void initialize()
         {
-            logger(typeof(SiemensPLC), DebugLevel.DEBUG, "==== Starting Initialization ====");
+            logger(AREA, DEBUG, "==== Starting Initialization ====");
 
             try
             {
@@ -78,39 +82,35 @@ namespace Mirage.plc
                 taskControlDB = Int16.Parse(doc.DocumentElement.SelectSingleNode("/plc/data/taskControlDB").InnerText);
                 dataStorageDB = Int16.Parse(doc.DocumentElement.SelectSingleNode("/plc/data/dataStorageDB").InnerText);
 
-                logger(typeof(SiemensPLC), DebugLevel.DEBUG, "IP : " + IP);
-                logger(typeof(SiemensPLC), DebugLevel.DEBUG, "Port : " + port);
-                logger(typeof(SiemensPLC), DebugLevel.DEBUG, "Rack : " + rack);
-                logger(typeof(SiemensPLC), DebugLevel.DEBUG, "Slot : " + slot);
-                logger(typeof(SiemensPLC), DebugLevel.DEBUG, "Task Control DB No : " + taskControlDB);
-                logger(typeof(SiemensPLC), DebugLevel.DEBUG, "Data Storage DB No : " + dataStorageDB);
+                logger(AREA, DEBUG, "IP : " + IP);
+                logger(AREA, DEBUG, "Port : " + port);
+                logger(AREA, DEBUG, "Rack : " + rack);
+                logger(AREA, DEBUG, "Slot : " + slot);
+                logger(AREA, DEBUG, "Task Control DB No : " + taskControlDB);
+                logger(AREA, DEBUG, "Data Storage DB No : " + dataStorageDB);
             }
-            catch (Exception e)
+            catch (Exception exception)
             {
-                keepRunning = false;
-
-                logger(typeof(SiemensPLC), DebugLevel.ERROR, "Siemens PLC failed to load configuration file. Mirage will terminate.");
-                log.Error(e);
-                logger(typeof(SiemensPLC), DebugLevel.ERROR, "Error : {e}");
+                //keepRunning = false;
+                logger(AREA, ERROR, "Siemens PLC failed to load configuration file. Mirage will terminate. Exception : ", exception);
             }
 
-            logger(typeof(SiemensPLC), DebugLevel.DEBUG, "==== Initialization Completed ====");
+            logger(AREA, DEBUG, "==== Initialization Completed ====");
         }
-
 
         /// <summary>
         /// Connects to a Siemens PLC. Based on information obtained through the initialize function.
         /// </summary>
         public static void establishConnection()
         {
-            logger(typeof(SiemensPLC), DebugLevel.DEBUG, "==== Establishing A Connection ====");
+            logger(AREA, DEBUG, "==== Establishing A Connection ====");
 
             fds.rfd = libnodave.openSocket(port, IP);
             fds.wfd = fds.rfd;
 
             if (fds.rfd != IntPtr.Zero)
             {
-                logger(typeof(SiemensPLC), DebugLevel.DEBUG, "Socket Opened Successfully");
+                logger(AREA, DEBUG, "Socket Opened Successfully");
 
                 di = new libnodave.daveInterface(fds, "IF1", 0, libnodave.daveProtoISOTCP, libnodave.daveSpeed187k);
                 //res = di.initAdapter();
@@ -119,27 +119,32 @@ namespace Mirage.plc
 
                 if (0 == dc.connectPLC())
                 {
-                    logger(typeof(SiemensPLC), DebugLevel.INFO, "Connected To The PLC");
+                    logger(AREA, INFO, "Connected To The PLC");
                 }
                 else
                 {
-                    logger(typeof(SiemensPLC), DebugLevel.ERROR, "Failed To Connect. Trying again, with result " + dc.connectPLC());
+                    logger(AREA, ERROR, "Failed To Connect. Trying again, with result " + dc.connectPLC());
                     plcConnectionErrors--;
+                    newMsg = false;
                     // failure
                     // terminate?
                 }
             }
             else
             {
-                logger(typeof(SiemensPLC), DebugLevel.ERROR, "Socket Failed To Open. DaveOSserialType is initialized to " + fds.rfd);
+                logger(AREA, ERROR, "Socket Failed To Open. DaveOSserialType is initialized to " + fds.rfd);
             }
 
-            logger(typeof(SiemensPLC), DebugLevel.DEBUG, "==== Finished Establishing A Connection ====");
+            logger(AREA, DEBUG, "==== Finished Establishing A Connection ====");
         }
 
-        // Polls the PLC to check if it needs to issue any new missions
+        /// <summary>
+        /// Polls the PLC for data regarding new tasks or missions.
+        /// </summary>
         public static void poll()
         {
+            logger(AREA, DEBUG, "==== Starting To Poll ====");
+
             int serialNumber, task, robotID, status, parameter;
 
             // Get the data from the PLC
@@ -147,186 +152,266 @@ namespace Mirage.plc
             { 
                 // readBytes(Area, Data Block Number (in PLC), Start Byte, Length, Byte Container)
                 memoryres = dc.readBytes(libnodave.daveFlags, taskControlDB, 0, 16, memoryBuffer);
-            }
-            catch(Exception e)
-            {
 
-            }
-
-            if (memoryres == 0)
-            {
-                byte[] tempBytesForConversion = new byte[4] { memoryBuffer[0], memoryBuffer[1], memoryBuffer[2], memoryBuffer[3] };
-
-                // Convert memory buffer from bytes to ints
-                // 32 Bit int is 4 bytes
-                serialNumber = BitConverter.ToInt32(tempBytesForConversion, 0);
-
-                // Only change memory if the PLC is making a new request
-                if(serialNumber != SiemensPLC.serialNumber)
+                if (memoryres == 0)
                 {
-                    // This determines which MiR to affect
-                    tempBytesForConversion = new byte[4] { memoryBuffer[4], memoryBuffer[5], memoryBuffer[6], memoryBuffer[7] };
-                    robotID = BitConverter.ToInt32(tempBytesForConversion, 0);
+                    byte[] tempBytesForConversion = new byte[4] { memoryBuffer[0], memoryBuffer[1], memoryBuffer[2], memoryBuffer[3] };
 
-                    // This determines which action to perform
-                    tempBytesForConversion = new byte[4] { memoryBuffer[8], memoryBuffer[9], memoryBuffer[10], memoryBuffer[11] };
-                    task = BitConverter.ToInt32(tempBytesForConversion, 0);
+                    // Convert memory buffer from bytes to ints
+                    // 32 Bit int is 4 bytes
+                    serialNumber = BitConverter.ToInt32(tempBytesForConversion, 0);
 
-                    // This is the status of the request - should be 0 stuff
-                    tempBytesForConversion = new byte[4] { memoryBuffer[12], memoryBuffer[13], memoryBuffer[14], memoryBuffer[15] };
-                    status = BitConverter.ToInt32(tempBytesForConversion, 0);
+                    // Only change memory if the PLC is making a new request
+                    if (serialNumber != SiemensPLC.serialNumber)
+                    {
+                        // This determines which MiR to affect
+                        tempBytesForConversion = new byte[4] { memoryBuffer[4], memoryBuffer[5], memoryBuffer[6], memoryBuffer[7] };
+                        robotID = BitConverter.ToInt32(tempBytesForConversion, 0);
 
-                    // This is the status of the request - should be 0 stuff
-                    tempBytesForConversion = new byte[4] { memoryBuffer[16], memoryBuffer[17], memoryBuffer[18], memoryBuffer[19] };
-                    parameter = BitConverter.ToInt32(tempBytesForConversion, 0);
+                        // This determines which action to perform
+                        tempBytesForConversion = new byte[4] { memoryBuffer[8], memoryBuffer[9], memoryBuffer[10], memoryBuffer[11] };
+                        task = BitConverter.ToInt32(tempBytesForConversion, 0);
 
-                    newMsg = true;
-                    SiemensPLC.status = status;
-                    SiemensPLC.task = task;
-                    SiemensPLC.robotID = robotID;
-                    SiemensPLC.serialNumber = serialNumber;
-                    SiemensPLC.parameter = parameter;
+                        // This is the status of the request - should be 0
+                        tempBytesForConversion = new byte[4] { memoryBuffer[12], memoryBuffer[13], memoryBuffer[14], memoryBuffer[15] };
+                        status = BitConverter.ToInt32(tempBytesForConversion, 0);
 
-                    logger(typeof(SiemensPLC), DebugLevel.DEBUG, "Status : " + status);
-                    logger(typeof(SiemensPLC), DebugLevel.DEBUG, "Task : " + task);
-                    logger(typeof(SiemensPLC), DebugLevel.DEBUG, "Robot ID : " + robotID);
-                    logger(typeof(SiemensPLC), DebugLevel.DEBUG, "Serial No : " + serialNumber);
-                    logger(typeof(SiemensPLC), DebugLevel.DEBUG, "Parameter : " + parameter);
+                        // Additional data, such as mission number, etc
+                        tempBytesForConversion = new byte[4] { memoryBuffer[16], memoryBuffer[17], memoryBuffer[18], memoryBuffer[19] };
+                        parameter = BitConverter.ToInt32(tempBytesForConversion, 0);
+
+                        newMsg = true;
+                        SiemensPLC.status = status;
+                        SiemensPLC.task = task;
+                        SiemensPLC.robotID = robotID;
+                        SiemensPLC.serialNumber = serialNumber;
+                        SiemensPLC.parameter = parameter;
+
+                        logger(AREA, DebugLevel.DEBUG, "Status : " + status);
+                        logger(AREA, DebugLevel.DEBUG, "Task : " + task);
+                        logger(AREA, DebugLevel.DEBUG, "Robot ID : " + robotID);
+                        logger(AREA, DebugLevel.DEBUG, "Serial No : " + serialNumber);
+                        logger(AREA, DebugLevel.DEBUG, "Parameter : " + parameter);
+                    }
+                    else
+                    {
+                        newMsg = false;
+                    }
                 }
                 else
                 {
+                    // TODO: look at libnodave for better error codes
+                    // Couldn't read the PLC bytes
+                    // Write as error to DB
+                    // Iterate the PLC connectivity counter
+                    plcConnectionErrors--;
                     newMsg = false;
                 }
+
             }
-            else
+            catch(Exception exception)
             {
-                // TODO: look at libnodave for better error codes
-                // Couldn't read the PLC bytes
-                // Write as error to DB
-                // Iterate the PLC connectivity counter
-                plcConnectionErrors++;
+                logger(AREA, ERROR, "Polling Failed. Error : ", exception);
+                plcConnectionErrors--;
+                newMsg = false;
             }
+
+            // Added for testing messages
+            if(!newMsg)
+            {
+                Console.WriteLine("Enter SerialNumber: ");
+                SiemensPLC.serialNumber = Int32.Parse(Console.ReadLine());
+
+                Console.WriteLine("Enter Task: ");
+                SiemensPLC.task = Int32.Parse(Console.ReadLine());
+
+                Console.WriteLine("Enter Robot ID: ");
+                SiemensPLC.robotID = Int32.Parse(Console.ReadLine());
+
+                SiemensPLC.status = 0;
+                SiemensPLC.parameter = 0;
+            }
+
+            logger(AREA, DEBUG, "==== Completed Polling ====");
         }
 
-        //
-        // A function to write data to a PLC at the end of an operation
-        // Should write three values:
-        // - if the assigned task was successful
-        // - the serial number of the task
-        // - data to be used for the PLC (batter life, etc)
-        //
-        // Defined on generic types so it can take floats, ints, strings 
-        public static void writeFloatData(string type, int statusCode, float data)
+        /// <summary>
+        /// A function to write data to a PLC at the end of an operation
+        /// Should write three values:
+        /// - if the assigned task was successful
+        /// - the serial number of the task
+        /// - data to be used for the PLC (batter life, etc)
+        ///
+        /// Defined on generic types so it can take floats, ints, strings 
+        /// </summary>
+        public static void writeData(string type, int statusCode, float data)
         {
+            logger(AREA, DEBUG, "==== Starting To Write Data ====");
+
+            logger(AREA, DEBUG, "Type : " + type);
+            logger(AREA, DEBUG, "Status Code : " + statusCode);
+            logger(AREA, DEBUG, "Data : " + data);
+
             // First, check if the data response was successful
-            if(statusCode == Status.CompletedPartially || statusCode == Status.CompletedNoErrors)
+            if (statusCode == Status.CompletedPartially || statusCode == Status.CompletedNoErrors)
             {
-                byte[] tempBytes; 
+                logger(AREA, DEBUG, "Request Completed Or Completed Partially. Status Code : " + statusCode);
+
+                byte[] tempBytes = BitConverter.GetBytes(data); 
                 int result = 0;
 
                 // TODO: This should really use an enum instead of strings
                 if (type == "moved")
                 {
-                    tempBytes = BitConverter.GetBytes(data);
-                    result = dc.writeBytes(libnodave.daveFlags, dataStorageDB, 12, 4, tempBytes); // location is incorrect atm
+                    try
+                    {
+                        result = dc.writeBytes(libnodave.daveFlags, dataStorageDB, 12, 4, tempBytes); // location is incorrect atm
+                    }
+                    catch
+                    {
+
+                    }
                 }
                 else if(type == "battery")
                 {
-                    tempBytes = BitConverter.GetBytes(data);
-                    result = dc.writeBytes(libnodave.daveFlags, dataStorageDB, 12, 4, tempBytes); // location is incorrect atm
+                    try
+                    {
+                        result = dc.writeBytes(libnodave.daveFlags, dataStorageDB, 12, 4, tempBytes); // location is incorrect atm
+                    }
+                    catch
+                    {
+
+                    }
                 }
 
                 if (result != 0)
                 {
-                    // Flag error
-
+                    logger(AREA, ERROR, "Failed To Save Data In PLC. Check PLC Connectivity.");
+                    plcConnectionErrors++;
                 }
             }
             else if(statusCode == Status.CouldntProcessRequest)
             {
+                logger(AREA, WARNING, "We Couldn't Process The Request. Status Code : " + statusCode);
+
                 updateTaskStatus(Status.CouldntProcessRequest);
-                // Send alert
             }
             else if(statusCode == Status.FatalError)
             {
+                logger(AREA, WARNING, "Fatal Error. Status Code : " + statusCode);
+
                 updateTaskStatus(Status.FatalError);
-                // Send alert
             }
             else
             {
+                logger(AREA, WARNING, "Unknown Status. Status Code : " + statusCode);
+
                 // Unknown Status ??? - > Treat like a fatal error
                 updateTaskStatus(Status.FatalError);
                 // Send alert
             }
+
+            logger(AREA, DEBUG, "==== Completed Data Write ====");
         }
 
-        public static void writeStringData(string type, int statusCode, string data)
+        public static void writeData(string type, int statusCode, string data)
         {
+            logger(AREA, DEBUG, "==== Starting To Write Data ====");
+
+            logger(AREA, DEBUG, "Type : " + type);
+            logger(AREA, DEBUG, "Status Code : " + statusCode);
+            logger(AREA, DEBUG, "Data : " + data);
+
             // First, check if the data response was successful
             if (statusCode == Status.CompletedPartially || statusCode == Status.CompletedNoErrors)
             {
-                byte[] tempBytes;
+                logger(AREA, DEBUG, "Request Completed Or Completed Partially. Status Code : " + statusCode);
+
+                byte[] tempBytes = System.Text.Encoding.ASCII.GetBytes(data);
                 int result = 0;
 
                 if (type == "mission_text")
                 {
-                    tempBytes = System.Text.Encoding.ASCII.GetBytes(data);
-                    result = dc.writeBytes(libnodave.daveFlags, dataStorageDB, 12, 4, tempBytes); // location is incorrect atm
+                    try
+                    {
+                        result = dc.writeBytes(libnodave.daveFlags, dataStorageDB, 12, 4, tempBytes); // location is incorrect atm
+                    }
+                    catch
+                    {
+
+                    }
                 }
 
                 if(result != 0)
                 {
-                    // Flag error
-
+                    logger(AREA, ERROR, "Failed To Save Data In PLC. Check PLC Connectivity.");
+                    plcConnectionErrors++;
                 }
             }
             else if (statusCode == Status.CouldntProcessRequest)
             {
+                logger(AREA, WARNING, "We Couldn't Process The Request. Status Code : " + statusCode);
+
                 updateTaskStatus(Status.CouldntProcessRequest);
-                // Send alert
             }
             else if (statusCode == Status.FatalError)
             {
+                logger(AREA, WARNING, "Fatal Error. Status Code : " + statusCode);
+
                 updateTaskStatus(Status.FatalError);
-                // Send alert
             }
             else
             {
+                logger(AREA, WARNING, "Unknown Status. Status Code : " + statusCode);
+
                 // Unknown Status ??? - > Treat like a fatal error
                 updateTaskStatus(Status.FatalError);
-                // Send alert
             }
+
+            logger(AREA, DEBUG, "==== Completed Data Write ====");
         }
 
-
+        /// <summary>
+        /// Updates the PLC Task Status memory, in the Task Control Data Block.
+        /// </summary>
+        /// <param name="status">Designates Task Status Code: still processing, success, failure, etc.</param>
+        /// See <see cref="Globals.Status"/> for possible task status codes.
         public static void updateTaskStatus(int status)
         {
+            logger(AREA, DEBUG, "==== Updating Task Status In PLC ====");
+
+            byte[] tempBytes = BitConverter.GetBytes(status);
+
             try
             {
-                byte[] tempBytes = BitConverter.GetBytes(status);
-
                 int result = dc.writeBytes(libnodave.daveFlags, taskControlDB, 12, 4, tempBytes);
 
                 if(result != 0)
                 {
-                    // Log error here
+                    logger(AREA, ERROR, "Task Status Update Was Unsuccessful.");
+                    plcConnectionErrors++;
+                }
+                else
+                {
+                    logger(AREA, DEBUG, "Task Status Updated To " + status);
                 }
             }
-            catch(Exception e)
+            catch(Exception exception)
             {
-
+                logger(AREA, ERROR, "Failed To Write To PLC. Exception: ", exception);
+                plcConnectionErrors++;
             }
+
+            logger(AREA, DEBUG, "==== Update Completed ====");
         }
 
-        //
-        // Checks to make sure PLC processed and parsed the reponse
-        //
-        // INPUT:   None
-        // OUTPUT:  Send Alert, or nothing
-        //
+        /// <summary>
+        /// Checks to make sure PLC processed and parsed the reponse. Implements
+        /// </summary>
         public static void checkResponse()
         {
-            int i = 0;
+            logger(AREA, DEBUG, "==== Checking PLC Response ====");
+
             byte[] tempByteBuffer = new byte[4];
 
             try
@@ -334,9 +419,10 @@ namespace Mirage.plc
                 // readBytes(Area, Data Block Number (in PLC), Start Byte, Length, Byte Container)
                 memoryres = dc.readBytes(libnodave.daveFlags, taskControlDB, 12, 4, tempByteBuffer);
             }
-            catch (Exception e)
+            catch (Exception exception)
             {
-
+                logger(AREA, ERROR, "Failed To Fetch Response Data: ", exception);
+                plcConnectionErrors++;
             }
 
             // PLC read was successful
@@ -364,13 +450,70 @@ namespace Mirage.plc
             }
 
             // Time-out if couldn't find the status
+
+            checkConnectivity();
+
+            // Set it to false so we
+            newMsg = false;
+
+            logger(AREA, DEBUG, "==== Response Check Completed ====");
         }
 
+        /// <summary>
+        /// Tries to reconnect to a PLC if the connection drops. If it does, and connectivity counter is below zero, it sends and email.
+        /// </summary>
+        private static void checkConnectivity()
+        {
+            logger(AREA, DEBUG, "==== Checking Connectivity ====");
+
+            if (plcConnectionErrors > 5)
+            {
+                logger(AREA, WARNING, "Error Counter Passed 5. Trying To Re-establish Connection.");
+
+                establishConnection();
+
+                if(plcConnectionErrors == 0)
+                {
+                    logger(AREA, INFO, "Connection Re-established.");
+                    // We've re-established a connection, error counter resets to 0
+                }
+                else if (plcConnectionErrors < 15)
+                {
+                    logger(AREA, ERROR, "Failed To Re-establish A Connection. Sending Alerts.");
+                    // Send an alert
+                }
+                else
+                {
+                    logger(AREA, ERROR, "Failed To Re-establish A Connection. Alert Has Been Sent.");
+                }
+            }
+            else
+            {
+                logger(AREA, DEBUG, "Connection Is Working.");
+            }
+
+            logger(AREA, DEBUG, "==== Connectivity Checked ====");
+        }
+
+        /// <summary>
+        /// Breaks the connection with a PLC. 
+        /// </summary>
         public static void disconnect()
         {
-            dc.disconnectPLC();
-            di.disconnectAdapter();
-            libnodave.closePort(fds.rfd);
+            logger(AREA, DEBUG, "==== Disconnecting PLC ====");
+
+            try
+            {
+                dc.disconnectPLC();
+                di.disconnectAdapter();
+                libnodave.closePort(fds.rfd);
+            }
+            catch (Exception exception)
+            {
+                logger(AREA, ERROR, "Failed To Disconnect. The Error Is: ", exception);
+            }
+
+            logger(AREA, DEBUG, "==== PLC Disconnection Completed ====");
         }
     }
 }

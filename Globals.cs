@@ -10,13 +10,6 @@ using log4net;
 using log4net.Config;
 using System.IO;
 
-/*  D E B U G    L E V E L S
- *  0 - No Debug, just standard messages 
- *  1 - Events
- *  2 - ...
- *  4 - Everything
-*/
-
 /* Contains global variables used by all of the classes.
  * 
  * 
@@ -130,11 +123,15 @@ public static class Globals
             // TODO: Use default values or send an email and terminate?
         }
 
+        //=========================================================|
+        //  Initialize Siemens PLC                                 |     
+        //=========================================================|
         SiemensPLC.initialize();
         SiemensPLC.establishConnection();
-        SiemensPLC.poll();
 
-
+        //=========================================================|
+        //  Initialize SMS Alerts                                  |     
+        //=========================================================|
         const string accountSid = "ACc9a9248dd2a1f6d6e673148e73cfc2f9";
         const string authToken = "b57abe0211b4fde95bf7ae159eb75e2d";
 
@@ -322,6 +319,8 @@ public static class Globals
         }
     }
 
+    // TODO: Probably remove this, later down the line
+    // No reason not to send alerts straight away
     public static void checkAlertsAndErrors()
     {
         int alert = 0;
@@ -364,6 +363,31 @@ public static class Globals
                 break;
             case DebugLevel.ERROR:
                 log.Error(message);
+                // Send an SMS message
+                break;
+        }
+    }
+
+    public static void logger(Type type, DebugLevel debug, string message, Exception exception)
+    {
+        log = LogManager.GetLogger(type);
+
+        switch (debug)
+        {
+            case DebugLevel.INFO:
+                log.Info(message, exception);
+                break;
+            case DebugLevel.DEBUG:
+                if (debugLevel > 0)
+                {
+                    log.Debug(message, exception);
+                }
+                break;
+            case DebugLevel.WARNING:
+                log.Warn(message, exception);
+                break;
+            case DebugLevel.ERROR:
+                log.Error(message, exception);
                 // Send an SMS message
                 break;
         }

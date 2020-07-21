@@ -129,6 +129,7 @@ namespace Mirage
             if (type == "status")
             {
                 robots[robotID].saveStatusInMemory(httpResponseTasks[robotID].Result);
+                logger(typeof(Fleet), DebugLevel.DEBUG, "Status is : " + robots[robotID].s.mission_text);
             }
             else if (type == "mission_scheduler")
             {
