@@ -6,30 +6,54 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using Twilio;
+using Twilio.Rest.Api.V2010.Account;
+using Twilio.Types;
 using log4net;
 using log4net.Config;
 using System.IO;
+using static Globals.DebugLevel;
 
-/* Contains global variables used by all of the classes.
+
+/* Contains global variables and methods employed by all of the classes.
  * 
  * 
  * 
 */
 public static class Globals
 {
+    //=========================================================|
+    //  Global Variables                                       |     
+    //=========================================================|
     public static bool keepRunning = true;
     public static bool resumingSession = false;
-    public static int debugLevel = 0, pollInterval, sizeOfFleet;
-    public static string logFile, emailAlert, baseURL;
+    public static int pollInterval;
+    public static int sizeOfFleet;
     public static MySqlConnection db;
     public static HttpClient comms;
 
     public static string fleetManagerIP;
     public static AuthenticationHeaderValue fleetManagerAuthToken;
 
-    public static ILog log = LogManager.GetLogger(typeof(Globals));
-    
+    //=========================================================|
+    //  Used For Logging & Debugging                           |     
+    //=========================================================|
+    public static int debugLevel = 0;
+    public static string logFile;
+    public static string emailAlert;
+    private static readonly Type AREA = typeof(Globals);
+    public static ILog log = LogManager.GetLogger(AREA);
 
+    //=========================================================|
+    //  For Sending SMS Alerts                                 |     
+    //=========================================================|
+    private const string accountSid = "ACc9a9248dd2a1f6d6e673148e73cfc2f9";
+    private const string authToken = "b57abe0211b4fde95bf7ae159eb75e2d";
+    private static string phone_rx;
+    private static string phone_twilio;
+
+    /// <summary>
+    /// Different Levels For Printing Debug Messages
+    /// </summary>
     public enum DebugLevel
     {
         INFO = 1,
@@ -38,9 +62,9 @@ public static class Globals
         ERROR = 4
     }
 
-    // Used for issuing tasks to the fleet or robots
-    // Based on PLC input
-    //public enum Tasks:int
+    /// <summary>
+    /// Used for issuing tasks to the fleet or robots. Matches PLC Task Codes. Does not conatin any methods.
+    /// </summary>
     public static class Tasks
     {
         public const int GetScheduleStatus = 100;
@@ -52,7 +76,9 @@ public static class Globals
         public const int GetRobotStatus = 202;
     }
 
-    // Status codes for PLC
+    /// <summary>
+    /// Task Status Codes that match PLC Task Status. Does not conatin any methods.
+    /// </summary>
     public static class Status
     {
         public const int Awaiting = 0;
@@ -65,12 +91,16 @@ public static class Globals
         public const int FatalError = 41;
     }
 
+    /// <summary>
+    /// Reads settings from various config files. They are: log4net.config, plc_config.xml and App.config.
+    /// </summary>
     public static void readAllSettings()
     {
+        // Begins logging to the console and file
         var logRepository = LogManager.GetRepository(System.Reflection.Assembly.GetEntryAssembly());
         XmlConfigurator.Configure(logRepository, new FileInfo("log4net.config"));
 
-        logger(typeof(Globals), DebugLevel.INFO, "==== Starting Mirage Data Harvester v0.01 ====");
+        logger(AREA, INFO, "==== Starting Mirage Data Harvester v0.01 ====");
 
         try
         {
@@ -81,20 +111,25 @@ public static class Globals
 
             if (appSettings.Count == 0)
             {
-                logger(typeof(Globals), DebugLevel.ERROR, "AppSettings Branch Within App.config Is Empty");
+                logger(AREA, ERROR, "AppSettings Branch Within App.config Is Empty");
+                logger(AREA, ERROR, "Terminating the application.");
+
                 // Send an email alert???
                 // Send an SMS message
                 keepRunning = false;
+                gracefulTermination("Failed to read application settings, on start-up. Check app.config.exe file. App will terminate");
             }
             else
             {
-                // Need to cast vars as default type is string
+                // Default type is string, so cast as appropriate
                 debugLevel = int.Parse(ConfigurationManager.AppSettings["debugLevel"]);
                 pollInterval = int.Parse(ConfigurationManager.AppSettings["pollInterval"]) * 1000; // Convert to seconds
                 sizeOfFleet = int.Parse(ConfigurationManager.AppSettings["sizeOfFleet"]);
                 logFile = ConfigurationManager.AppSettings["logFile"];
                 emailAlert = ConfigurationManager.AppSettings["emailAlert"];
                 resumingSession = bool.Parse(ConfigurationManager.AppSettings["resumingSession"]);
+                phone_rx = ConfigurationManager.AppSettings["phone_rx"];
+                phone_twilio = ConfigurationManager.AppSettings["phone_twilio"];
 
                 Console.WriteLine("Do you want to start a new session? (y/n)");
                 string newSession = Console.ReadLine();
@@ -113,77 +148,59 @@ public static class Globals
 
                 foreach (var key in appSettings.AllKeys)
                 {
-                    logger(typeof(Globals), DebugLevel.DEBUG, key + " is set to " + appSettings[key]);
+                    logger(AREA, DEBUG, key + " is set to " + appSettings[key]);
                 }
             }
         }
-        catch (ConfigurationErrorsException)
+        catch (ConfigurationErrorsException exception)
         {
-            Console.WriteLine("==== Error reading app settings ====");
-            // TODO: Use default values or send an email and terminate?
+            logger(AREA, DEBUG, "Couldn't Read App Settings. Error: ", exception);
+
+            gracefulTermination("Failed to read application settings, on start-up. App will terminate");
         }
 
         //=========================================================|
         //  Initialize Siemens PLC                                 |     
         //=========================================================|
         SiemensPLC.initialize();
-        SiemensPLC.establishConnection();
 
         //=========================================================|
-        //  Initialize SMS Alerts                                  |     
+        //  Initialize SMS communication for alerts                |     
         //=========================================================|
-        const string accountSid = "ACc9a9248dd2a1f6d6e673148e73cfc2f9";
-        const string authToken = "b57abe0211b4fde95bf7ae159eb75e2d";
-
-        string phone_rx = "+447583098757";
-        string phone_twilio = "+12512500577";
-        string msg_body = "Test Alert from Mirage";
-
-        // Initialize SMS communication for alerts
         TwilioClient.Init(accountSid, authToken);
 
-        // Send Test SMS
-        //MessageResource.Create(
-        //    to: new PhoneNumber(phone_rx),
-        //    from: new PhoneNumber(phone_twilio),
-        //    body: msg_body);
+        logger(AREA, INFO, "==== Settings Fetched Successfully ====");
     }
 
+    /// <summary>
+    /// 
+    /// </summary>
     public static void connectToDB()
     {
-        if (debugLevel > -1)
-            Console.WriteLine("==== Connecting To Databases ====");
+        logger(AREA, DEBUG, "==== Connecting To Databases ====");
+
         try
         {
             db = new MySqlConnection(ConfigurationManager.ConnectionStrings["master"].ConnectionString);
             db.Open();
 
-            if (debugLevel > -1)
-                Console.WriteLine("Local Master DB Connection Established");
+            logger(AREA, INFO, "Connected to master DB");
         }
-        catch (MySqlException ex)
+        catch (MySqlException exception)
         {
-            Console.WriteLine("Local Master DB Connection Failed");
-            Console.WriteLine(ex);
-            // Print MySQL exception
-            // Send Email
-
-            Console.WriteLine("Attempting A Connation With Local Slave DB");
+            logger(AREA, ERROR, "Master DB connection failed with error: ", exception);
+            logger(AREA, INFO, "Attempting to connect to local server");
 
             try
             {
                 db = new MySqlConnection(ConfigurationManager.ConnectionStrings["slave"].ConnectionString);
                 db.Open();
 
-                if (debugLevel > -1)
-                {
-                    Console.WriteLine("Local Slave DB Connection Established");
-                }
+                logger(AREA, INFO, "Connected to master DB");
             }
             catch (MySqlException e)
             {
-                Console.WriteLine("Local Slave DB Connection Failed");
-                Console.WriteLine(e);
+                logger(AREA, ERROR, "Local connection failed with error: ", e);
                 // Print MySQL exception
                 // Send email and terminate process?
                 keepRunning = false;
@@ -191,41 +208,70 @@ public static class Globals
         }
     }
 
+    /// <summary>
+    /// 
+    /// </summary>
     public static void setUpDefaultComms()
     {
-        // TODO: Set up httpClient as a service to make network debugging easier
+        logger(AREA, DEBUG, "==== Setting Up Connection Details ====");
 
-        if (debugLevel > -1)
-            Console.WriteLine("==== Setting Up Default API Connection Details ====");
+        try
+        {
+            comms = new HttpClient();
+            comms.DefaultRequestVersion = HttpVersion.Version11;
+            comms.DefaultRequestHeaders.Accept.Clear();
+            comms.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            comms.DefaultRequestHeaders.Add("Accept-Language", "en_US");
+            comms.Timeout = TimeSpan.FromMinutes(10);
+        }
+        catch(Exception exception)
+        {
 
-        // TODO: Catch Exceptions if they exist (maybe a null exception?)
-        comms = new HttpClient();
-        comms.DefaultRequestVersion = HttpVersion.Version11;
-        comms.DefaultRequestHeaders.Accept.Clear();
-        comms.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        comms.DefaultRequestHeaders.Add("Accept-Language", "en_US");
-        comms.Timeout = TimeSpan.FromMinutes(10);
+        }
 
-        // Establish PLC Connection TODO: add error handling
         SiemensPLC.establishConnection();
+
+        logger(AREA, INFO, "==== Connections Established ====");
     }
 
+    /// <summary>
+    /// 
+    /// </summary>
     public static void closeComms()
     {
-        if (debugLevel > -1)
-            Console.WriteLine("==== Closing Socket Connections ====");
+        logger(AREA, DEBUG, "==== Closing Socket Connections ====");
 
-        comms.Dispose();
+        try
+        {
+            comms.Dispose();
+            SiemensPLC.disconnect();
+        }
+        catch(NullReferenceException exception)
+        {
+            logger(AREA, ERROR, "Couldn't close comms as they've not been instantiated: ", exception);
+        }
+        catch(Exception exception)
+        {
+            logger(AREA, ERROR, "Couldn't close comms because of the following exception: ", exception);
+        }
 
-        SiemensPLC.disconnect();
+        logger(AREA, INFO, "==== Closed Communications ====");
     }
 
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="json"></param>
     public static void logJSON(string json)
     {
         Console.WriteLine(json);
         issueInsertQuery("INSERT INTO mir.logger(DATA) values ('" + MySqlHelper.EscapeString(json) + "');");
     }
 
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="query"></param>
     public static void issueInsertQuery(string query)
     {
         int rowsAffected = 0;
@@ -255,6 +301,11 @@ public static class Globals
         }
     }
 
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="table"></param>
+    /// <returns></returns>
     public static int? getIDQuery(string table)
     {
         int? id = null;
@@ -285,6 +336,11 @@ public static class Globals
         return id;
     }
 
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="value"></param>
+    /// <returns></returns>
     public static object addToDB(object value)
     {
         if (null != value)
@@ -319,30 +375,64 @@ public static class Globals
         }
     }
 
-    // TODO: Probably remove this, later down the line
-    // No reason not to send alerts straight away
-    public static void checkAlertsAndErrors()
+    /// <summary>
+    /// Sends an SMS alert and terminates the program. Only used in extreme cases.
+    /// </summary>
+    /// <param name="terminationReason">Reason for termination and the content of an SMS alert.</param>
+    public static void gracefulTermination(string terminationReason)
     {
-        int alert = 0;
-        int fatal = 10;
+        logger(AREA, INFO, "==== Terminating Unexpectedly ====");
+        logger(AREA, INFO, terminationReason);
 
-        if(alert < fatal)
-        {
-            // If a non-fatal alert, store in the log file (or DB) 
-            // and send an email (through Grafana?)
-        }
-        else if(alert > fatal)
-        {
-            // If we've got a fatal alert, we want to terminate the program
-            // still do it gracefully. Send an SMS alert, email, store in log
+        closeComms();
 
+        sendSMS(terminationReason);
 
-
-
-            keepRunning = false;
-        }
+        Environment.Exit(1);
     }
 
+    /// <summary>
+    /// Sends an SMS alert and terminates the program. Only used in extreme cases.
+    /// </summary>
+    /// <param name="terminationReason">Reason for termination and the content of an SMS alert.</param>
+    public static void gracefulTermination()
+    {
+        logger(AREA, INFO, "==== Graceful Termination ====");
+
+        closeComms();
+
+        Environment.Exit(1);
+    }
+
+    /// <summary>
+    /// Sends an SMS Alert 
+    /// </summary>
+    /// <param name="message"></param>
+    public static void sendSMS(string message)
+    {
+        logger(AREA, DEBUG, "==== Sending SMS Alert ====");
+
+        try
+        { 
+            MessageResource.Create(
+                to: new PhoneNumber(phone_rx),
+                from: new PhoneNumber(phone_twilio),
+                body: message);
+        }
+        catch (Exception exception)
+        {
+            logger(AREA, ERROR, "Failed To Send SMS. Error: ", exception);
+        }
+
+        logger(AREA, DEBUG, "==== SMS Alert Sent ====");
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="type"></param>
+    /// <param name="debug"></param>
+    /// <param name="message"></param>
     public static void logger(Type type, DebugLevel debug, string message)
     {
         log = LogManager.GetLogger(type);
@@ -353,7 +443,7 @@ public static class Globals
                 log.Info(message);
                 break;
             case DebugLevel.DEBUG:
-                if(debugLevel > 0)
+                if(debugLevel > -1)
                 { 
                     log.Debug(message);
                 }
@@ -368,6 +458,13 @@ public static class Globals
         }
     }
 
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="type"></param>
+    /// <param name="debug"></param>
+    /// <param name="message"></param>
+    /// <param name="exception"></param>
     public static void logger(Type type, DebugLevel debug, string message, Exception exception)
     {
         log = LogManager.GetLogger(type);
@@ -378,7 +475,7 @@ public static class Globals
                 log.Info(message, exception);
                 break;
             case DebugLevel.DEBUG:
-                if (debugLevel > 0)
+                if (debugLevel > -1)
                 {
                     log.Debug(message, exception);
                 }

@@ -18,13 +18,16 @@ namespace Mirage.plc
     /// </remarks>
     class SiemensPLC
     {
+        //=========================================================|
+        //  Libnodave driver types, used to form comms with PLC    |         
+        //=========================================================|
         private static daveOSserialType fds;
         private static daveInterface di;
         private static daveConnection dc;
 
         //=========================================================|
-        // For S7-1200 and 1500, use rack = 0, slot = 1            |
-        // IP and port are fetched at initialization, from config  |
+        //  For S7-1200 and 1500, use rack = 0, slot = 1           |
+        //  IP and port are fetched at initialization, from config |
         //=========================================================|
         private static string IP;
         private static int port;
@@ -32,10 +35,10 @@ namespace Mirage.plc
         private static int slot = 1;
 
         //=========================================================|
-        // These should reflect the data blocks in the PLC         |
+        //  These should reflect the data blocks in the PLC        |
         //                                                         |
-        // We're assuming that each block is completely dedicated  |
-        // to storing only this data, so they start at offset 0.   |    
+        //  We're assuming that each block is completely dedicated |
+        //  to storing only this data, so they start at offset 0.  |    
         //=========================================================|
         private static int taskControlDB;
         private static int dataStorageDB;
@@ -43,22 +46,21 @@ namespace Mirage.plc
         //=========================================================|
         //  PLC Task Control Block                                 |
         //=========================================================|
-        // Start serial number on -1. The PLC value is unsigned
-        // so this way we'll always pick up the first task, 
-        // without risk of accidently having the same serial number in memory and in plc
-        public static int serialNumber = -1; 
+        public static int serialNumber = -1; // So we don't risk accidently having the same serial number as in PLC on restart
         public static int robotID;
         public static int task;
         public static int status;
         public static int parameter;
 
+        //=========================================================|
+        //  General Message helper parameters                      |
+        //=========================================================|
         public static bool newMsg;
-
         private static int memoryres;
         private static byte[] memoryBuffer = new byte[16];
 
         //=========================================================|
-        //  Used For Debugging                                     |     
+        //  Used For Logging & Debugging                           |     
         //=========================================================|
         public static int plcConnectionErrors = 0;
         private static readonly Type AREA = typeof(SiemensPLC);
@@ -209,7 +211,12 @@ namespace Mirage.plc
                 }
 
             }
-            catch(Exception exception)
+            catch (NullReferenceException exception)
+            {
+                logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
+                // run establishConnection routine?
+            }
+            catch (Exception exception)
             {
                 logger(AREA, ERROR, "Polling Failed. Error : ", exception);
                 plcConnectionErrors--;
@@ -230,6 +237,7 @@ namespace Mirage.plc
 
                 SiemensPLC.status = 0;
                 SiemensPLC.parameter = 0;
+                SiemensPLC.newMsg = true;
             }
 
             logger(AREA, DEBUG, "==== Completed Polling ====");
@@ -258,7 +266,7 @@ namespace Mirage.plc
                 logger(AREA, DEBUG, "Request Completed Or Completed Partially. Status Code : " + statusCode);
 
                 byte[] tempBytes = BitConverter.GetBytes(data); 
-                int result = 0;
+                int result = 1;
 
                 // TODO: This should really use an enum instead of strings
                 if (type == "moved")
@@ -314,6 +322,12 @@ namespace Mirage.plc
             logger(AREA, DEBUG, "==== Completed Data Write ====");
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="type"></param>
+        /// <param name="statusCode"></param>
+        /// <param name="data"></param>
         public static void writeData(string type, int statusCode, string data)
         {
             logger(AREA, DEBUG, "==== Starting To Write Data ====");
@@ -328,7 +342,7 @@ namespace Mirage.plc
                 logger(AREA, DEBUG, "Request Completed Or Completed Partially. Status Code : " + statusCode);
 
                 byte[] tempBytes = System.Text.Encoding.ASCII.GetBytes(data);
-                int result = 0;
+                int result = 1;
 
                 if (type == "mission_text")
                 {
@@ -388,7 +402,7 @@ namespace Mirage.plc
 
                 if(result != 0)
                 {
-                    logger(AREA, ERROR, "Task Status Update Was Unsuccessful.");
+                    logger(AREA, ERROR, "Task Status Update Was Unsuccessful");
                     plcConnectionErrors++;
                 }
                 else
@@ -396,10 +410,19 @@ namespace Mirage.plc
                     logger(AREA, DEBUG, "Task Status Updated To " + status);
                 }
             }
-            catch(Exception exception)
+            catch(NullReferenceException exception)
+            {
+                logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
+                // run establishConnection routine?
+            }
+            catch (Exception exception)
             {
                 logger(AREA, ERROR, "Failed To Write To PLC. Exception: ", exception);
                 plcConnectionErrors++;
+            }
+            finally
+            {
+
             }
 
             logger(AREA, DEBUG, "==== Update Completed ====");
@@ -419,10 +442,19 @@ namespace Mirage.plc
                 // readBytes(Area, Data Block Number (in PLC), Start Byte, Length, Byte Container)
                 memoryres = dc.readBytes(libnodave.daveFlags, taskControlDB, 12, 4, tempByteBuffer);
             }
+            catch(NullReferenceException exception)
+            {
+                logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
+                // run establishConnection routine?
+            }
             catch (Exception exception)
             {
                 logger(AREA, ERROR, "Failed To Fetch Response Data: ", exception);
                 plcConnectionErrors++;
+            }
+            finally
+            {
+
             }
 
             // PLC read was successful
