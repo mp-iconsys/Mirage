@@ -8,7 +8,7 @@ using System.Text;
 
 namespace Mirage.rest
 {
-    class Status : IRest
+    public class Status : IRest
     {
         public int mode_id { get; set; }
         public int state_id { get; set; }

@@ -30,7 +30,7 @@ namespace Mirage.rest
         public void print()
         {
             Console.WriteLine();
-            Console.WriteLine("==== MAP NO: " + Map_id + " ====");
+            Console.WriteLine("==== PRINTING MAP NO: " + Map_id + " ====");
             Console.WriteLine("Created_by: " + Created_by);
             Console.WriteLine("Created_by_id: " + Created_by_id);
             Console.WriteLine("Created_by_name: " + Created_by_name);

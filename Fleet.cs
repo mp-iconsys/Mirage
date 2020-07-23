@@ -13,9 +13,9 @@ namespace Mirage
         // keep it separate from the robot array for cleaner code  |
         //=========================================================|
         // TODO : Make these all lists, so the size can be amended at runtime
-        public Robot[] robots;                                      // TODO: Make this a list so we can add and remove Robots on demand
+        public Robot[] robots;                                      
         public Robot fleetManager;
-        private Task<HttpResponseMessage>[] httpResponseTasks; // TODO: ditto as above
+        private Task<HttpResponseMessage>[] httpResponseTasks;
         private Task<HttpResponseMessage> fleetResponseTask;
 
         //=========================================================|
@@ -146,7 +146,7 @@ namespace Mirage
             }
             else if (type == "mission_scheduler")
             {
-                fleetManager.m.saveToMemory(fleetResponseTask.Result);
+                fleetManager.Missions[0].saveToMemory(fleetResponseTask.Result);
             }
 
             logger(AREA, DEBUG, "==== Completed Get Request ====");
@@ -191,9 +191,17 @@ namespace Mirage
             for (int i = 0; i < sizeOfFleet; i++)
             {
                 robots[i].saveMaps(await httpResponseTasks[i]);
-                robots[i].saveMapsData();
+                //robots[i].saveMapsData();
             }
         }
-    
+
+        public async Task saveMissionsAsync()
+        {
+            for (int i = 0; i < sizeOfFleet; i++)
+            {
+                robots[i].saveMissions(await httpResponseTasks[i]);
+                //robots[i].saveMapsData();
+            }
+        }
     }
 }

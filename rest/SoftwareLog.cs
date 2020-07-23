@@ -5,16 +5,16 @@ using System.Text;
 
 namespace Mirage.rest
 {
-    class SoftwareLog : IRest
+    public class SoftwareLog : IRest
     {
-        private string Action { get; set; }
-        private string End_time { get; set; }
-        private string From { get; set; }
-        private string Guid { get; set; }
-        private string Start_time { get; set; }
-        private string State { get; set; }
-        private string To { get; set; }
-        private string Url { get; set; }
+        public string Action { get; set; }
+        public string End_time { get; set; }
+        public string From { get; set; }
+        public string Guid { get; set; }
+        public string Start_time { get; set; }
+        public string State { get; set; }
+        public string To { get; set; }
+        public string Url { get; set; }
 
         public void print()
         {

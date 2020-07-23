@@ -13,12 +13,6 @@ using log4net.Config;
 using System.IO;
 using static Globals.DebugLevel;
 
-
-/* Contains global variables and methods employed by all of the classes.
- * 
- * 
- * 
-*/
 public static class Globals
 {
     //=========================================================|
@@ -38,7 +32,6 @@ public static class Globals
     //  Used For Logging & Debugging                           |     
     //=========================================================|
     public static int debugLevel = 0;
-    public static string logFile;
     public static string emailAlert;
     private static readonly Type AREA = typeof(Globals);
     public static ILog log = LogManager.GetLogger(AREA);
@@ -125,7 +118,6 @@ public static class Globals
                 debugLevel = int.Parse(ConfigurationManager.AppSettings["debugLevel"]);
                 pollInterval = int.Parse(ConfigurationManager.AppSettings["pollInterval"]) * 1000; // Convert to seconds
                 sizeOfFleet = int.Parse(ConfigurationManager.AppSettings["sizeOfFleet"]);
-                logFile = ConfigurationManager.AppSettings["logFile"];
                 emailAlert = ConfigurationManager.AppSettings["emailAlert"];
                 resumingSession = bool.Parse(ConfigurationManager.AppSettings["resumingSession"]);
                 phone_rx = ConfigurationManager.AppSettings["phone_rx"];
@@ -173,7 +165,7 @@ public static class Globals
     }
 
     /// <summary>
-    /// 
+    /// Establishes a connection to master database. If not available, it switches over to a local DB.
     /// </summary>
     public static void connectToDB()
     {
@@ -209,7 +201,7 @@ public static class Globals
     }
 
     /// <summary>
-    /// 
+    /// Establishes default communications with the PLC and standard headers for HTTP REST traffic.
     /// </summary>
     public static void setUpDefaultComms()
     {
@@ -235,7 +227,7 @@ public static class Globals
     }
 
     /// <summary>
-    /// 
+    /// Disposes default communication: HTTP Client as well as Siemens Libnodave connection.
     /// </summary>
     public static void closeComms()
     {

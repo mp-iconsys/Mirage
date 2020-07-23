@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Net;
 using System.Net.Http;
-using System.Threading;
 using System.Threading.Tasks;
 using Mirage.plc;
 using static Globals;
@@ -32,9 +31,9 @@ namespace Mirage
 
             int i = 0;
 
-            //=============================================| 
-            //  M A I N      L O O P                       |
-            //=============================================|
+            //====================================================|
+            //  M A I N      L O O P                              |
+            //====================================================|
             while (keepRunning)
             {
                 int currentTimer = 12345;
@@ -43,17 +42,14 @@ namespace Mirage
 
                 SiemensPLC.poll();
 
-                // Act on PLC data
-                // This is synchronous even though it involves http requests
-                if(SiemensPLC.newMsg)
+                SiemensPLC.newMsg = false;
+
+                if (SiemensPLC.newMsg)
                 {
                     logger(AREA, DEBUG, "==== New Task From PLC ====");
 
-                    // Set PLC status to Mirage processing
                     SiemensPLC.updateTaskStatus(Status.StartedProcessing);
 
-                    // Check which task we've got to do & do it
-                    // Save any response to predefined PLC registers
                     switch (SiemensPLC.task)
                     {
                         case Tasks.GetScheduleStatus:
@@ -82,8 +78,6 @@ namespace Mirage
                             break;
                     }
 
-                    // Check PLC parsed the data alright
-                    // Times out after a while if no respose
                     SiemensPLC.checkResponse();
                 }
 
@@ -241,8 +235,29 @@ namespace Mirage
                 Console.WriteLine($"Connection Problems: '{e}'");
             }
 
+            try
+            {
+                try
+                {
+                    mirFleet.issueGetRequests("missions");
+                    mirFleet.saveMissionsAsync().Wait();
+                }
+                catch (HttpRequestException e)
+                {
+                    // TODO: Handle more exceptions
+                    // Remove the task which is causing the exception
 
-            // Download missions
+                    Console.WriteLine("Couldn't connect to the robot");
+                    Console.WriteLine("Check your network, dns settings, robot is up, etc.");
+                    Console.WriteLine("Please see error log (enter location here) for more details");
+                    // Store the detailed error in the error log
+                    Console.WriteLine(e);
+                }
+            }
+            catch (WebException e)
+            {
+                Console.WriteLine($"Connection Problems: '{e}'");
+            }
         }
 
         private static void getScheduleStatus()
@@ -260,7 +275,7 @@ namespace Mirage
         {
             logger(AREA, INFO, "==== Send Mission To Scheduler ====");
 
-            int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.m.postRequest());
+            int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Missions[0].postRequest());
 
             SiemensPLC.updateTaskStatus(restStatus);
 
@@ -271,7 +286,7 @@ namespace Mirage
         {
             logger(AREA, INFO, "==== Create New Mission In Robot " + SiemensPLC.robotID + " ====");
 
-            int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.m.createMission(SiemensPLC.parameter));
+            int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Missions[0].createMission(SiemensPLC.parameter));
 
             SiemensPLC.updateTaskStatus(restStatus);
 
@@ -282,7 +297,7 @@ namespace Mirage
         {
             logger(AREA, INFO, "==== Clear Mission Schedule ====");
 
-            int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.m.deleteRequest());
+            int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Missions[0].deleteRequest());
 
             SiemensPLC.updateTaskStatus(restStatus);
 
