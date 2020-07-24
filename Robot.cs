@@ -320,7 +320,7 @@ namespace Mirage
 
             for (int i = 0; i < Missions.Count; i++)
             {
-                Missions[i].print();
+                //Missions[i].print();
                 Missions[i].saveToDB(id);
             }
 
@@ -346,7 +346,7 @@ namespace Mirage
 
             for(int i = 0;  i < Registers.Count; i++)
             { 
-                Registers[i].print();
+                //Registers[i].print();
                 Registers[i].saveToDB(id);
             }
 

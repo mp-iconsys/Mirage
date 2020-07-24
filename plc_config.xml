@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
 <plc>
 	<connectionString>
-		<ip>192.168.0.123</ip>
+		<ip>192.168.0.1</ip>
 		<port>102</port>
 		<rack>0</rack>
 		<slot>1</slot>

@@ -42,8 +42,6 @@ namespace Mirage
 
                 SiemensPLC.poll();
 
-                SiemensPLC.newMsg = false;
-
                 if (SiemensPLC.newMsg)
                 {
                     logger(AREA, DEBUG, "==== New Task From PLC ====");

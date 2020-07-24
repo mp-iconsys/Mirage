@@ -57,7 +57,7 @@ namespace Mirage.plc
         //=========================================================|
         public static bool newMsg;
         private static int memoryres;
-        private static byte[] memoryBuffer = new byte[16];
+        private static byte[] memoryBuffer = new byte[20];
 
         //=========================================================|
         //  Used For Logging & Debugging                           |     
@@ -151,16 +151,22 @@ namespace Mirage.plc
 
             // Get the data from the PLC
             try
-            { 
+            {
                 // readBytes(Area, Data Block Number (in PLC), Start Byte, Length, Byte Container)
-                memoryres = dc.readBytes(libnodave.daveFlags, taskControlDB, 0, 16, memoryBuffer);
+                memoryres = dc.readBytes(libnodave.daveDB, taskControlDB, 0, 20, memoryBuffer);
 
                 if (memoryres == 0)
                 {
+                    logger(AREA, DEBUG, BitConverter.ToString(memoryBuffer));
+
                     byte[] tempBytesForConversion = new byte[4] { memoryBuffer[0], memoryBuffer[1], memoryBuffer[2], memoryBuffer[3] };
 
                     // Convert memory buffer from bytes to ints
                     // 32 Bit int is 4 bytes
+
+                    if (BitConverter.IsLittleEndian)
+                        Array.Reverse(tempBytesForConversion);
+
                     serialNumber = BitConverter.ToInt32(tempBytesForConversion, 0);
 
                     // Only change memory if the PLC is making a new request
@@ -168,18 +174,26 @@ namespace Mirage.plc
                     {
                         // This determines which MiR to affect
                         tempBytesForConversion = new byte[4] { memoryBuffer[4], memoryBuffer[5], memoryBuffer[6], memoryBuffer[7] };
+                        if (BitConverter.IsLittleEndian)
+                            Array.Reverse(tempBytesForConversion);
                         robotID = BitConverter.ToInt32(tempBytesForConversion, 0);
 
                         // This determines which action to perform
                         tempBytesForConversion = new byte[4] { memoryBuffer[8], memoryBuffer[9], memoryBuffer[10], memoryBuffer[11] };
+                        if (BitConverter.IsLittleEndian)
+                            Array.Reverse(tempBytesForConversion);
                         task = BitConverter.ToInt32(tempBytesForConversion, 0);
 
                         // This is the status of the request - should be 0
                         tempBytesForConversion = new byte[4] { memoryBuffer[12], memoryBuffer[13], memoryBuffer[14], memoryBuffer[15] };
+                        if (BitConverter.IsLittleEndian)
+                            Array.Reverse(tempBytesForConversion);
                         status = BitConverter.ToInt32(tempBytesForConversion, 0);
 
                         // Additional data, such as mission number, etc
                         tempBytesForConversion = new byte[4] { memoryBuffer[16], memoryBuffer[17], memoryBuffer[18], memoryBuffer[19] };
+                        if (BitConverter.IsLittleEndian)
+                            Array.Reverse(tempBytesForConversion);
                         parameter = BitConverter.ToInt32(tempBytesForConversion, 0);
 
                         newMsg = true;
@@ -202,6 +216,7 @@ namespace Mirage.plc
                 }
                 else
                 {
+                    logger(AREA, ERROR, libnodave.daveStrerror(memoryres));
                     // TODO: look at libnodave for better error codes
                     // Couldn't read the PLC bytes
                     // Write as error to DB
@@ -224,7 +239,7 @@ namespace Mirage.plc
             }
 
             // Added for testing messages
-            if(!newMsg)
+/*            if(!newMsg)
             {
                 Console.WriteLine("Enter SerialNumber: ");
                 SiemensPLC.serialNumber = Int32.Parse(Console.ReadLine());
@@ -238,7 +253,7 @@ namespace Mirage.plc
                 SiemensPLC.status = 0;
                 SiemensPLC.parameter = 0;
                 SiemensPLC.newMsg = true;
-            }
+            }*/
 
             logger(AREA, DEBUG, "==== Completed Polling ====");
         }
@@ -265,7 +280,10 @@ namespace Mirage.plc
             {
                 logger(AREA, DEBUG, "Request Completed Or Completed Partially. Status Code : " + statusCode);
 
-                byte[] tempBytes = BitConverter.GetBytes(data); 
+                byte[] tempBytes = BitConverter.GetBytes(data);
+                if (BitConverter.IsLittleEndian)
+                    Array.Reverse(tempBytes);
+
                 int result = 1;
 
                 // TODO: This should really use an enum instead of strings
@@ -273,7 +291,7 @@ namespace Mirage.plc
                 {
                     try
                     {
-                        result = dc.writeBytes(libnodave.daveFlags, dataStorageDB, 12, 4, tempBytes); // location is incorrect atm
+                        result = dc.writeBytes(libnodave.daveDB, dataStorageDB, 4, 8, tempBytes); // location is incorrect atm
                     }
                     catch
                     {
@@ -284,11 +302,11 @@ namespace Mirage.plc
                 {
                     try
                     {
-                        result = dc.writeBytes(libnodave.daveFlags, dataStorageDB, 12, 4, tempBytes); // location is incorrect atm
+                        result = dc.writeBytes(libnodave.daveDB, dataStorageDB, 0, 4, tempBytes); // location is incorrect atm
                     }
                     catch
                     {
-
+                        
                     }
                 }
 
@@ -296,6 +314,10 @@ namespace Mirage.plc
                 {
                     logger(AREA, ERROR, "Failed To Save Data In PLC. Check PLC Connectivity.");
                     plcConnectionErrors++;
+                }
+                else
+                {
+                    updateTaskStatus(Status.CompletedNoErrors);
                 }
             }
             else if(statusCode == Status.CouldntProcessRequest)
@@ -342,13 +364,16 @@ namespace Mirage.plc
                 logger(AREA, DEBUG, "Request Completed Or Completed Partially. Status Code : " + statusCode);
 
                 byte[] tempBytes = System.Text.Encoding.ASCII.GetBytes(data);
+                if (BitConverter.IsLittleEndian)
+                    Array.Reverse(tempBytes);
+
                 int result = 1;
 
                 if (type == "mission_text")
                 {
                     try
                     {
-                        result = dc.writeBytes(libnodave.daveFlags, dataStorageDB, 12, 4, tempBytes); // location is incorrect atm
+                        result = dc.writeBytes(libnodave.daveDB, dataStorageDB, 12, 4, tempBytes); // location is incorrect atm
                     }
                     catch
                     {
@@ -395,14 +420,19 @@ namespace Mirage.plc
             logger(AREA, DEBUG, "==== Updating Task Status In PLC ====");
 
             byte[] tempBytes = BitConverter.GetBytes(status);
+            logger(AREA, DEBUG, BitConverter.ToString(tempBytes));
+
+            if (BitConverter.IsLittleEndian)
+                Array.Reverse(tempBytes);
 
             try
             {
-                int result = dc.writeBytes(libnodave.daveFlags, taskControlDB, 12, 4, tempBytes);
+                int result = dc.writeBytes(libnodave.daveDB, taskControlDB, 12, 4, tempBytes);
 
                 if(result != 0)
                 {
                     logger(AREA, ERROR, "Task Status Update Was Unsuccessful");
+                    logger(AREA, ERROR, libnodave.daveStrerror(memoryres));
                     plcConnectionErrors++;
                 }
                 else
@@ -440,7 +470,7 @@ namespace Mirage.plc
             try
             {
                 // readBytes(Area, Data Block Number (in PLC), Start Byte, Length, Byte Container)
-                memoryres = dc.readBytes(libnodave.daveFlags, taskControlDB, 12, 4, tempByteBuffer);
+                memoryres = dc.readBytes(libnodave.daveDB, taskControlDB, 12, 4, tempByteBuffer);
             }
             catch(NullReferenceException exception)
             {

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using log4net.Repository.Hierarchy;
+using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Text;
@@ -71,8 +72,17 @@ namespace Mirage.rest
         /// <param name="guid"></param>
         private void getMissionNumber(string guid)
         {
-            missionNumberString = guid.Substring(19, 4);
-            missionNumber = Int32.Parse(missionNumberString);
+            try
+            { 
+                missionNumberString = guid.Substring(19, 4);
+                missionNumber = Int32.Parse(missionNumberString);
+            }
+            catch
+            {
+
+                missionNumberString = "0011";
+                missionNumber = 11;
+            }
         }
 
         public void saveAll(HttpResponseMessage response, int robotID)

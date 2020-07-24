@@ -214,10 +214,17 @@ namespace Mirage.rest
             query += Globals.addToDB(joystick_low_speed_mode_enabled);
             query += Globals.addToDB(joystick_web_session_id);
 
-            for (int i = 0; i < m.Count; i++)
+            try
             {
-                if (m[i].Guid == map_id)
-                    map_id = m[i].Map_id.ToString();
+                for (int i = 0; i < m.Count; i++)
+                {
+                    if (m[i].Guid == map_id)
+                        map_id = m[i].Map_id.ToString();
+                }
+            }
+            catch
+            {
+                map_id = "0";
             }
 
             query += Globals.addToDB(map_id);
