@@ -2,7 +2,6 @@
 using System.Xml;
 using static Globals;
 using static Globals.DebugLevel;
-using DotNetSiemensPLCToolBoxLibrary.Communication.LibNoDave;
 using static DotNetSiemensPLCToolBoxLibrary.Communication.LibNoDave.libnodave;
 
 namespace Mirage.plc
@@ -53,11 +52,9 @@ namespace Mirage.plc
         public static int parameter;
 
         //=========================================================|
-        //  General Message helper parameters                      |
+        //  Message helper parameters                              |
         //=========================================================|
         public static bool newMsg;
-        private static int memoryres;
-        private static byte[] memoryBuffer = new byte[20];
 
         //=========================================================|
         //  Used For Logging & Debugging                           |     
@@ -78,11 +75,11 @@ namespace Mirage.plc
                             doc.Load(@"plc_config.xml");
 
                 IP = doc.DocumentElement.SelectSingleNode("/plc/connectionString/ip").InnerText;
-                port = Int16.Parse(doc.DocumentElement.SelectSingleNode("/plc/connectionString/port").InnerText);
-                rack = Int16.Parse(doc.DocumentElement.SelectSingleNode("/plc/connectionString/rack").InnerText);
-                slot = Int16.Parse(doc.DocumentElement.SelectSingleNode("/plc/connectionString/slot").InnerText);
-                taskControlDB = Int16.Parse(doc.DocumentElement.SelectSingleNode("/plc/data/taskControlDB").InnerText);
-                dataStorageDB = Int16.Parse(doc.DocumentElement.SelectSingleNode("/plc/data/dataStorageDB").InnerText);
+                port = short.Parse(doc.DocumentElement.SelectSingleNode("/plc/connectionString/port").InnerText);
+                rack = short.Parse(doc.DocumentElement.SelectSingleNode("/plc/connectionString/rack").InnerText);
+                slot = short.Parse(doc.DocumentElement.SelectSingleNode("/plc/connectionString/slot").InnerText);
+                taskControlDB = short.Parse(doc.DocumentElement.SelectSingleNode("/plc/data/taskControlDB").InnerText);
+                dataStorageDB = short.Parse(doc.DocumentElement.SelectSingleNode("/plc/data/dataStorageDB").InnerText);
 
                 logger(AREA, DEBUG, "IP : " + IP);
                 logger(AREA, DEBUG, "Port : " + port);
@@ -93,11 +90,11 @@ namespace Mirage.plc
             }
             catch (Exception exception)
             {
-                //keepRunning = false;
+                keepRunning = false;
                 logger(AREA, ERROR, "Siemens PLC failed to load configuration file. Mirage will terminate. Exception : ", exception);
             }
 
-            logger(AREA, DEBUG, "==== Initialization Completed ====");
+            logger(AREA, INFO, "==== Initialization Completed ====");
         }
 
         /// <summary>
@@ -107,17 +104,16 @@ namespace Mirage.plc
         {
             logger(AREA, DEBUG, "==== Establishing A Connection ====");
 
-            fds.rfd = libnodave.openSocket(port, IP);
+            fds.rfd = openSocket(port, IP);
             fds.wfd = fds.rfd;
 
             if (fds.rfd != IntPtr.Zero)
             {
                 logger(AREA, DEBUG, "Socket Opened Successfully");
 
-                di = new libnodave.daveInterface(fds, "IF1", 0, libnodave.daveProtoISOTCP, libnodave.daveSpeed187k);
-                //res = di.initAdapter();
+                di = new daveInterface(fds, "IF1", 0, daveProtoISOTCP, daveSpeed187k);
                 di.setTimeout(1000000);
-                dc = new libnodave.daveConnection(di, 0, rack, slot);
+                dc = new daveConnection(di, 0, rack, slot);
 
                 if (0 == dc.connectPLC())
                 {
@@ -126,18 +122,22 @@ namespace Mirage.plc
                 else
                 {
                     logger(AREA, ERROR, "Failed To Connect. Trying again, with result " + dc.connectPLC());
+                    logger(AREA, ERROR, daveStrerror(dc.connectPLC()));
+
                     plcConnectionErrors--;
                     newMsg = false;
-                    // failure
-                    // terminate?
                 }
             }
             else
             {
                 logger(AREA, ERROR, "Socket Failed To Open. DaveOSserialType is initialized to " + fds.rfd);
+                logger(AREA, ERROR, daveStrerror(fds.rfd.ToInt32()));
+
+                plcConnectionErrors--;
+                newMsg = false;
             }
 
-            logger(AREA, DEBUG, "==== Finished Establishing A Connection ====");
+            logger(AREA, DEBUG, "==== Established A Connection ====");
         }
 
         /// <summary>
@@ -147,13 +147,14 @@ namespace Mirage.plc
         {
             logger(AREA, DEBUG, "==== Starting To Poll ====");
 
-            int serialNumber, task, robotID, status, parameter;
+            int serialNumber, task, robotID, status, parameter, memoryres;
+            byte[] memoryBuffer = new byte[20];
 
             // Get the data from the PLC
             try
             {
                 // readBytes(Area, Data Block Number (in PLC), Start Byte, Length, Byte Container)
-                memoryres = dc.readBytes(libnodave.daveDB, taskControlDB, 0, 20, memoryBuffer);
+                memoryres = dc.readBytes(daveDB, taskControlDB, 0, 20, memoryBuffer);
 
                 if (memoryres == 0)
                 {
@@ -161,9 +162,7 @@ namespace Mirage.plc
 
                     byte[] tempBytesForConversion = new byte[4] { memoryBuffer[0], memoryBuffer[1], memoryBuffer[2], memoryBuffer[3] };
 
-                    // Convert memory buffer from bytes to ints
-                    // 32 Bit int is 4 bytes
-
+                    // Need to reverse the bytes to get actual values
                     if (BitConverter.IsLittleEndian)
                         Array.Reverse(tempBytesForConversion);
 
@@ -203,11 +202,11 @@ namespace Mirage.plc
                         SiemensPLC.serialNumber = serialNumber;
                         SiemensPLC.parameter = parameter;
 
-                        logger(AREA, DebugLevel.DEBUG, "Status : " + status);
-                        logger(AREA, DebugLevel.DEBUG, "Task : " + task);
-                        logger(AREA, DebugLevel.DEBUG, "Robot ID : " + robotID);
-                        logger(AREA, DebugLevel.DEBUG, "Serial No : " + serialNumber);
-                        logger(AREA, DebugLevel.DEBUG, "Parameter : " + parameter);
+                        logger(AREA, DEBUG, "Status : " + status);
+                        logger(AREA, DEBUG, "Task : " + task);
+                        logger(AREA, DEBUG, "Robot ID : " + robotID);
+                        logger(AREA, DEBUG, "Serial No : " + serialNumber);
+                        logger(AREA, DEBUG, "Parameter : " + parameter);
                     }
                     else
                     {
@@ -216,11 +215,8 @@ namespace Mirage.plc
                 }
                 else
                 {
-                    logger(AREA, ERROR, libnodave.daveStrerror(memoryres));
-                    // TODO: look at libnodave for better error codes
-                    // Couldn't read the PLC bytes
-                    // Write as error to DB
-                    // Iterate the PLC connectivity counter
+                    logger(AREA, ERROR, "Failed to Poll");
+                    logger(AREA, ERROR, daveStrerror(memoryres));
                     plcConnectionErrors--;
                     newMsg = false;
                 }
@@ -229,7 +225,10 @@ namespace Mirage.plc
             catch (NullReferenceException exception)
             {
                 logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
-                // run establishConnection routine?
+                plcConnectionErrors--;
+                newMsg = false;
+
+                establishConnection();
             }
             catch (Exception exception)
             {
@@ -270,10 +269,11 @@ namespace Mirage.plc
         public static void writeData(string type, int statusCode, float data)
         {
             logger(AREA, DEBUG, "==== Starting To Write Data ====");
-
             logger(AREA, DEBUG, "Type : " + type);
             logger(AREA, DEBUG, "Status Code : " + statusCode);
             logger(AREA, DEBUG, "Data : " + data);
+
+            int result = 1;
 
             // First, check if the data response was successful
             if (statusCode == Status.CompletedPartially || statusCode == Status.CompletedNoErrors)
@@ -281,38 +281,36 @@ namespace Mirage.plc
                 logger(AREA, DEBUG, "Request Completed Or Completed Partially. Status Code : " + statusCode);
 
                 byte[] tempBytes = BitConverter.GetBytes(data);
-                if (BitConverter.IsLittleEndian)
-                    Array.Reverse(tempBytes);
-
-                int result = 1;
+                if (BitConverter.IsLittleEndian) { Array.Reverse(tempBytes); }
 
                 // TODO: This should really use an enum instead of strings
                 if (type == "moved")
                 {
                     try
                     {
-                        result = dc.writeBytes(libnodave.daveDB, dataStorageDB, 4, 8, tempBytes); // location is incorrect atm
+                        result = dc.writeBytes(daveDB, dataStorageDB, 4, 8, tempBytes);
                     }
                     catch
                     {
-
+                        logger(AREA, ERROR, "Failed To Save Data In PLC. Check PLC Connectivity.");
                     }
                 }
                 else if(type == "battery")
                 {
                     try
                     {
-                        result = dc.writeBytes(libnodave.daveDB, dataStorageDB, 0, 4, tempBytes); // location is incorrect atm
+                        result = dc.writeBytes(daveDB, dataStorageDB, 0, 4, tempBytes);
                     }
                     catch
                     {
-                        
+                        logger(AREA, ERROR, "Failed To Save Data In PLC. Check PLC Connectivity.");
                     }
                 }
 
                 if (result != 0)
                 {
                     logger(AREA, ERROR, "Failed To Save Data In PLC. Check PLC Connectivity.");
+                    logger(AREA, ERROR, daveStrerror(result));
                     plcConnectionErrors++;
                 }
                 else
@@ -323,25 +321,21 @@ namespace Mirage.plc
             else if(statusCode == Status.CouldntProcessRequest)
             {
                 logger(AREA, WARNING, "We Couldn't Process The Request. Status Code : " + statusCode);
-
                 updateTaskStatus(Status.CouldntProcessRequest);
             }
             else if(statusCode == Status.FatalError)
             {
                 logger(AREA, WARNING, "Fatal Error. Status Code : " + statusCode);
-
                 updateTaskStatus(Status.FatalError);
             }
             else
             {
                 logger(AREA, WARNING, "Unknown Status. Status Code : " + statusCode);
-
-                // Unknown Status ??? - > Treat like a fatal error
                 updateTaskStatus(Status.FatalError);
-                // Send alert
+                // Unknown Status ??? - > Treat like a fatal error
             }
 
-            logger(AREA, DEBUG, "==== Completed Data Write ====");
+            logger(AREA, INFO, "==== Completed Data Write ====");
         }
 
         /// <summary>
@@ -353,10 +347,11 @@ namespace Mirage.plc
         public static void writeData(string type, int statusCode, string data)
         {
             logger(AREA, DEBUG, "==== Starting To Write Data ====");
-
             logger(AREA, DEBUG, "Type : " + type);
             logger(AREA, DEBUG, "Status Code : " + statusCode);
             logger(AREA, DEBUG, "Data : " + data);
+
+            int result = 1;
 
             // First, check if the data response was successful
             if (statusCode == Status.CompletedPartially || statusCode == Status.CompletedNoErrors)
@@ -364,50 +359,56 @@ namespace Mirage.plc
                 logger(AREA, DEBUG, "Request Completed Or Completed Partially. Status Code : " + statusCode);
 
                 byte[] tempBytes = System.Text.Encoding.ASCII.GetBytes(data);
-                if (BitConverter.IsLittleEndian)
-                    Array.Reverse(tempBytes);
-
-                int result = 1;
+                if (BitConverter.IsLittleEndian) { Array.Reverse(tempBytes); }
 
                 if (type == "mission_text")
                 {
                     try
                     {
-                        result = dc.writeBytes(libnodave.daveDB, dataStorageDB, 12, 4, tempBytes); // location is incorrect atm
+                        result = dc.writeBytes(daveDB, dataStorageDB, 8, 256, tempBytes);
                     }
                     catch
                     {
-
+                        logger(AREA, ERROR, "Failed To Save Data In PLC. Check PLC Connectivity.");
+                    }
+                }
+                else if (type == "mission_schedule")
+                {
+                    try
+                    {
+                        result = dc.writeBytes(daveDB, dataStorageDB, 264, 256, tempBytes);
+                    }
+                    catch
+                    {
+                        logger(AREA, ERROR, "Failed To Save Data In PLC. Check PLC Connectivity.");
                     }
                 }
 
-                if(result != 0)
+                if (result != 0)
                 {
                     logger(AREA, ERROR, "Failed To Save Data In PLC. Check PLC Connectivity.");
+                    logger(AREA, ERROR, daveStrerror(result));
                     plcConnectionErrors++;
                 }
             }
             else if (statusCode == Status.CouldntProcessRequest)
             {
                 logger(AREA, WARNING, "We Couldn't Process The Request. Status Code : " + statusCode);
-
                 updateTaskStatus(Status.CouldntProcessRequest);
             }
             else if (statusCode == Status.FatalError)
             {
                 logger(AREA, WARNING, "Fatal Error. Status Code : " + statusCode);
-
                 updateTaskStatus(Status.FatalError);
             }
             else
             {
                 logger(AREA, WARNING, "Unknown Status. Status Code : " + statusCode);
-
-                // Unknown Status ??? - > Treat like a fatal error
                 updateTaskStatus(Status.FatalError);
+                // Unknown Status ??? - > Treat like a fatal error
             }
 
-            logger(AREA, DEBUG, "==== Completed Data Write ====");
+            logger(AREA, INFO, "==== Completed Data Write ====");
         }
 
         /// <summary>
@@ -420,19 +421,17 @@ namespace Mirage.plc
             logger(AREA, DEBUG, "==== Updating Task Status In PLC ====");
 
             byte[] tempBytes = BitConverter.GetBytes(status);
-            logger(AREA, DEBUG, BitConverter.ToString(tempBytes));
 
-            if (BitConverter.IsLittleEndian)
-                Array.Reverse(tempBytes);
+            if (BitConverter.IsLittleEndian) { Array.Reverse(tempBytes); }
 
             try
             {
-                int result = dc.writeBytes(libnodave.daveDB, taskControlDB, 12, 4, tempBytes);
+                int result = dc.writeBytes(daveDB, taskControlDB, 12, 4, tempBytes);
 
                 if(result != 0)
                 {
                     logger(AREA, ERROR, "Task Status Update Was Unsuccessful");
-                    logger(AREA, ERROR, libnodave.daveStrerror(memoryres));
+                    logger(AREA, ERROR, daveStrerror(result));
                     plcConnectionErrors++;
                 }
                 else
@@ -443,7 +442,7 @@ namespace Mirage.plc
             catch(NullReferenceException exception)
             {
                 logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
-                // run establishConnection routine?
+                establishConnection();
             }
             catch (Exception exception)
             {
@@ -466,16 +465,42 @@ namespace Mirage.plc
             logger(AREA, DEBUG, "==== Checking PLC Response ====");
 
             byte[] tempByteBuffer = new byte[4];
+            int memoryres = 1;
 
             try
             {
-                // readBytes(Area, Data Block Number (in PLC), Start Byte, Length, Byte Container)
-                memoryres = dc.readBytes(libnodave.daveDB, taskControlDB, 12, 4, tempByteBuffer);
+                memoryres = dc.readBytes(daveDB, taskControlDB, 12, 4, tempByteBuffer);
+
+                // PLC read was successful
+                if (memoryres == 0)
+                {
+                    status = BitConverter.ToInt32(tempByteBuffer, 0);
+
+                    if (status == Status.PlcOK)
+                    {
+                        logger(AREA, DEBUG, "PLC Processed Data");
+                    }
+                    else if (status == Status.PlcError)
+                    {
+                        logger(AREA, ERROR, "PLC Failed To Process Data");
+                    }
+                    else
+                    {
+                        logger(AREA, ERROR, "Unknown Status");
+                    }
+                }
+                else
+                {
+                    logger(AREA, ERROR, "Response Check Failed");
+                    logger(AREA, ERROR, daveStrerror(memoryres));
+                    plcConnectionErrors++;
+                }
             }
-            catch(NullReferenceException exception)
+            catch (NullReferenceException exception)
             {
                 logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
-                // run establishConnection routine?
+                plcConnectionErrors++;
+                establishConnection();
             }
             catch (Exception exception)
             {
@@ -487,34 +512,6 @@ namespace Mirage.plc
 
             }
 
-            // PLC read was successful
-            if (memoryres == 0)
-            {
-                status = BitConverter.ToInt32(tempByteBuffer, 0);
-
-                if(status == Status.PlcOK)
-                {
-                    // Do nothing
-                }
-                else if(status == Status.PlcError)
-                {
-                    // Send error
-                }
-                else
-                {
-
-                }               
-            }
-            else
-            {
-                // Failed to get the status data from PLC
-                // Send error
-            }
-
-            // Time-out if couldn't find the status
-
-            checkConnectivity();
-
             // Set it to false so we
             newMsg = false;
 
@@ -524,7 +521,7 @@ namespace Mirage.plc
         /// <summary>
         /// Tries to reconnect to a PLC if the connection drops. If it does, and connectivity counter is below zero, it sends and email.
         /// </summary>
-        private static void checkConnectivity()
+        public static void checkConnectivity()
         {
             logger(AREA, DEBUG, "==== Checking Connectivity ====");
 
@@ -568,7 +565,7 @@ namespace Mirage.plc
             {
                 dc.disconnectPLC();
                 di.disconnectAdapter();
-                libnodave.closePort(fds.rfd);
+                closePort(fds.rfd);
             }
             catch (Exception exception)
             {

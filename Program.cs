@@ -79,6 +79,8 @@ namespace Mirage
                     SiemensPLC.checkResponse();
                 }
 
+                SiemensPLC.checkConnectivity();
+
                 // Poll MiR Fleet - async operation that happens every pollInterval
                 if (currentTimer < pollInterval)
                 {
@@ -264,7 +266,7 @@ namespace Mirage
 
             int restStatus = mirFleet.issueGetRequest("mission_scheduler/" + SiemensPLC.robotID, SiemensPLC.robotID);
 
-            SiemensPLC.writeData("mission_text", restStatus, mirFleet.robots[SiemensPLC.robotID].s.mission_text);
+            SiemensPLC.writeData("mission_schedule", restStatus, mirFleet.robots[SiemensPLC.robotID].s.mission_text);
 
             logger(AREA, DEBUG, "==== Obtained Scheduler Status ====");
         }
