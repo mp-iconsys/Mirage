@@ -301,10 +301,10 @@ namespace Mirage
             s = JsonConvert.DeserializeObject<rest.Status>(response.Content.ReadAsStringAsync().Result);
             //logger(AREA, DEBUG, response.Content.ReadAsStringAsync().Result);
 
-            //s.print();
-            s.saveToDB(id, Maps);
+            s.print();
+            s.saveToDB(id);
 
-            logger(AREA, DEBUG, "==== Finished Saving Logs ====");
+            logger(AREA, DEBUG, "==== Finished Saving Status ====");
         }
 
         /// <summary>

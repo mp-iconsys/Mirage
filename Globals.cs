@@ -218,7 +218,7 @@ public static class Globals
         }
         catch(Exception exception)
         {
-
+            logger(AREA, ERROR, "Failed to set up an HTTP Connection. Error: ", exception);
         }
 
         SiemensPLC.establishConnection();
@@ -285,6 +285,37 @@ public static class Globals
             {
                 Console.WriteLine("Insert Query Stored Successfully");
             }
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine("Failed To Insert");
+            Console.WriteLine(e);
+        }
+    }
+
+    public static void issueQuery(MySqlCommand cmd)
+    {
+        int rowsAffected = 0;
+
+        try
+        {
+            cmd.Connection = db;
+            cmd.Prepare();
+            rowsAffected = cmd.ExecuteNonQuery();
+
+            Console.WriteLine("Rows Affected: " + rowsAffected);
+
+            if (rowsAffected == 0)
+            {
+                // Query Failed
+                Console.WriteLine("Insert Query Hasn't Been Stored");
+            }
+            else if (debugLevel > 0)
+            {
+                Console.WriteLine("Insert Query Stored Successfully");
+            }
+
+            cmd.Dispose();
         }
         catch (Exception e)
         {

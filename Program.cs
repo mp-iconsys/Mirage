@@ -27,6 +27,11 @@ namespace Mirage
 
             getInitialFleetData();
 
+            mirFleet.issueGetRequests("status");
+            await mirFleet.saveFleetStatusAsync();
+
+            gracefulTermination();
+
             logger(AREA, DEBUG, "==== Starting Main Loop ====");
 
             int i = 0;
