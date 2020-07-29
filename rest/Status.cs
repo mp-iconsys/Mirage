@@ -1,11 +1,10 @@
-﻿using MySql.Data.MySqlClient;
-using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Net.Http;
+﻿using System;
+using System.Data;
 using System.Text;
+using System.Net.Http;
+using System.Collections.Generic;
+using MySql.Data.MySqlClient;
+using Newtonsoft.Json;
 using static Globals;
 
 namespace Mirage.rest
@@ -44,6 +43,9 @@ namespace Mirage.rest
 
         public Status() { }
 
+        /// <summary>
+        /// 
+        /// </summary>
         public void print()
         {
             Console.WriteLine("mode_id: " + mode_id);
@@ -61,6 +63,10 @@ namespace Mirage.rest
             Console.WriteLine("velocity angular: " + velocity.angular);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="response"></param>
         public void saveToMemory(HttpResponseMessage response) 
         { 
             Status temp = JsonConvert.DeserializeObject<Status>(response.Content.ReadAsStringAsync().Result);
@@ -96,58 +102,96 @@ namespace Mirage.rest
             velocity = temp.velocity;
     }
 
-        public void saveToDB() 
-        { 
-            // Use a transaction here
-        }
-
+        /// <summary>
+        /// Saves position, velocity, errors (if they exist) along with the status information
+        /// of the robot.
+        /// </summary>
+        /// <param name="robotID">Specifies robot id</param>
         public void saveToDB(int robotID)
         {
-            MySqlCommand cmd = new MySqlCommand();
+            MySqlCommand cmd = new MySqlCommand("store_status");
 
             try
             {
-                cmd.CommandText = "CALL store_status(@robotID, @pos_x, @pox_y, @pos_orientation, @velocity_lin, @velocity_ang, "
-                                + "@erroc_code, @error_desc, @error_module, @map_guid, @modeID, @stateID, @uptime, @batteryTimeRemaining, "
-                                + "@batteryPercentage, @distanceToTarget, @moved, @joystickLowSpeedMode, @joystickWebSessionID, @mission_queue_id, "
-                                + "@mission_text, @mode_text, @safetySystemMuted, @unloaded_map_changes, @user_prompt_id);";
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.Parameters.Add(new MySqlParameter("ROBOT_ID", robotID));
+                cmd.Parameters.Add(new MySqlParameter("POS_X", position.x));
+                cmd.Parameters.Add(new MySqlParameter("POS_Y", position.y));
+                cmd.Parameters.Add(new MySqlParameter("POS_ORIENTATION", position.orientation));
+                cmd.Parameters.Add(new MySqlParameter("VELOCITY_LIN", velocity.linear));
+                cmd.Parameters.Add(new MySqlParameter("VELOCITY_ANG", velocity.angular));
 
-                cmd.Parameters.Add("@robotID", MySqlDbType.UInt64).Value = robotID;
-                cmd.Parameters.Add("@pos_x", MySqlDbType.Float).Value = position.x;
-                cmd.Parameters.Add("@pox_y", MySqlDbType.Float).Value = position.y;
-                cmd.Parameters.Add("@pos_orientation", MySqlDbType.Float).Value = position.orientation;
-                cmd.Parameters.Add("@velocity_lin", MySqlDbType.Float).Value = velocity.linear;
-                cmd.Parameters.Add("@velocity_ang", MySqlDbType.Float).Value = velocity.angular;
-
-                if(errors.Count > 0)
-                { 
-                    cmd.Parameters.Add("@erroc_code", MySqlDbType.UInt64).Value = errors[0].code;
-                    cmd.Parameters.Add("@error_desc", MySqlDbType.VarChar).Value = errors[0].description;
-                    cmd.Parameters.Add("@error_module", MySqlDbType.VarChar).Value = errors[0].module;
+                if (errors.Count > 0)
+                {
+                    cmd.Parameters.Add(new MySqlParameter("ERROR_CODE", errors[0].code));
+                    cmd.Parameters.Add(new MySqlParameter("ERROR_DESCRIPTION", errors[0].description));
+                    cmd.Parameters.Add(new MySqlParameter("ERROR_MODULE", errors[0].module));
                 }
                 else
                 {
-                    cmd.Parameters.Add("@erroc_code", MySqlDbType.UInt64).Value = DBNull.Value;
-                    cmd.Parameters.Add("@error_desc", MySqlDbType.VarChar).Value = DBNull.Value;
-                    cmd.Parameters.Add("@error_module", MySqlDbType.VarChar).Value = DBNull.Value;
+                    cmd.Parameters.Add(new MySqlParameter("ERROR_CODE", DBNull.Value));
+                    cmd.Parameters.Add(new MySqlParameter("ERROR_DESCRIPTION", DBNull.Value));
+                    cmd.Parameters.Add(new MySqlParameter("ERROR_MODULE", DBNull.Value));
                 }
 
-                cmd.Parameters.Add("@map_guid", MySqlDbType.VarChar).Value = map_id;
-                cmd.Parameters.Add("@modeID", MySqlDbType.UInt64).Value = mode_id;
-                cmd.Parameters.Add("@stateID", MySqlDbType.UInt64).Value = state_id;
-                cmd.Parameters.Add("@uptime", MySqlDbType.UInt64).Value = uptime;
-                cmd.Parameters.Add("@batteryTimeRemaining", MySqlDbType.UInt64).Value = battery_time_remaining;
-                cmd.Parameters.Add("@batteryPercentage", MySqlDbType.Float).Value = battery_percentage;
-                cmd.Parameters.Add("@distanceToTarget", MySqlDbType.Float).Value = distance_to_next_target;
-                cmd.Parameters.Add("@moved", MySqlDbType.Float).Value = moved;
-                cmd.Parameters.Add("@joystickLowSpeedMode", MySqlDbType.Int32).Value = convertToInt(joystick_low_speed_mode_enabled);
-                cmd.Parameters.Add("@joystickWebSessionID", MySqlDbType.VarChar).Value = joystick_web_session_id;
-                cmd.Parameters.Add("@mission_queue_id", MySqlDbType.VarChar).Value = mission_queue_id;
-                cmd.Parameters.Add("@mission_text", MySqlDbType.VarChar).Value = mission_text;
-                cmd.Parameters.Add("@mode_text", MySqlDbType.VarChar).Value = mode_text;
-                cmd.Parameters.Add("@safetySystemMuted", MySqlDbType.Int32).Value = convertToInt(safety_system_muted);
-                cmd.Parameters.Add("@unloaded_map_changes", MySqlDbType.Int32).Value = convertToInt(unloaded_map_changes);
-                cmd.Parameters.Add("@user_prompt_id", MySqlDbType.UInt64).Value = user_prompt;
+                cmd.Parameters.Add(new MySqlParameter("MAP_GUID", map_id));
+                cmd.Parameters.Add(new MySqlParameter("MODE_ID", mode_id));
+                cmd.Parameters.Add(new MySqlParameter("STATE_ID", state_id));
+                cmd.Parameters.Add(new MySqlParameter("UPTIME", uptime));
+                cmd.Parameters.Add(new MySqlParameter("BATTER_TIME", battery_time_remaining));
+                cmd.Parameters.Add(new MySqlParameter("BATTERY_PERCENTAGE", battery_percentage));
+                cmd.Parameters.Add(new MySqlParameter("DISTANCE_TO_TARGET", distance_to_next_target));
+                cmd.Parameters.Add(new MySqlParameter("MOVED", moved));
+                cmd.Parameters.Add(new MySqlParameter("JOYSTICK_LOW_SPEED_MODE", convertToInt(joystick_low_speed_mode_enabled)));
+                cmd.Parameters.Add(new MySqlParameter("JOYSTICK_WEB_SESSION", joystick_web_session_id));
+                cmd.Parameters.Add(new MySqlParameter("MISSION_QUEUE_ID", mission_queue_id));
+                cmd.Parameters.Add(new MySqlParameter("MISSION_TEXT", mission_text));
+                cmd.Parameters.Add(new MySqlParameter("MODE_TEXT", mode_text));
+                cmd.Parameters.Add(new MySqlParameter("SAFETY_SYSTEM_MUTED", convertToInt(safety_system_muted)));
+                cmd.Parameters.Add(new MySqlParameter("UNLOADED_MAP_CHANGES", convertToInt(unloaded_map_changes)));
+                cmd.Parameters.Add(new MySqlParameter("USER_PROMPT_ID", user_prompt));
+
+ /*                cmd.CommandText = "CALL store_status(@robotID, @pos_x, @pox_y, @pos_orientation, @velocity_lin, @velocity_ang, "
+                                 + "@erroc_code, @error_desc, @error_module, @map_guid, @modeID, @stateID, @uptime, @batteryTimeRemaining, "
+                                 + "@batteryPercentage, @distanceToTarget, @moved, @joystickLowSpeedMode, @joystickWebSessionID, @mission_queue_id, "
+                                 + "@mission_text, @mode_text, @safetySystemMuted, @unloaded_map_changes, @user_prompt_id);";
+
+                 cmd.Parameters.Add("@robotID", MySqlDbType.UInt64).Value = robotID;
+                 cmd.Parameters.Add("@pos_x", MySqlDbType.Float).Value = position.x;
+                 cmd.Parameters.Add("@pox_y", MySqlDbType.Float).Value = position.y;
+                 cmd.Parameters.Add("@pos_orientation", MySqlDbType.Float).Value = position.orientation;
+                 cmd.Parameters.Add("@velocity_lin", MySqlDbType.Float).Value = velocity.linear;
+                 cmd.Parameters.Add("@velocity_ang", MySqlDbType.Float).Value = velocity.angular;
+
+                 if(errors.Count > 0)
+                 { 
+                     cmd.Parameters.Add("@erroc_code", MySqlDbType.UInt64).Value = errors[0].code;
+                     cmd.Parameters.Add("@error_desc", MySqlDbType.VarChar).Value = errors[0].description;
+                     cmd.Parameters.Add("@error_module", MySqlDbType.VarChar).Value = errors[0].module;
+                 }
+                 else
+                 {
+                     cmd.Parameters.Add("@erroc_code", MySqlDbType.UInt64).Value = DBNull.Value;
+                     cmd.Parameters.Add("@error_desc", MySqlDbType.VarChar).Value = DBNull.Value;
+                     cmd.Parameters.Add("@error_module", MySqlDbType.VarChar).Value = DBNull.Value;
+                 }
+
+                 cmd.Parameters.Add("@map_guid", MySqlDbType.VarChar).Value = map_id;
+                 cmd.Parameters.Add("@modeID", MySqlDbType.UInt64).Value = mode_id;
+                 cmd.Parameters.Add("@stateID", MySqlDbType.UInt64).Value = state_id;
+                 cmd.Parameters.Add("@uptime", MySqlDbType.UInt64).Value = uptime;
+                 cmd.Parameters.Add("@batteryTimeRemaining", MySqlDbType.UInt64).Value = battery_time_remaining;
+                 cmd.Parameters.Add("@batteryPercentage", MySqlDbType.Float).Value = battery_percentage;
+                 cmd.Parameters.Add("@distanceToTarget", MySqlDbType.Float).Value = distance_to_next_target;
+                 cmd.Parameters.Add("@moved", MySqlDbType.Float).Value = moved;
+                 cmd.Parameters.Add("@joystickLowSpeedMode", MySqlDbType.Int32).Value = convertToInt(joystick_low_speed_mode_enabled);
+                 cmd.Parameters.Add("@joystickWebSessionID", MySqlDbType.VarChar).Value = joystick_web_session_id;
+                 cmd.Parameters.Add("@mission_queue_id", MySqlDbType.VarChar).Value = mission_queue_id;
+                 cmd.Parameters.Add("@mission_text", MySqlDbType.VarChar).Value = mission_text;
+                 cmd.Parameters.Add("@mode_text", MySqlDbType.VarChar).Value = mode_text;
+                 cmd.Parameters.Add("@safetySystemMuted", MySqlDbType.Int32).Value = convertToInt(safety_system_muted);
+                 cmd.Parameters.Add("@unloaded_map_changes", MySqlDbType.Int32).Value = convertToInt(unloaded_map_changes);
+                 cmd.Parameters.Add("@user_prompt_id", MySqlDbType.UInt64).Value = user_prompt;*/
 
                 //.Parameters.AddWithValue(
 
@@ -160,6 +204,11 @@ namespace Mirage.rest
             }
         }
 
+        /// <summary>
+        /// Helper function for converting a boolean string (false or true) into an integer
+        /// </summary>
+        /// <param name="a"></param>
+        /// <returns></returns>
         private int convertToInt(string a)
         {
             if (a == "true") { return 1; }
@@ -167,6 +216,11 @@ namespace Mirage.rest
             else { return 2; }
         }
 
+        /// <summary>
+        /// Old way of saving status data.
+        /// </summary>
+        /// <param name="robotID"></param>
+        /// <param name="m"></param>
         public void saveToDB(int robotID, List<Map> m)
         {
             Console.WriteLine("Saving To DB");
@@ -212,15 +266,16 @@ namespace Mirage.rest
                 cmd.Parameters.Add("@unloaded_map_changes", MySqlDbType.Bit).Value = unloaded_map_changes;
                 cmd.Parameters.Add("@user_prompt_id", MySqlDbType.Int32).Value = user_prompt;
 
-                Console.WriteLine("To String:");
-                Console.WriteLine(cmd.ToString());
+                //Console.WriteLine("To String:");
+                //Console.WriteLine(cmd.ToString());
 
                 logger(typeof(Status), DebugLevel.DEBUG, cmd.ToString());
 
-                Globals.issueQuery(cmd);
+                issueQuery(cmd);
             }
             catch (Exception exception)
             {
+                logger(typeof(Status), DebugLevel.DEBUG, "Exception: ", exception);
                 cmd.Dispose();
 
             }
@@ -378,13 +433,21 @@ namespace Mirage.rest
                         Globals.issueInsertQuery(query);*/
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="response"></param>
+        /// <param name="robotID"></param>
         public void saveAll(HttpResponseMessage response, int robotID)
         {
             saveToMemory(response);
             saveToDB(robotID);
         }
 
-        // Status does not have a delete option for Mirs
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
         public HttpRequestMessage deleteRequest()
         {
             HttpRequestMessage request = new HttpRequestMessage
@@ -397,7 +460,10 @@ namespace Mirage.rest
             return request;
         }
 
-        // Status does not have a delete option for Mirs
+        /// <summary>
+        /// Status does not have a delete option for Mirs
+        /// </summary>
+        /// <returns></returns> 
         public HttpRequestMessage postRequest()
         {
             string payload = "stuff";
@@ -412,6 +478,10 @@ namespace Mirage.rest
             return request;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
         public HttpRequestMessage putRequest()
         {
             string payload = "stuff";
@@ -426,9 +496,9 @@ namespace Mirage.rest
             return request;
         }
 
-        //  Nested Classes, to contain data in a nicer way
-        // 
-        // 
+        /// <summary>
+        /// Nested class, used to contain position data.
+        /// </summary>
         public class Position
         {
             public double x { get; set; }
@@ -436,6 +506,9 @@ namespace Mirage.rest
             public double orientation { get; set; }
         }
 
+        /// <summary>
+        /// Nested class, used to contain errors.
+        /// </summary>
         public class ErrorsItem
         {
             public int code { get; set; }
@@ -443,12 +516,18 @@ namespace Mirage.rest
             public string module { get; set; }
         }
 
+        /// <summary>
+        /// Nested class, used to contain velocity data.
+        /// </summary>
         public class Velocity
         {
             public double linear { get; set; }
             public double angular { get; set; }
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
         public class User_prompt
         {
             public string guid { get; set; }
@@ -458,6 +537,9 @@ namespace Mirage.rest
             public string user_group { get; set; }
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
         public class Cart
         {
             public int id { get; set; }
@@ -467,6 +549,9 @@ namespace Mirage.rest
             public int offset_locked_wheels { get; set; }
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
         public class Hook_status
         {
             public string available { get; set; }

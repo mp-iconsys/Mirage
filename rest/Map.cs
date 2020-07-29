@@ -1,7 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Net.Http;
+using System.Data;
 using System.Text;
+using System.Net.Http;
+using System.Collections.Generic;
+using MySql.Data.MySqlClient;
+using static Globals;
 
 namespace Mirage.rest
 {
@@ -27,6 +30,9 @@ namespace Mirage.rest
         public string Url { get; set; }
         public int Map_id { get; set; }
 
+        /// <summary>
+        /// 
+        /// </summary>
         public void print()
         {
             Console.WriteLine();
@@ -52,27 +58,64 @@ namespace Mirage.rest
             Console.WriteLine();
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="response"></param>
         public void saveToMemory(HttpResponseMessage response) {}
 
-        public void saveToDB() {}
-
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="robotID"></param>
         public void saveToDB(int robotID)
         {
-            string query = "REPLACE INTO maps (`MAP_ID`, `ROBOT_ID`, `NAME`, `CREATED_BY_NAME`, `CREATED_BY_ID`, `MAP`, `METADATA`, `ONE_WAY_MAP`, `ORIGIN_THETA`, `ORIGIN_X`, `ORIGIN_Y`, `PATH_GUIDES`, `PATHS`, `POSITIONS`, `RESOLUTION`) VALUES ";
+            MySqlCommand cmd = new MySqlCommand("store_maps");
 
-            query   += "('" + Map_id + "', '" + robotID + "', '" + Name + "', '" + Created_by_name + "', '" + Created_by_id + "', '" + map + "', '" + Metadata + "', '"
-                    + One_way_map + "', '" + Origin_theta + "', '" + Origin_x + "', '" + Origin_y + "', '" + Path_guides + "', '" + Paths + "', '"
-                    + Positions + "', '" + Resolution + "');";
+            try
+            {
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.Parameters.Add(new MySqlParameter("MAP_ID", Map_id));
+                cmd.Parameters.Add(new MySqlParameter("ROBOT_ID", robotID));
+                cmd.Parameters.Add(new MySqlParameter("NAME", Name));
+                cmd.Parameters.Add(new MySqlParameter("GUID", Guid));
+                cmd.Parameters.Add(new MySqlParameter("CREATED_BY_NAME", Created_by_name));
+                cmd.Parameters.Add(new MySqlParameter("CREATED_BY_ID", Created_by_id));
+                cmd.Parameters.Add(new MySqlParameter("MAP", map));
+                cmd.Parameters.Add(new MySqlParameter("METADATA", Metadata));
+                cmd.Parameters.Add(new MySqlParameter("ONE_WAY_MAP", One_way_map));
+                cmd.Parameters.Add(new MySqlParameter("ORIGIN_THETA", Origin_theta));
+                cmd.Parameters.Add(new MySqlParameter("ORIGIN_X", Origin_x));
+                cmd.Parameters.Add(new MySqlParameter("ORIGIN_Y", Origin_y));
+                cmd.Parameters.Add(new MySqlParameter("PATH_GUIDES", Path_guides));
+                cmd.Parameters.Add(new MySqlParameter("PATHS", Paths));
+                cmd.Parameters.Add(new MySqlParameter("POSITIONS", Positions));
+                cmd.Parameters.Add(new MySqlParameter("RESOLUTION", Resolution));
 
-            Globals.issueInsertQuery(query);
+                issueQuery(cmd);
+            }
+            catch (Exception exception)
+            {
+                cmd.Dispose();
+                Console.WriteLine(exception);
+            }
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="response"></param>
+        /// <param name="robotID"></param>
         public void saveAll(HttpResponseMessage response, int robotID)
         {
             saveToMemory(response);
             saveToDB(robotID);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
         public HttpRequestMessage deleteRequest()
         {
             HttpRequestMessage request = new HttpRequestMessage
@@ -85,6 +128,10 @@ namespace Mirage.rest
             return request;
         }
         
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
         public HttpRequestMessage postRequest()
         {
             string payload = "stuff";
@@ -99,6 +146,10 @@ namespace Mirage.rest
             return request;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
         public HttpRequestMessage putRequest()
         {
             string payload = "stuff";

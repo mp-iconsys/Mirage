@@ -567,6 +567,10 @@ namespace Mirage.plc
                 di.disconnectAdapter();
                 closePort(fds.rfd);
             }
+            catch (NullReferenceException exception)
+            {
+                logger(AREA, ERROR, "Connection Has Not Been Instantiated. Exception: ", exception);
+            }
             catch (Exception exception)
             {
                 logger(AREA, ERROR, "Failed To Disconnect. The Error Is: ", exception);

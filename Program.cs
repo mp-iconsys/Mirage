@@ -137,8 +137,9 @@ namespace Mirage
             gracefulTermination();
         }
 
-        // Force the wait so we're doing things in order
-        // Synchronous initial fetch, so there'll be some delay on start-up
+        /// <summary>
+        /// Force the wait so we're doing things in order. Synchronous initial fetch, so there'll be some delay on start-up
+        /// </summary>
         private static void getInitialFleetData()
         {
             // Create the fleet which will contain out robot data
@@ -265,6 +266,9 @@ namespace Mirage
             }
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
         private static void getScheduleStatus()
         {
             logger(AREA, INFO, "==== Get Schedule Status ====");
@@ -276,6 +280,9 @@ namespace Mirage
             logger(AREA, DEBUG, "==== Obtained Scheduler Status ====");
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
         private static void sendMissionToScheduler()
         {
             logger(AREA, INFO, "==== Send Mission To Scheduler ====");
@@ -287,6 +294,9 @@ namespace Mirage
             logger(AREA, DEBUG, "==== Mission Sent ====");
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
         private static void createMission()
         {
             logger(AREA, INFO, "==== Create New Mission In Robot " + SiemensPLC.robotID + " ====");
@@ -298,6 +308,9 @@ namespace Mirage
             logger(AREA, DEBUG, "==== Created New Mission ====");
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
         private static void clearScheduler()
         {
             logger(AREA, INFO, "==== Clear Mission Schedule ====");
@@ -309,6 +322,9 @@ namespace Mirage
             logger(AREA, DEBUG, "==== Cleared Mission Scheduler ====");
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
         private static void getBattery()
         {
             Console.WriteLine("==== Get Battery Life ====");
@@ -318,6 +334,9 @@ namespace Mirage
             SiemensPLC.writeData("battery", restStatus, mirFleet.robots[SiemensPLC.robotID].s.battery_percentage);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
         private static void getDistance()
         {
             logger(AREA, INFO, "==== Get Distance Travelled ====");
@@ -329,6 +348,9 @@ namespace Mirage
             logger(AREA, DEBUG, "==== Distance Travelled Status Fetched And Saved ====");
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
         private static void getRobotStatus()
         {
             logger(AREA, INFO, "==== Get Mission Status ====");
@@ -340,6 +362,9 @@ namespace Mirage
             logger(AREA, DEBUG, "==== Mission Status Fetched And Saved ====");
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
         private static void unknownMission()
         {
             logger(AREA, ERROR, "==== Unknown Mission ====");
@@ -349,6 +374,9 @@ namespace Mirage
             // Issue an alert
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
         private static void calculationsAndReporting()
         {
 

@@ -23,6 +23,9 @@ namespace Mirage
         //=========================================================|
         private static readonly Type AREA = typeof(Fleet);
 
+        /// <summary>
+        /// 
+        /// </summary>
         public Fleet() 
         {
             robots = new Robot[sizeOfFleet];
@@ -31,6 +34,10 @@ namespace Mirage
             instantiateRobots(sizeOfFleet);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="sizeOfFleet"></param>
         public Fleet (int sizeOfFleet)
         {
             robots = new Robot[sizeOfFleet];
@@ -39,6 +46,10 @@ namespace Mirage
             instantiateRobots(sizeOfFleet);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="sizeOfFleet"></param>
         public void instantiateRobots(int sizeOfFleet)
         {
             fleetManager = new Robot(fleetManagerIP, fleetManagerAuthToken);
@@ -50,6 +61,10 @@ namespace Mirage
             }
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="type"></param>
         public void issueGetRequests(string type)
         {
             for(int i = 0; i < sizeOfFleet; i++)
@@ -79,7 +94,12 @@ namespace Mirage
             }
         }
 
-        // Sync method that issues a get request and saves data in memory
+        /// <summary>
+        /// Sync method that issues a get request and saves data in memory
+        /// </summary>
+        /// <param name="type"></param>
+        /// <param name="robotID"></param>
+        /// <returns></returns>
         public int issueGetRequest(string type, int robotID)
         {
             logger(AREA, DEBUG, "==== Issuing Get Request ====");
@@ -154,6 +174,10 @@ namespace Mirage
             return functionStatus;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
         public async Task saveFleetStatusAsync()
         {
             for (int i = 0; i < sizeOfFleet; i++)
@@ -162,6 +186,10 @@ namespace Mirage
             }
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
         public async Task saveFleetRegistersAsync()
         {
             for (int i = 0; i < sizeOfFleet; i++)
@@ -170,6 +198,10 @@ namespace Mirage
             }
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
         public async Task saveSoftwareLogsAsync()
         {
             for (int i = 0; i < sizeOfFleet; i++)
@@ -178,6 +210,10 @@ namespace Mirage
             }
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
         public async Task saveSettingsAsync()
         {
             for (int i = 0; i < sizeOfFleet; i++)
@@ -186,6 +222,10 @@ namespace Mirage
             }
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
         public async Task saveMapsAsync()
         {
             for (int i = 0; i < sizeOfFleet; i++)
@@ -195,6 +235,10 @@ namespace Mirage
             }
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
         public async Task saveMissionsAsync()
         {
             for (int i = 0; i < sizeOfFleet; i++)

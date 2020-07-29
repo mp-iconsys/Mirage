@@ -1,8 +1,9 @@
-﻿using log4net.Repository.Hierarchy;
-using System;
-using System.Collections.Generic;
-using System.Net.Http;
+﻿using System;
+using System.Data;
 using System.Text;
+using System.Net.Http;
+using MySql.Data.MySqlClient;
+using static Globals;
 
 namespace Mirage.rest
 {
@@ -17,6 +18,10 @@ namespace Mirage.rest
 
         public Mission() { }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="missionNumber"></param>
         public Mission(int missionNumber)
         {
             this.missionNumber = missionNumber;
@@ -29,6 +34,11 @@ namespace Mirage.rest
             guid = guid + missionNumberString;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="missionNumber"></param>
+        /// <returns></returns>
         public string stringyfyMission(int missionNumber)
         {
             if (missionNumber < 10)
@@ -37,6 +47,9 @@ namespace Mirage.rest
                 return missionNumber.ToString();
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
         public void print()
         {
             Console.WriteLine("Mission No: " + missionNumber);
@@ -47,6 +60,10 @@ namespace Mirage.rest
             Console.WriteLine("missionNumberString: " + missionNumberString);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="response"></param>
         public void saveToMemory(HttpResponseMessage response)
         {
 
@@ -60,10 +77,31 @@ namespace Mirage.rest
         {
             getMissionNumber(guid);
 
+            MySqlCommand cmd = new MySqlCommand("store_missions");
+
+            try
+            {
+                cmd.CommandType = CommandType.StoredProcedure;
+
+                cmd.Parameters.Add(new MySqlParameter("MISSION_ID", missionNumber));
+                cmd.Parameters.Add(new MySqlParameter("ROBOT_ID", robotID));
+                cmd.Parameters.Add(new MySqlParameter("GUID", guid));
+                cmd.Parameters.Add(new MySqlParameter("NAME", name));
+                cmd.Parameters.Add(new MySqlParameter("URL", url));
+
+                issueQuery(cmd);
+            }
+            catch (Exception exception)
+            {
+                cmd.Dispose();
+                Console.WriteLine(exception);
+            }
+
+/*
             string  query = "REPLACE INTO missions (`MISSION_ID`, `ROBOT_ID`, `GUID`, `Name`, `URL`) VALUES ";
                     query += "('" + missionNumber + "','" + robotID + "','" + guid + "','" + name + "','" + url + "');";
 
-            Globals.issueInsertQuery(query);
+            Globals.issueInsertQuery(query);*/
         }
 
         /// <summary>
@@ -85,12 +123,21 @@ namespace Mirage.rest
             }
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="response"></param>
+        /// <param name="robotID"></param>
         public void saveAll(HttpResponseMessage response, int robotID)
         {
 
         }
 
-        // Create mission
+        /// <summary>
+        /// Create mission
+        /// </summary>
+        /// <param name="missionNumber"></param>
+        /// <returns></returns>
         public HttpRequestMessage createMission(int missionNumber)
         {
             string payload = "{\r\n  \"guid\": \"" + guid + stringyfyMission(missionNumber) + "\",\r\n  \"name\": \"Mission" + stringyfyMission(missionNumber) + "\",\r\n  \"description\": \"template_mission_" + stringyfyMission(missionNumber) + "\",\r\n  \"hidden\": false,\r\n  \"group_id\": \"mirconst-guid-0000-0011-missiongroup\",\r\n  \"session_id\": \"caa94ad9-65cc-11e9-abc1-94c691a7361d\",\r\n  \"created_by_id\": \"mirconst-guid-0000-0004-users0000000\"\r\n}";

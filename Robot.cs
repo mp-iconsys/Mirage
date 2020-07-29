@@ -43,7 +43,9 @@ namespace Mirage
         //=========================================================|
         private static readonly Type AREA = typeof(Robot);
 
-        // Instantiate with connection details
+        /// <summary>
+        /// Instantiate with connection details
+        /// </summary>
         public Robot()
         {
             fetchConnectionDetails();
@@ -52,7 +54,10 @@ namespace Mirage
             s = new rest.Status();
         }
 
-        // Instantiate with connection details
+        /// <summary>
+        /// Instantiate with connection details
+        /// </summary>
+        /// <param name="id"></param>
         public Robot(int id)
         {
             this.id = id;
@@ -63,7 +68,11 @@ namespace Mirage
             s = new rest.Status();
         }
 
-        // For when we're fetching the details from the database
+        /// <summary>
+        /// For when we're fetching the details from the database
+        /// </summary>
+        /// <param name="ipAddress"></param>
+        /// <param name="authValue"></param>
         public Robot(string ipAddress, AuthenticationHeaderValue authValue)
         {
             this.ipAddress = ipAddress;
@@ -327,6 +336,10 @@ namespace Mirage
             logger(AREA, DEBUG, "==== Finished Saving Missions ====");
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="response"></param>
         public void saveStatusInMemory(HttpResponseMessage response)
         {
             s = JsonConvert.DeserializeObject<rest.Status>(response.Content.ReadAsStringAsync().Result);
@@ -338,6 +351,10 @@ namespace Mirage
                 s.print();
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="response"></param>
         public void saveRegisters(HttpResponseMessage response)
         {
             logger(AREA, DEBUG, "==== Saving Registers ====");

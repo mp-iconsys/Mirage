@@ -1,7 +1,10 @@
-﻿using Newtonsoft.Json;
+﻿using MySql.Data.MySqlClient;
+using Newtonsoft.Json;
 using System;
+using System.Data;
 using System.Net.Http;
 using System.Text;
+using static Globals;
 
 namespace Mirage.rest
 {
@@ -16,6 +19,9 @@ namespace Mirage.rest
         public string To { get; set; }
         public string Url { get; set; }
 
+        /// <summary>
+        /// 
+        /// </summary>
         public void print()
         {
             Console.WriteLine("Action: " + Action);
@@ -28,6 +34,10 @@ namespace Mirage.rest
             Console.WriteLine("Url: " + Url);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="response"></param>
         public void saveToMemory(HttpResponseMessage response)
         {
             SoftwareLog temp = JsonConvert.DeserializeObject<SoftwareLog>(response.Content.ReadAsStringAsync().Result);
@@ -42,22 +52,58 @@ namespace Mirage.rest
             Url = temp.Url;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="robotID"></param>
         public void saveToDB(int robotID)
         {
+            MySqlCommand cmd = new MySqlCommand("store_maps");
+
+            try
+            {
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.Parameters.Add(new MySqlParameter("ROBOT_ID", robotID));
+                cmd.Parameters.Add(new MySqlParameter("FROM", From));
+                cmd.Parameters.Add(new MySqlParameter("TO", To));
+                cmd.Parameters.Add(new MySqlParameter("ACTION", Action));
+                cmd.Parameters.Add(new MySqlParameter("STATE", State));
+                cmd.Parameters.Add(new MySqlParameter("START_TIME", Start_time));
+                cmd.Parameters.Add(new MySqlParameter("END_TIME", End_time));
+                cmd.Parameters.Add(new MySqlParameter("URL", Url));
+                cmd.Parameters.Add(new MySqlParameter("GUID", Guid));
+
+                issueQuery(cmd);
+            }
+            catch (Exception exception)
+            {
+                cmd.Dispose();
+                Console.WriteLine(exception);
+            }
+/*
             string query = "REPLACE INTO software_logs (`ROBOT_ID`, `FROM`, `TO`, `ACTION`, `STATE`, `START_TIME`, `END_TIME`, `URL`, `GUID`) VALUES ";
 
             query += "('" + robotID + "', '" + From + "', '" + To + "', '" + Action + "', '" + State + "', '" + Start_time
                       + "', '" + End_time + "', '" + Url + "', '" + Guid + "');";
 
-            Globals.issueInsertQuery(query);
+            Globals.issueInsertQuery(query);*/
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="response"></param>
+        /// <param name="robotID"></param>
         public void saveAll(HttpResponseMessage response, int robotID)
         {
             saveToMemory(response);
             saveToDB(robotID);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
         public HttpRequestMessage deleteRequest()
         {
             HttpRequestMessage request = new HttpRequestMessage
@@ -70,6 +116,10 @@ namespace Mirage.rest
             return request;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
         public HttpRequestMessage postRequest()
         {
             string payload = "stuff";
@@ -84,6 +134,10 @@ namespace Mirage.rest
             return request;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
         public HttpRequestMessage putRequest()
         {
             string payload = "stuff";
@@ -97,6 +151,5 @@ namespace Mirage.rest
 
             return request;
         }
-
     }
 }

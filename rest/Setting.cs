@@ -1,7 +1,9 @@
-﻿using Newtonsoft.Json;
-using System;
-using System.Net.Http;
+﻿using System;
+using System.Data;
 using System.Text;
+using System.Net.Http;
+using Newtonsoft.Json;
+using MySql.Data.MySqlClient;
 using static Globals;
 using static Globals.DebugLevel;
 
@@ -16,6 +18,9 @@ namespace Mirage.rest
         public string Value { get; set; }
         public string Default { get; set; }
 
+        /// <summary>
+        /// 
+        /// </summary>
         public void print()
         {
             Console.WriteLine("ID: " + Id);
@@ -26,6 +31,10 @@ namespace Mirage.rest
             Console.WriteLine("Default: " + Default);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="response"></param>
         public void saveToMemory(HttpResponseMessage response)
         {
             Setting temp = JsonConvert.DeserializeObject<Setting>(response.Content.ReadAsStringAsync().Result);
@@ -38,23 +47,59 @@ namespace Mirage.rest
             Default = temp.Default;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="robotID"></param>
         public void saveToDB(int robotID)
         {
+            MySqlCommand cmd = new MySqlCommand("store_maps");
+
+            try
+            {
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.Parameters.Add(new MySqlParameter("SETTING_ID", Id));
+                cmd.Parameters.Add(new MySqlParameter("ROBOT_ID", robotID));
+                cmd.Parameters.Add(new MySqlParameter("NAME", Name));
+                cmd.Parameters.Add(new MySqlParameter("PARENT_NAME", Parent_name));
+                cmd.Parameters.Add(new MySqlParameter("URL", Url));
+                cmd.Parameters.Add(new MySqlParameter("VALUE", Value));
+                cmd.Parameters.Add(new MySqlParameter("DEFAULT_VALUE", Default));
+
+                issueQuery(cmd);
+            }
+            catch (Exception exception)
+            {
+                cmd.Dispose();
+                Console.WriteLine(exception);
+            }
+
+/*
             string query = "REPLACE INTO settings (`SETTING_ID`, `ROBOT_ID`, `NAME`, `PARENT_NAME`, `URL`, `VALUE`, `DEFAULT_VALUE`) VALUES ";
 
             query += "('" + Id + "','" + robotID + "','" + Name + "','" + Parent_name + "','" + Url + "','" + Value + "','" + Default + "');";
 
             //logger(typeof(Setting), DEBUG, query);
 
-            Globals.issueInsertQuery(query);
+            Globals.issueInsertQuery(query);*/
+
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="response"></param>
+        /// <param name="robotID"></param>
         public void saveAll(HttpResponseMessage response, int robotID)
         {
             saveToMemory(response);
             saveToDB(robotID);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
         public HttpRequestMessage deleteRequest()
         {
             HttpRequestMessage request = new HttpRequestMessage
@@ -67,6 +112,10 @@ namespace Mirage.rest
             return request;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
         public HttpRequestMessage postRequest()
         {
             HttpRequestMessage request = new HttpRequestMessage
@@ -79,6 +128,10 @@ namespace Mirage.rest
             return request;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
         public HttpRequestMessage putRequest()
         {
             HttpRequestMessage request = new HttpRequestMessage

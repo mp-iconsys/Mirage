@@ -293,6 +293,10 @@ public static class Globals
         }
     }
 
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="cmd"></param>
     public static void issueQuery(MySqlCommand cmd)
     {
         int rowsAffected = 0;
@@ -329,7 +333,7 @@ public static class Globals
     /// </summary>
     /// <param name="table"></param>
     /// <returns></returns>
-    public static int? getIDQuery(string table)
+/*    public static int? getIDQuery(string table)
     {
         int? id = null;
 
@@ -357,14 +361,14 @@ public static class Globals
         }
 
         return id;
-    }
+    }*/
 
     /// <summary>
     /// 
     /// </summary>
     /// <param name="value"></param>
     /// <returns></returns>
-    public static object addToDB(object value)
+/*    public static object addToDB(object value)
     {
         if (null != value)
         {
@@ -396,7 +400,7 @@ public static class Globals
 
             return "NULL,";
         }
-    }
+    }*/
 
     /// <summary>
     /// Sends an SMS alert and terminates the program. Only used in extreme cases.
