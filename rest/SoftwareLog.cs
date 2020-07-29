@@ -58,7 +58,7 @@ namespace Mirage.rest
         /// <param name="robotID"></param>
         public void saveToDB(int robotID)
         {
-            MySqlCommand cmd = new MySqlCommand("store_maps");
+            MySqlCommand cmd = new MySqlCommand("store_software_logs");
 
             try
             {
@@ -80,13 +80,6 @@ namespace Mirage.rest
                 cmd.Dispose();
                 Console.WriteLine(exception);
             }
-/*
-            string query = "REPLACE INTO software_logs (`ROBOT_ID`, `FROM`, `TO`, `ACTION`, `STATE`, `START_TIME`, `END_TIME`, `URL`, `GUID`) VALUES ";
-
-            query += "('" + robotID + "', '" + From + "', '" + To + "', '" + Action + "', '" + State + "', '" + Start_time
-                      + "', '" + End_time + "', '" + Url + "', '" + Guid + "');";
-
-            Globals.issueInsertQuery(query);*/
         }
 
         /// <summary>

@@ -96,12 +96,6 @@ namespace Mirage.rest
                 cmd.Dispose();
                 Console.WriteLine(exception);
             }
-
-/*
-            string  query = "REPLACE INTO missions (`MISSION_ID`, `ROBOT_ID`, `GUID`, `Name`, `URL`) VALUES ";
-                    query += "('" + missionNumber + "','" + robotID + "','" + guid + "','" + name + "','" + url + "');";
-
-            Globals.issueInsertQuery(query);*/
         }
 
         /// <summary>

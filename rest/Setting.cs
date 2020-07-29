@@ -53,7 +53,7 @@ namespace Mirage.rest
         /// <param name="robotID"></param>
         public void saveToDB(int robotID)
         {
-            MySqlCommand cmd = new MySqlCommand("store_maps");
+            MySqlCommand cmd = new MySqlCommand("store_settings");
 
             try
             {
@@ -73,16 +73,6 @@ namespace Mirage.rest
                 cmd.Dispose();
                 Console.WriteLine(exception);
             }
-
-/*
-            string query = "REPLACE INTO settings (`SETTING_ID`, `ROBOT_ID`, `NAME`, `PARENT_NAME`, `URL`, `VALUE`, `DEFAULT_VALUE`) VALUES ";
-
-            query += "('" + Id + "','" + robotID + "','" + Name + "','" + Parent_name + "','" + Url + "','" + Value + "','" + Default + "');";
-
-            //logger(typeof(Setting), DEBUG, query);
-
-            Globals.issueInsertQuery(query);*/
-
         }
 
         /// <summary>

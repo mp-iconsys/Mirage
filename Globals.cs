@@ -257,40 +257,7 @@ public static class Globals
     public static void logJSON(string json)
     {
         Console.WriteLine(json);
-        issueInsertQuery("INSERT INTO mir.logger(DATA) values ('" + MySqlHelper.EscapeString(json) + "');");
-    }
-
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <param name="query"></param>
-    public static void issueInsertQuery(string query)
-    {
-        int rowsAffected = 0;
-
-        if (debugLevel > 3)
-            Console.WriteLine(query);
-
-        try
-        {
-            MySqlCommand insertQuery = new MySqlCommand(query, db);
-            rowsAffected = insertQuery.ExecuteNonQuery();
-
-            if (rowsAffected == 0)
-            {
-                // Query Failed
-                Console.WriteLine("Insert Query Hasn't Been Stored");
-            }
-            else if (debugLevel > 0)
-            {
-                Console.WriteLine("Insert Query Stored Successfully");
-            }
-        }
-        catch (Exception e)
-        {
-            Console.WriteLine("Failed To Insert");
-            Console.WriteLine(e);
-        }
+        //issueInsertQuery("INSERT INTO mir.logger(DATA) values ('" + MySqlHelper.EscapeString(json) + "');");
     }
 
     /// <summary>
@@ -327,80 +294,6 @@ public static class Globals
             Console.WriteLine(e);
         }
     }
-
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <param name="table"></param>
-    /// <returns></returns>
-/*    public static int? getIDQuery(string table)
-    {
-        int? id = null;
-
-        if (debugLevel > 1)
-            Console.WriteLine(table);
-
-        try
-        {
-            MySqlCommand getQuery = new MySqlCommand("SELECT MAX(" + table + "_id) FROM " + table, db);
-
-
-            if (debugLevel > 1)
-                Console.WriteLine(getQuery);
-
-            object result = getQuery.ExecuteScalar();
-            if (result != null)
-                id = (int)Convert.ToUInt64(result);
-            else
-                Console.WriteLine("We've got a null");
-        }
-        catch (Exception e)
-        {
-            Console.WriteLine("Failed To Insert");
-            Console.WriteLine(e);
-        }
-
-        return id;
-    }*/
-
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <param name="value"></param>
-    /// <returns></returns>
-/*    public static object addToDB(object value)
-    {
-        if (null != value)
-        {
-            if(debugLevel > 1)
-            { 
-                Console.WriteLine("Value isn't null");
-                Console.WriteLine("Value is: " + value.ToString());
-            }
-
-            if (value.ToString() == "''")
-            {
-                return "NULL,";
-            }
-            else if (value.ToString() == "false")
-            {
-                return "'0',";
-            }
-            else if (value.ToString() == "true")
-            {
-                return "'1',";
-            }
-            else
-                return "'" + value + "',";
-        }
-        else
-        {
-            if(debugLevel > 1)
-                Console.WriteLine("Value is null");
-
-            return "NULL,";
-        }
-    }*/
 
     /// <summary>
     /// Sends an SMS alert and terminates the program. Only used in extreme cases.

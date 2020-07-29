@@ -63,13 +63,6 @@ namespace Mirage.rest
                 cmd.Dispose();
                 Console.WriteLine(exception);
             }
-/*
-            string query = "REPLACE INTO registers (`ROBOT_ID`, `REGISTER_ID`, `VALUE`) VALUES ";
-                   query += "('" + robotID + "','" + id + "','" + value + "');";
-
-            //logger(typeof(Setting), DEBUG, query);
-
-            Globals.issueInsertQuery(query);*/
         }
 
         /// <summary>

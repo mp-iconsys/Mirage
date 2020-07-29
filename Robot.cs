@@ -129,8 +129,8 @@ namespace Mirage
                 }
 
                 // Store the data in the DB
-                string query = "REPLACE INTO robot (`ROBOT_ID`, `IP`, `AUTH`) VALUES ('" + id + "', '" + ipAddress + "', '" + Convert.ToBase64String(Encoding.UTF8.GetBytes($"{apiUsername}:{ComputeSha256Hash(apiPassword)}")) + "');";
-                Globals.issueInsertQuery(query);
+                //string query = "REPLACE INTO robot (`ROBOT_ID`, `IP`, `AUTH`) VALUES ('" + id + "', '" + ipAddress + "', '" + Convert.ToBase64String(Encoding.UTF8.GetBytes($"{apiUsername}:{ComputeSha256Hash(apiPassword)}")) + "');";
+                //Globals.issueInsertQuery(query);
 
                 // Change the App.config setting so that we load an existing config next time
                 //Globals.AddUpdateAppSettings("resumingSession", "true");
