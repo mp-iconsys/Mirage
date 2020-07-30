@@ -116,7 +116,7 @@ public static class Globals
             {
                 // Default type is string, so cast as appropriate
                 debugLevel = int.Parse(ConfigurationManager.AppSettings["debugLevel"]);
-                pollInterval = int.Parse(ConfigurationManager.AppSettings["pollInterval"]) * 1000; // Convert to seconds
+                pollInterval = int.Parse(ConfigurationManager.AppSettings["pollInterval"]); 
                 sizeOfFleet = int.Parse(ConfigurationManager.AppSettings["sizeOfFleet"]);
                 emailAlert = ConfigurationManager.AppSettings["emailAlert"];
                 resumingSession = bool.Parse(ConfigurationManager.AppSettings["resumingSession"]);
@@ -154,7 +154,7 @@ public static class Globals
         //=========================================================|
         //  Initialize Siemens PLC                                 |     
         //=========================================================|
-        SiemensPLC.initialize();
+        //SiemensPLC.initialize();
 
         //=========================================================|
         //  Initialize SMS communication for alerts                |     
@@ -221,7 +221,7 @@ public static class Globals
             logger(AREA, ERROR, "Failed to set up an HTTP Connection. Error: ", exception);
         }
 
-        SiemensPLC.establishConnection();
+        //SiemensPLC.establishConnection();
 
         logger(AREA, INFO, "==== Connections Established ====");
     }
@@ -278,8 +278,8 @@ public static class Globals
 
             if (rowsAffected == 0)
             {
-                // Query Failed
-                Console.WriteLine("Insert Query Hasn't Been Stored");
+                // Query Worked (for transactions and procedures)
+                //Console.WriteLine("Insert Query Hasn't Been Stored");
             }
             else if (debugLevel > 0)
             {

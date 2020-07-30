@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using Mirage.plc;
 using static Globals;
@@ -27,114 +29,161 @@ namespace Mirage
 
             getInitialFleetData();
 
-            mirFleet.issueGetRequests("status");
-            await mirFleet.saveFleetStatusAsync();
-
-            gracefulTermination();
-
             logger(AREA, DEBUG, "==== Starting Main Loop ====");
 
             int i = 0;
+
+            Stopwatch timer = new Stopwatch();
+                      timer.Start();
 
             //====================================================|
             //  M A I N      L O O P                              |
             //====================================================|
             while (keepRunning)
             {
-                int currentTimer = 12345;
+                //logger(AREA, DEBUG, "==== Loop " + ++i + " Starting ====");
 
-                logger(AREA, DEBUG, "==== Loop " + ++i + " Starting ====");
-
-                SiemensPLC.poll();
-
-                if (SiemensPLC.newMsg)
+                //logger(AREA, DEBUG, "Current Stopwatch Time: " + timer.Elapsed.TotalSeconds);
+/*
+                if (timer.Elapsed.Seconds == pollInterval)
                 {
-                    logger(AREA, DEBUG, "==== New Task From PLC ====");
+                    logger(AREA, DEBUG, "We're doing the poll");
+                    logger(AREA, DEBUG, "Current Stopwatch Time: " + timer.Elapsed.TotalSeconds);
 
-                    SiemensPLC.updateTaskStatus(Status.StartedProcessing);
-
-                    switch (SiemensPLC.task)
-                    {
-                        case Tasks.GetScheduleStatus:
-                            getScheduleStatus();
-                            break;
-                        case Tasks.SendMissionToScheduler:
-                            sendMissionToScheduler();
-                            break;
-                        case Tasks.CreateMission:
-                            createMission();
-                            break;
-                        case Tasks.ClearScheduler:
-                            clearScheduler();
-                            break;
-                        case Tasks.GetBattery:
-                            getBattery();
-                            break;
-                        case Tasks.GetDistance:
-                            getDistance();
-                            break;
-                        case Tasks.GetRobotStatus:
-                            getRobotStatus();
-                            break;
-                        default:
-                            unknownMission();
-                            break;
-                    }
-
-                    SiemensPLC.checkResponse();
+                    timer.Restart();
                 }
+*/
 
-                SiemensPLC.checkConnectivity();
+
+                /*                SiemensPLC.poll();
+
+                                if (SiemensPLC.newMsg)
+                                {
+                                    logger(AREA, DEBUG, "==== New Task From PLC ====");
+
+                                    SiemensPLC.updateTaskStatus(Status.StartedProcessing);
+
+                                    switch (SiemensPLC.task)
+                                    {
+                                        case Tasks.GetScheduleStatus:
+                                            getScheduleStatus();
+                                            break;
+                                        case Tasks.SendMissionToScheduler:
+                                            sendMissionToScheduler();
+                                            break;
+                                        case Tasks.CreateMission:
+                                            createMission();
+                                            break;
+                                        case Tasks.ClearScheduler:
+                                            clearScheduler();
+                                            break;
+                                        case Tasks.GetBattery:
+                                            getBattery();
+                                            break;
+                                        case Tasks.GetDistance:
+                                            getDistance();
+                                            break;
+                                        case Tasks.GetRobotStatus:
+                                            getRobotStatus();
+                                            break;
+                                        default:
+                                            unknownMission();
+                                            break;
+                                    }
+
+                                    SiemensPLC.checkResponse();
+                                }
+
+                                SiemensPLC.checkConnectivity();*/
 
                 // Poll MiR Fleet - async operation that happens every pollInterval
-                if (currentTimer < pollInterval)
+                if (timer.Elapsed.Seconds == pollInterval)
                 {
-                    try
-                    {
-                        try
-                        {
-                            // We're sending GET requests to the MiR servers
-                            // Saving them asynchronously as they come along
-                            if (debugLevel > -1)
-                                Console.WriteLine("==== Getting Status ====");
+                    logger(AREA, DEBUG, "Current Stopwatch Time: " + timer.Elapsed.TotalSeconds);
+                    timer.Restart();
+                    pollRobots();
 
-                            mirFleet.issueGetRequests("status");
-                            await mirFleet.saveFleetStatusAsync();
+                    /*                    try
+                                        {
+                                            try
+                                            {
+                                                if (debugLevel > -1)
+                                                    Console.WriteLine("==== Getting Status ====");
 
-                            if (debugLevel > -1)
-                                Console.WriteLine("==== Getting Registers ====");
+                                                mirFleet.issueGetRequests("status");
+                                                await mirFleet.saveFleetStatusAsync();
 
-                            mirFleet.issueGetRequests("registers");
-                            await mirFleet.saveFleetRegistersAsync();
-                        }
-                        catch (HttpRequestException e)
-                        {
-                            // TODO: Handle more exceptions
-                            // Remove the task which is causing the exception
+                                                if (debugLevel > -1)
+                                                    Console.WriteLine("==== Getting Registers ====");
 
-                            Console.WriteLine("Couldn't connect to the robot");
-                            Console.WriteLine("Check your network, dns settings, robot is up, etc.");
-                            Console.WriteLine("Please see error log (enter location here) for more details");
-                            // Store the detailed error in the error log
-                            Console.WriteLine(e);
-                        }
-                    }
-                    catch (WebException e)
-                    {
-                        Console.WriteLine($"Connection Problems: '{e}'");
-                    }
+                                                mirFleet.issueGetRequests("registers");
+                                                await mirFleet.saveFleetRegistersAsync();
+                                            }
+                                            catch (HttpRequestException e)
+                                            {
+                                                // TODO: Handle more exceptions
+                                                // Remove the task which is causing the exception
+
+                                                Console.WriteLine("Couldn't connect to the robot");
+                                                Console.WriteLine("Check your network, dns settings, robot is up, etc.");
+                                                Console.WriteLine("Please see error log (enter location here) for more details");
+                                                // Store the detailed error in the error log
+                                                Console.WriteLine(e);
+                                            }
+                                        }
+                                        catch (WebException e)
+                                        {
+                                            Console.WriteLine($"Connection Problems: '{e}'");
+                                        }*/
                 }
 
                 // Perform calcs + reporting
                 //calculationsAndReporting();
 
-                logger(AREA, DEBUG, "==== Loop " + i + " Finished ====");
+                //logger(AREA, DEBUG, "==== Loop " + i + " Finished ====");
 
-                //Thread.Sleep(pollInterval*100); // Ugly as fuck but will change to event based stuff once I add a GUI
-                //keepRunning = true;
+                Thread.Sleep(500);
             }
 
             gracefulTermination();
+        }
+
+        public static async void pollRobots()
+        {
+            try
+            {
+                try
+                {
+                    // We're sending GET requests to the MiR servers
+                    // Saving them asynchronously as they come along
+                    if (debugLevel > -1)
+                        Console.WriteLine("==== Getting Status ====");
+
+                    mirFleet.issueGetRequests("status");
+                    await mirFleet.saveFleetStatusAsync();
+
+                    if (debugLevel > -1)
+                        Console.WriteLine("==== Getting Registers ====");
+
+                    mirFleet.issueGetRequests("registers");
+                    await mirFleet.saveFleetRegistersAsync();
+                }
+                catch (HttpRequestException e)
+                {
+                    // TODO: Handle more exceptions
+                    // Remove the task which is causing the exception
+
+                    Console.WriteLine("Couldn't connect to the robot");
+                    Console.WriteLine("Check your network, dns settings, robot is up, etc.");
+                    Console.WriteLine("Please see error log (enter location here) for more details");
+                    // Store the detailed error in the error log
+                    Console.WriteLine(e);
+                }
+            }
+            catch (WebException e)
+            {
+                Console.WriteLine($"Connection Problems: '{e}'");
+            }
         }
 
         /// <summary>

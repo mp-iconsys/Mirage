@@ -306,9 +306,16 @@ namespace Mirage
         public void saveStatus(HttpResponseMessage response)
         {
             logger(AREA, DEBUG, "==== Saving Status Data ====");
+            logger(AREA, DEBUG, response.Content.ReadAsStringAsync().Result);
 
-            s = JsonConvert.DeserializeObject<rest.Status>(response.Content.ReadAsStringAsync().Result);
-            //logger(AREA, DEBUG, response.Content.ReadAsStringAsync().Result);
+            try
+            {
+                s = JsonConvert.DeserializeObject<rest.Status>(response.Content.ReadAsStringAsync().Result);
+            }
+            catch (Exception exception)
+            {
+                logger(AREA, ERROR, "Failed to decode JSON data: ", exception);
+            }
 
             s.print();
             s.saveToDB(id);
