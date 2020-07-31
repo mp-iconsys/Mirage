@@ -27,6 +27,7 @@
 
   <ItemGroup>
     <Folder Include="config\" />
+    <Folder Include="src\" />
   </ItemGroup>
 
   <ItemGroup>

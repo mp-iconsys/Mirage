@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Diagnostics;
-using System.Net;
-using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Mirage.plc;
@@ -29,7 +27,7 @@ namespace Mirage
 
             logger(AREA, DEBUG, "==== Starting Main Loop ====");
 
-            int i = 0;
+            long i = 0;
 
             Stopwatch timer = new Stopwatch();
             timer.Start();
@@ -39,8 +37,8 @@ namespace Mirage
             //====================================================|
             while (keepRunning)
             {
-                //logger(AREA, DEBUG, "==== Loop " + ++i + " Starting ====");
-                //logger(AREA, DEBUG, "Current Stopwatch Time: " + timer.Elapsed.TotalSeconds);
+                logger(AREA, DEBUG, "==== Loop " + ++i + " Starting ====");
+                logger(AREA, DEBUG, "Current Stopwatch Time: " + timer.Elapsed.TotalSeconds);
 
                 /*                SiemensPLC.poll();
 
@@ -86,15 +84,14 @@ namespace Mirage
                 // Poll MiR Fleet - async operation that happens every pollInterval
                 if (timer.Elapsed.Seconds >= pollInterval)
                 {
-                    logger(AREA, DEBUG, timer.Elapsed.TotalSeconds + " seconds since last poll. Poll interval is: " + pollInterval);
+                    logger(AREA, INFO, timer.Elapsed.TotalSeconds + " seconds since last poll. Poll interval is: " + pollInterval);
                     timer.Restart();
                     mirFleet.pollRobots();
                 }
 
-                // Perform calcs + reporting
-                //calculationsAndReporting();
+                calculationsAndReporting();
 
-                //logger(AREA, DEBUG, "==== Loop " + i + " Finished ====");
+                logger(AREA, DEBUG, "==== Loop " + i + " Finished ====");
 
                 Thread.Sleep(500);
             }
