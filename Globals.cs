@@ -1,5 +1,4 @@
-﻿using Mirage.plc;
-using MySql.Data.MySqlClient;
+﻿using MySql.Data.MySqlClient;
 using System;
 using System.Configuration;
 using System.Net;
@@ -11,6 +10,8 @@ using Twilio.Types;
 using log4net;
 using log4net.Config;
 using System.IO;
+using Mirage.plc;
+using Mirage;
 using static Globals.DebugLevel;
 
 public static class Globals
@@ -27,6 +28,7 @@ public static class Globals
 
     public static string fleetManagerIP;
     public static AuthenticationHeaderValue fleetManagerAuthToken;
+    public static Fleet mirFleet;
 
     //=========================================================|
     //  Used For Logging & Debugging                           |     
@@ -72,7 +74,7 @@ public static class Globals
     /// <summary>
     /// Task Status Codes that match PLC Task Status. Does not conatin any methods.
     /// </summary>
-    public static class Status
+    public static class TaskStatus
     {
         public const int Awaiting = 0;
         public const int StartedProcessing = 1;
@@ -91,9 +93,10 @@ public static class Globals
     {
         // Begins logging to the console and file
         var logRepository = LogManager.GetRepository(System.Reflection.Assembly.GetEntryAssembly());
-        XmlConfigurator.Configure(logRepository, new FileInfo("log4net.config"));
+        XmlConfigurator.Configure(logRepository, new FileInfo(@"config\log4net.config"));
 
-        logger(AREA, INFO, "==== Starting Mirage Data Harvester v0.01 ====");
+        logger(AREA, INFO, "Starting Mirage Data Harvester v0.01");
+        logger(AREA, DEBUG, "==== Obtaining Settings ====");
 
         try
         {
@@ -142,6 +145,8 @@ public static class Globals
                 {
                     logger(AREA, DEBUG, key + " is set to " + appSettings[key]);
                 }
+
+                logger(AREA, INFO, "Settings Fetched Successfully");
             }
         }
         catch (ConfigurationErrorsException exception)
@@ -154,14 +159,19 @@ public static class Globals
         //=========================================================|
         //  Initialize Siemens PLC                                 |     
         //=========================================================|
-        //SiemensPLC.initialize();
+        SiemensPLC.initialize();
 
         //=========================================================|
         //  Initialize SMS communication for alerts                |     
         //=========================================================|
         TwilioClient.Init(accountSid, authToken);
 
-        logger(AREA, INFO, "==== Settings Fetched Successfully ====");
+        //=========================================================|
+        //  Initialize Fleet Container                             |     
+        //=========================================================|
+        mirFleet = new Fleet();
+
+        logger(AREA, DEBUG, "==== Finished Obtaining Settings ====");
     }
 
     /// <summary>
@@ -176,7 +186,7 @@ public static class Globals
             db = new MySqlConnection(ConfigurationManager.ConnectionStrings["master"].ConnectionString);
             db.Open();
 
-            logger(AREA, INFO, "Connected to master DB");
+            logger(AREA, INFO, "Connected To Master DB");
         }
         catch (MySqlException exception)
         {
@@ -188,7 +198,7 @@ public static class Globals
                 db = new MySqlConnection(ConfigurationManager.ConnectionStrings["slave"].ConnectionString);
                 db.Open();
 
-                logger(AREA, INFO, "Connected to master DB");
+                logger(AREA, INFO, "Connected To Slave DB");
             }
             catch (MySqlException e)
             {
@@ -215,6 +225,8 @@ public static class Globals
             comms.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             comms.DefaultRequestHeaders.Add("Accept-Language", "en_US");
             comms.Timeout = TimeSpan.FromMinutes(10);
+
+            logger(AREA, INFO, "MiR HTTP Connections Established");
         }
         catch(Exception exception)
         {
@@ -223,7 +235,7 @@ public static class Globals
 
         //SiemensPLC.establishConnection();
 
-        logger(AREA, INFO, "==== Connections Established ====");
+        logger(AREA, DEBUG, "==== Connections Established ====");
     }
 
     /// <summary>
@@ -274,7 +286,7 @@ public static class Globals
             cmd.Prepare();
             rowsAffected = cmd.ExecuteNonQuery();
 
-            Console.WriteLine("Rows Affected: " + rowsAffected);
+            //Console.WriteLine("Rows Affected: " + rowsAffected);
 
             if (rowsAffected == 0)
             {
@@ -363,7 +375,7 @@ public static class Globals
                 log.Info(message);
                 break;
             case DebugLevel.DEBUG:
-                if(debugLevel > -1)
+                if(debugLevel > 1)
                 { 
                     log.Debug(message);
                 }
@@ -395,7 +407,7 @@ public static class Globals
                 log.Info(message, exception);
                 break;
             case DebugLevel.DEBUG:
-                if (debugLevel > -1)
+                if (debugLevel > 1)
                 {
                     log.Debug(message, exception);
                 }

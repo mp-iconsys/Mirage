@@ -13,14 +13,6 @@ using static Globals.DebugLevel;
 
 namespace Mirage
 {
-    /* Robot Class, mainly a data container
-     * Contains:
-     * - Connection details: IP + Authentication String
-     * - Generic data about the status of the robot
-     * - Registers (100 int, 100 float)
-     * - Other data?
-    */
-
     // TODO: Clean-up so we're a bit more tidy
     public class Robot
     {
@@ -36,7 +28,7 @@ namespace Mirage
         private List<Map> Maps { get; set; }
         private List<Setting> Settings { get; set; }
         public List<Mission> Missions { get; set; }
-        public rest.Status s { get; set; }
+        public Status s { get; set; }
 
         //=========================================================|
         //  Used For Logging & Debugging                           |     
@@ -51,7 +43,7 @@ namespace Mirage
             fetchConnectionDetails();
 
             Registers = new List<Register>(new Register[200]);
-            s = new rest.Status();
+            s = new Status();
         }
 
         /// <summary>
@@ -65,7 +57,7 @@ namespace Mirage
             fetchConnectionDetails();
 
             Registers = new List<Register>(new Register[200]);
-            s = new rest.Status();
+            s = new Status();
         }
 
         /// <summary>
@@ -79,7 +71,7 @@ namespace Mirage
             this.authValue = authValue;
 
             Registers = new List<Register>(new Register[200]);
-            s = new rest.Status();
+            s = new Status();
         }
 
         /// <summary>
@@ -89,7 +81,7 @@ namespace Mirage
         {
             string apiUsername, apiPassword;
 
-            if (Globals.resumingSession)
+            if (resumingSession)
             {
                 // We're resuming an existing session so fetch the robot connection details from a database
                 string query = "SELECT IP, AUTH FROM robot WHERE ROBOT_ID =" + id;
@@ -102,7 +94,7 @@ namespace Mirage
                         ipAddress = reader.GetString("IP");
                         authValue = new AuthenticationHeaderValue("Basic", reader.GetString("AUTH"));
                     }
-                } 
+                }
             }
             else
             {
@@ -179,7 +171,7 @@ namespace Mirage
         public void formConnection()
         {
             //comms.BaseAddress = new Uri("http://" + ipAddress + "/api/v2.0.0/"); -> hhtpClient is a singleton so we can only set the defaults once
-            Globals.comms.DefaultRequestHeaders.Authorization = authValue; // This might cause problems if we're using many robots with different auth strings
+            comms.DefaultRequestHeaders.Authorization = authValue; // This might cause problems if we're using many robots with different auth strings
         }
 
         /// <summary>
@@ -192,7 +184,7 @@ namespace Mirage
         public async Task<HttpResponseMessage> sendGetRequest(string uri)
         {
             formConnection();
-            return await Globals.comms.GetAsync(getBaseURI() + uri);
+            return await comms.GetAsync(getBaseURI() + uri);
         }
 
         /// <summary>
@@ -204,27 +196,34 @@ namespace Mirage
         {
             int statusCode = 0;
 
-            HttpResponseMessage result = Globals.comms.SendAsync(request).Result;
-
-            if (result.IsSuccessStatusCode)
+            try
             {
-                statusCode = (int)result.StatusCode;
+                HttpResponseMessage result = comms.SendAsync(request).Result;
 
-                if (statusCode > 199 && statusCode < 400)
+                if (result.IsSuccessStatusCode)
                 {
-                    Console.WriteLine("Data Sent Successfully");
-                    statusCode = Globals.Status.CompletedNoErrors;
+                    statusCode = (int)result.StatusCode;
+
+                    if (statusCode > 199 && statusCode < 400)
+                    {
+                        Console.WriteLine("Data Sent Successfully");
+                        statusCode = Globals.TaskStatus.CompletedNoErrors;
+                    }
+                    else if (statusCode > 399)
+                    {
+                        Console.WriteLine("Data send did not succeed");
+                        statusCode = Globals.TaskStatus.CouldntProcessRequest;
+                    }
+                    else
+                    {
+                        Console.WriteLine("Unknown Error");
+                        statusCode = Globals.TaskStatus.FatalError;
+                    }
                 }
-                else if (statusCode > 399)
-                {
-                    Console.WriteLine("Data send did not succeed");
-                    statusCode = Globals.Status.CouldntProcessRequest;
-                }
-                else
-                {
-                    Console.WriteLine("Unknown Error");
-                    statusCode = Globals.Status.FatalError;
-                }
+            }
+            catch (Exception exception)
+            {
+                logger(AREA, ERROR, "Failed to decode send REST request: ", exception);
             }
 
             return statusCode;
@@ -237,16 +236,23 @@ namespace Mirage
         public void saveSoftwareLogs(HttpResponseMessage response)
         {
             logger(AREA, DEBUG, "==== Saving Software Logs ====");
-            //logger(AREA, DEBUG, response.Content.ReadAsStringAsync().Result);
 
-            SoftwareLogs = JsonConvert.DeserializeObject<List<SoftwareLog>>(response.Content.ReadAsStringAsync().Result);
-
-            for (int i = 0; i < SoftwareLogs.Count; i++)
+            try
             {
-                SoftwareLogs[i].saveToDB(id);
+                SoftwareLogs = JsonConvert.DeserializeObject<List<SoftwareLog>>(response.Content.ReadAsStringAsync().Result);
+
+                for (int i = 0; i < SoftwareLogs.Count; i++)
+                {
+                    SoftwareLogs[i].saveToDB(id);
+                }
+            }
+            catch (Exception exception)
+            {
+                logger(AREA, ERROR, "Failed to decode JSON data: ", exception);
+                logger(AREA, ERROR, response.Content.ReadAsStringAsync().Result);
             }
 
-            logger(AREA, DEBUG, "==== Finished Saving Logs ====");
+            logger(AREA, DEBUG, "==== Finished Saving Software Logs ====");
         }
 
         /// <summary>
@@ -256,25 +262,30 @@ namespace Mirage
         public void saveMaps(HttpResponseMessage response)
         {
             logger(AREA, DEBUG, "==== Saving Maps ====");
-            //logger(AREA, DEBUG, response.Content.ReadAsStringAsync().Result);
 
-            Maps = JsonConvert.DeserializeObject<List<Map>>(response.Content.ReadAsStringAsync().Result);
-
-            Task<HttpResponseMessage> responseMsg;
-
-            for (int i = 0; i < Maps.Count; i++)
+            try
             {
-                responseMsg = sendGetRequest("maps/" + Maps[i].Guid);
-                responseMsg.Wait(); // Block the current thread 
-                                    // We want the set-up to be synchronous
+                Maps = JsonConvert.DeserializeObject<List<Map>>(response.Content.ReadAsStringAsync().Result);
 
-                Console.WriteLine("==== Iterator : " + i + " ====");
-                Console.WriteLine("==== Maps ID Prior To call: " + Maps[i].Map_id + " ====");
+                Task<HttpResponseMessage> responseMsg;
 
-                Maps[i] = JsonConvert.DeserializeObject<Map>(responseMsg.Result.Content.ReadAsStringAsync().Result);
-                Maps[i].Map_id = i;
-                //Maps[i].print();
-                Maps[i].saveToDB(id);
+                for (int i = 0; i < Maps.Count; i++)
+                {
+                    responseMsg = sendGetRequest("maps/" + Maps[i].Guid);
+                    responseMsg.Wait(); // Block the current thread as we want the set-up to be synchronous
+
+                    logger(AREA, DEBUG, "Map No: " + i);
+
+                    Maps[i] = JsonConvert.DeserializeObject<Map>(responseMsg.Result.Content.ReadAsStringAsync().Result);
+                    Maps[i].Map_id = i;
+                    //Maps[i].print();
+                    Maps[i].saveToDB(id);
+                }
+            }
+            catch (Exception exception)
+            {
+                logger(AREA, ERROR, "Failed to decode JSON data: ", exception);
+                logger(AREA, ERROR, response.Content.ReadAsStringAsync().Result);
             }
 
             logger(AREA, DEBUG, "==== Finished Saving Maps ====");
@@ -286,17 +297,25 @@ namespace Mirage
         /// <param name="response"></param>
         public void saveSettings(HttpResponseMessage response)
         {
-            logger(AREA, DEBUG, "==== Saving Robot Settings Logs ====");
+            logger(AREA, DEBUG, "==== Saving Robot Settings ====");
 
-            Settings = JsonConvert.DeserializeObject<List<Setting>>(response.Content.ReadAsStringAsync().Result);
-
-            for (int i = 0; i < Settings.Count; i++)
+            try
             {
-                //Settings[i].print();
-                Settings[i].saveToDB(id);
+                Settings = JsonConvert.DeserializeObject<List<Setting>>(response.Content.ReadAsStringAsync().Result);
+
+                for (int i = 0; i < Settings.Count; i++)
+                {
+                    //Settings[i].print();
+                    Settings[i].saveToDB(id);
+                }
+            }
+            catch (Exception exception)
+            {
+                logger(AREA, ERROR, "Failed to decode JSON data: ", exception);
+                logger(AREA, ERROR, response.Content.ReadAsStringAsync().Result);
             }
 
-            logger(AREA, DEBUG, "==== Finished Saving Logs ====");
+            logger(AREA, DEBUG, "==== Finished Saving Settings ====");
         }
 
         /// <summary>
@@ -306,19 +325,19 @@ namespace Mirage
         public void saveStatus(HttpResponseMessage response)
         {
             logger(AREA, DEBUG, "==== Saving Status Data ====");
-            logger(AREA, DEBUG, response.Content.ReadAsStringAsync().Result);
 
             try
             {
-                s = JsonConvert.DeserializeObject<rest.Status>(response.Content.ReadAsStringAsync().Result);
+                s = JsonConvert.DeserializeObject<Status>(response.Content.ReadAsStringAsync().Result);
+
+                //s.print();
+                s.saveToDB(id);
             }
             catch (Exception exception)
             {
                 logger(AREA, ERROR, "Failed to decode JSON data: ", exception);
+                logger(AREA, ERROR, response.Content.ReadAsStringAsync().Result);
             }
-
-            s.print();
-            s.saveToDB(id);
 
             logger(AREA, DEBUG, "==== Finished Saving Status ====");
         }
@@ -331,13 +350,20 @@ namespace Mirage
         {
             logger(AREA, DEBUG, "==== Saving Missions ====");
 
-            Missions = JsonConvert.DeserializeObject<List<Mission>>(response.Content.ReadAsStringAsync().Result);
-            logger(AREA, DEBUG, response.Content.ReadAsStringAsync().Result);
-
-            for (int i = 0; i < Missions.Count; i++)
+            try
             {
-                //Missions[i].print();
-                Missions[i].saveToDB(id);
+                Missions = JsonConvert.DeserializeObject<List<Mission>>(response.Content.ReadAsStringAsync().Result);
+
+                for (int i = 0; i < Missions.Count; i++)
+                {
+                    //Missions[i].print();
+                    Missions[i].saveToDB(id);
+                }
+            }
+            catch (Exception exception)
+            {
+                logger(AREA, ERROR, "Failed to decode JSON data: ", exception);
+                logger(AREA, ERROR, response.Content.ReadAsStringAsync().Result);
             }
 
             logger(AREA, DEBUG, "==== Finished Saving Missions ====");
@@ -349,13 +375,17 @@ namespace Mirage
         /// <param name="response"></param>
         public void saveStatusInMemory(HttpResponseMessage response)
         {
-            s = JsonConvert.DeserializeObject<rest.Status>(response.Content.ReadAsStringAsync().Result);
+            logger(AREA, DEBUG, "==== Saving Status In Memory ====");
 
-            if (Globals.debugLevel > 2)
-                Globals.logJSON(response.Content.ReadAsStringAsync().Result);
-
-            if (Globals.debugLevel > 2)
-                s.print();
+            try
+            {
+                s = JsonConvert.DeserializeObject<Status>(response.Content.ReadAsStringAsync().Result);
+            }
+            catch (Exception exception)
+            {
+                logger(AREA, ERROR, "Failed to decode JSON data: ", exception);
+                logger(AREA, ERROR, response.Content.ReadAsStringAsync().Result);
+            }
         }
 
         /// <summary>
@@ -366,12 +396,20 @@ namespace Mirage
         {
             logger(AREA, DEBUG, "==== Saving Registers ====");
 
-            Registers = JsonConvert.DeserializeObject<List<Register>>(response.Content.ReadAsStringAsync().Result);
+            try
+            {
+                Registers = JsonConvert.DeserializeObject<List<Register>>(response.Content.ReadAsStringAsync().Result);
 
-            for(int i = 0;  i < Registers.Count; i++)
-            { 
-                //Registers[i].print();
-                Registers[i].saveToDB(id);
+                for (int i = 0; i < Registers.Count; i++)
+                {
+                    //Registers[i].print();
+                    Registers[i].saveToDB(id);
+                }
+            }
+            catch (Exception exception)
+            {
+                logger(AREA, ERROR, "Failed to decode JSON data: ", exception);
+                logger(AREA, ERROR, response.Content.ReadAsStringAsync().Result);
             }
 
             logger(AREA, DEBUG, "==== Finished Saving Registers ====");

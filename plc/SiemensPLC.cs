@@ -72,7 +72,7 @@ namespace Mirage.plc
             try
             {
                 XmlDocument doc = new XmlDocument();
-                            doc.Load(@"plc_config.xml");
+                            doc.Load(@"config\plc_config.xml");
 
                 IP = doc.DocumentElement.SelectSingleNode("/plc/connectionString/ip").InnerText;
                 port = short.Parse(doc.DocumentElement.SelectSingleNode("/plc/connectionString/port").InnerText);
@@ -118,13 +118,14 @@ namespace Mirage.plc
                 if (0 == dc.connectPLC())
                 {
                     logger(AREA, INFO, "Connected To The PLC");
+                    plcConnectionErrors = 0; // Reset counter on successfull connection
                 }
                 else
                 {
                     logger(AREA, ERROR, "Failed To Connect. Trying again, with result " + dc.connectPLC());
                     logger(AREA, ERROR, daveStrerror(dc.connectPLC()));
 
-                    plcConnectionErrors--;
+                    plcConnectionErrors++;
                     newMsg = false;
                 }
             }
@@ -133,7 +134,7 @@ namespace Mirage.plc
                 logger(AREA, ERROR, "Socket Failed To Open. DaveOSserialType is initialized to " + fds.rfd);
                 logger(AREA, ERROR, daveStrerror(fds.rfd.ToInt32()));
 
-                plcConnectionErrors--;
+                plcConnectionErrors++;
                 newMsg = false;
             }
 
@@ -150,7 +151,6 @@ namespace Mirage.plc
             int serialNumber, task, robotID, status, parameter, memoryres;
             byte[] memoryBuffer = new byte[20];
 
-            // Get the data from the PLC
             try
             {
                 // readBytes(Area, Data Block Number (in PLC), Start Byte, Length, Byte Container)
@@ -163,8 +163,7 @@ namespace Mirage.plc
                     byte[] tempBytesForConversion = new byte[4] { memoryBuffer[0], memoryBuffer[1], memoryBuffer[2], memoryBuffer[3] };
 
                     // Need to reverse the bytes to get actual values
-                    if (BitConverter.IsLittleEndian)
-                        Array.Reverse(tempBytesForConversion);
+                    if (BitConverter.IsLittleEndian) { Array.Reverse(tempBytesForConversion); }
 
                     serialNumber = BitConverter.ToInt32(tempBytesForConversion, 0);
 
@@ -217,7 +216,7 @@ namespace Mirage.plc
                 {
                     logger(AREA, ERROR, "Failed to Poll");
                     logger(AREA, ERROR, daveStrerror(memoryres));
-                    plcConnectionErrors--;
+                    plcConnectionErrors++;
                     newMsg = false;
                 }
 
@@ -225,7 +224,7 @@ namespace Mirage.plc
             catch (NullReferenceException exception)
             {
                 logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
-                plcConnectionErrors--;
+                plcConnectionErrors++;
                 newMsg = false;
 
                 establishConnection();
@@ -233,7 +232,7 @@ namespace Mirage.plc
             catch (Exception exception)
             {
                 logger(AREA, ERROR, "Polling Failed. Error : ", exception);
-                plcConnectionErrors--;
+                plcConnectionErrors++;
                 newMsg = false;
             }
 
@@ -276,7 +275,7 @@ namespace Mirage.plc
             int result = 1;
 
             // First, check if the data response was successful
-            if (statusCode == Status.CompletedPartially || statusCode == Status.CompletedNoErrors)
+            if (statusCode == TaskStatus.CompletedPartially || statusCode == TaskStatus.CompletedNoErrors)
             {
                 logger(AREA, DEBUG, "Request Completed Or Completed Partially. Status Code : " + statusCode);
 
@@ -315,23 +314,23 @@ namespace Mirage.plc
                 }
                 else
                 {
-                    updateTaskStatus(Status.CompletedNoErrors);
+                    updateTaskStatus(TaskStatus.CompletedNoErrors);
                 }
             }
-            else if(statusCode == Status.CouldntProcessRequest)
+            else if(statusCode == TaskStatus.CouldntProcessRequest)
             {
                 logger(AREA, WARNING, "We Couldn't Process The Request. Status Code : " + statusCode);
-                updateTaskStatus(Status.CouldntProcessRequest);
+                updateTaskStatus(TaskStatus.CouldntProcessRequest);
             }
-            else if(statusCode == Status.FatalError)
+            else if(statusCode == TaskStatus.FatalError)
             {
                 logger(AREA, WARNING, "Fatal Error. Status Code : " + statusCode);
-                updateTaskStatus(Status.FatalError);
+                updateTaskStatus(TaskStatus.FatalError);
             }
             else
             {
                 logger(AREA, WARNING, "Unknown Status. Status Code : " + statusCode);
-                updateTaskStatus(Status.FatalError);
+                updateTaskStatus(TaskStatus.FatalError);
                 // Unknown Status ??? - > Treat like a fatal error
             }
 
@@ -354,7 +353,7 @@ namespace Mirage.plc
             int result = 1;
 
             // First, check if the data response was successful
-            if (statusCode == Status.CompletedPartially || statusCode == Status.CompletedNoErrors)
+            if (statusCode == TaskStatus.CompletedPartially || statusCode == TaskStatus.CompletedNoErrors)
             {
                 logger(AREA, DEBUG, "Request Completed Or Completed Partially. Status Code : " + statusCode);
 
@@ -391,20 +390,20 @@ namespace Mirage.plc
                     plcConnectionErrors++;
                 }
             }
-            else if (statusCode == Status.CouldntProcessRequest)
+            else if (statusCode == TaskStatus.CouldntProcessRequest)
             {
                 logger(AREA, WARNING, "We Couldn't Process The Request. Status Code : " + statusCode);
-                updateTaskStatus(Status.CouldntProcessRequest);
+                updateTaskStatus(TaskStatus.CouldntProcessRequest);
             }
-            else if (statusCode == Status.FatalError)
+            else if (statusCode == TaskStatus.FatalError)
             {
                 logger(AREA, WARNING, "Fatal Error. Status Code : " + statusCode);
-                updateTaskStatus(Status.FatalError);
+                updateTaskStatus(TaskStatus.FatalError);
             }
             else
             {
                 logger(AREA, WARNING, "Unknown Status. Status Code : " + statusCode);
-                updateTaskStatus(Status.FatalError);
+                updateTaskStatus(TaskStatus.FatalError);
                 // Unknown Status ??? - > Treat like a fatal error
             }
 
@@ -415,7 +414,7 @@ namespace Mirage.plc
         /// Updates the PLC Task Status memory, in the Task Control Data Block.
         /// </summary>
         /// <param name="status">Designates Task Status Code: still processing, success, failure, etc.</param>
-        /// See <see cref="Globals.Status"/> for possible task status codes.
+        /// See <see cref="Globals.TaskStatus"/> for possible task status codes.
         public static void updateTaskStatus(int status)
         {
             logger(AREA, DEBUG, "==== Updating Task Status In PLC ====");
@@ -458,7 +457,7 @@ namespace Mirage.plc
         }
 
         /// <summary>
-        /// Checks to make sure PLC processed and parsed the reponse. Implements
+        /// Checks to make sure PLC processed and parsed the reponse.
         /// </summary>
         public static void checkResponse()
         {
@@ -476,11 +475,11 @@ namespace Mirage.plc
                 {
                     status = BitConverter.ToInt32(tempByteBuffer, 0);
 
-                    if (status == Status.PlcOK)
+                    if (status == TaskStatus.PlcOK)
                     {
                         logger(AREA, DEBUG, "PLC Processed Data");
                     }
-                    else if (status == Status.PlcError)
+                    else if (status == TaskStatus.PlcError)
                     {
                         logger(AREA, ERROR, "PLC Failed To Process Data");
                     }
@@ -512,14 +511,14 @@ namespace Mirage.plc
 
             }
 
-            // Set it to false so we
+            // Set message to false as we've processed the message
             newMsg = false;
 
             logger(AREA, DEBUG, "==== Response Check Completed ====");
         }
 
         /// <summary>
-        /// Tries to reconnect to a PLC if the connection drops. If it does, and connectivity counter is below zero, it sends and email.
+        /// Tries to reconnect to a PLC if the connection drops. If it does, and connectivity counter is below 15, it sends and email.
         /// </summary>
         public static void checkConnectivity()
         {

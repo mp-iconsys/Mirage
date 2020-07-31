@@ -1,19 +1,20 @@
 ﻿using System;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using static Globals;
 using static Globals.DebugLevel;
 
 namespace Mirage
 {
-    class Fleet
+    public class Fleet
     {
         //=========================================================|
         // Fleet manager is essentially a robot                    |
         // keep it separate from the robot array for cleaner code  |
         //=========================================================|
         // TODO : Make these all lists, so the size can be amended at runtime
-        public Robot[] robots;                                      
+        public Robot[] robots;
         public Robot fleetManager;
         private Task<HttpResponseMessage>[] httpResponseTasks;
         private Task<HttpResponseMessage> fleetResponseTask;
@@ -26,7 +27,7 @@ namespace Mirage
         /// <summary>
         /// 
         /// </summary>
-        public Fleet() 
+        public Fleet()
         {
             robots = new Robot[sizeOfFleet];
             httpResponseTasks = new Task<HttpResponseMessage>[sizeOfFleet];
@@ -38,7 +39,7 @@ namespace Mirage
         /// 
         /// </summary>
         /// <param name="sizeOfFleet"></param>
-        public Fleet (int sizeOfFleet)
+        public Fleet(int sizeOfFleet)
         {
             robots = new Robot[sizeOfFleet];
             httpResponseTasks = new Task<HttpResponseMessage>[sizeOfFleet];
@@ -67,7 +68,7 @@ namespace Mirage
         /// <param name="type"></param>
         public void issueGetRequests(string type)
         {
-            for(int i = 0; i < sizeOfFleet; i++)
+            for (int i = 0; i < sizeOfFleet; i++)
             {
                 try
                 {
@@ -104,13 +105,13 @@ namespace Mirage
         {
             logger(AREA, DEBUG, "==== Issuing Get Request ====");
 
-            int functionStatus = Status.CompletedNoErrors;
+            int functionStatus = Globals.TaskStatus.CompletedNoErrors;
 
             try
             {
                 try
                 {
-                    if(type == "mission_scheduler" || robotID == 666)
+                    if (type == "mission_scheduler" || robotID == 666)
                     {
                         logger(AREA, DEBUG, "Sending " + type + " To Mission Scheduler");
                         fleetResponseTask = fleetManager.sendGetRequest(type);
@@ -128,18 +129,18 @@ namespace Mirage
                     logger(AREA, ERROR, "Couldn't Connect To The Robot. Check Your Network, DNS Settings, Robot Status, etc.");
                     logger(AREA, ERROR, "The Error Is: ", exception);
 
-                    functionStatus = Status.CouldntProcessRequest;
+                    functionStatus = Globals.TaskStatus.CouldntProcessRequest;
                 }
             }
             catch (System.Net.WebException exception)
             {
                 logger(AREA, ERROR, "Connection Problems: ", exception);
 
-                functionStatus = Status.CouldntProcessRequest;
+                functionStatus = Globals.TaskStatus.CouldntProcessRequest;
             }
 
             try
-            { 
+            {
                 if (type == "mission_scheduler" || robotID == 666)
                 {
                     fleetResponseTask.Wait();
@@ -153,7 +154,7 @@ namespace Mirage
             }
             catch (Exception exception)
             {
-                functionStatus = Status.CouldntProcessRequest;
+                functionStatus = Globals.TaskStatus.CouldntProcessRequest;
 
                 logger(AREA, ERROR, "Connection Problems: ", exception);
             }
@@ -244,8 +245,178 @@ namespace Mirage
             for (int i = 0; i < sizeOfFleet; i++)
             {
                 robots[i].saveMissions(await httpResponseTasks[i]);
-                //robots[i].saveMapsData();
             }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public async void pollRobots()
+        {
+            logger(AREA, INFO, "Harvesting Data");
+
+            try
+            {
+                try
+                {
+                    mirFleet.issueGetRequests("status");
+                    await mirFleet.saveFleetStatusAsync();
+
+                    mirFleet.issueGetRequests("registers");
+                    await mirFleet.saveFleetRegistersAsync();
+                }
+                catch (HttpRequestException e)
+                {
+                    // TODO: Handle more exceptions
+                    // Remove the task which is causing the exception
+
+                    Console.WriteLine("Couldn't connect to the robot");
+                    Console.WriteLine("Check your network, dns settings, robot is up, etc.");
+                    Console.WriteLine("Please see error log (enter location here) for more details");
+                    // Store the detailed error in the error log
+                    Console.WriteLine(e);
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"Connection Problems: '{e}'");
+            }
+        }
+
+        /// <summary>
+        /// Force the wait so we're doing things in order. Synchronous initial fetch, so there'll be some delay on start-up
+        /// </summary>
+        public void getInitialFleetData()
+        {
+            try
+            {
+                try
+                {
+                    mirFleet.issueGetRequests("/software/logs");
+                    mirFleet.saveSoftwareLogsAsync().Wait();
+                }
+                catch (HttpRequestException e)
+                {
+                    // TODO: Handle more exceptions
+                    // Remove the task which is causing the exception
+
+                    Console.WriteLine("Couldn't connect to the robot");
+                    Console.WriteLine("Check your network, dns settings, robot is up, etc.");
+                    Console.WriteLine("Please see error log (enter location here) for more details");
+                    // Store the detailed error in the error log
+                    Console.WriteLine(e);
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"Connection Problems: '{e}'");
+            }
+
+            Thread.Sleep(2000);
+
+            try
+            {
+                try
+                {
+                    mirFleet.issueGetRequests("maps");
+                    mirFleet.saveMapsAsync().Wait();
+                }
+                catch (HttpRequestException e)
+                {
+                    // TODO: Handle more exceptions
+                    // Remove the task which is causing the exception
+
+                    Console.WriteLine("Couldn't connect to the robot");
+                    Console.WriteLine("Check your network, dns settings, robot is up, etc.");
+                    Console.WriteLine("Please see error log (enter location here) for more details");
+                    // Store the detailed error in the error log
+                    Console.WriteLine(e);
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"Connection Problems: '{e}'");
+            }
+
+            Thread.Sleep(2000);
+
+            try
+            {
+                try
+                {
+                    mirFleet.issueGetRequests("settings");
+                    mirFleet.saveSettingsAsync().Wait();
+                }
+                catch (HttpRequestException e)
+                {
+                    // TODO: Handle more exceptions
+                    // Remove the task which is causing the exception
+
+                    Console.WriteLine("Couldn't connect to the robot");
+                    Console.WriteLine("Check your network, dns settings, robot is up, etc.");
+                    Console.WriteLine("Please see error log (enter location here) for more details");
+                    // Store the detailed error in the error log
+                    Console.WriteLine(e);
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"Connection Problems: '{e}'");
+            }
+
+            Thread.Sleep(2000);
+
+            try
+            {
+                try
+                {
+                    mirFleet.issueGetRequests("settings/advanced");
+                    mirFleet.saveSettingsAsync().Wait();
+                }
+                catch (HttpRequestException e)
+                {
+                    // TODO: Handle more exceptions
+                    // Remove the task which is causing the exception
+
+                    Console.WriteLine("Couldn't connect to the robot");
+                    Console.WriteLine("Check your network, dns settings, robot is up, etc.");
+                    Console.WriteLine("Please see error log (enter location here) for more details");
+                    // Store the detailed error in the error log
+                    Console.WriteLine(e);
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"Connection Problems: '{e}'");
+            }
+
+            Thread.Sleep(2000);
+
+            try
+            {
+                try
+                {
+                    mirFleet.issueGetRequests("missions");
+                    mirFleet.saveMissionsAsync().Wait();
+                }
+                catch (HttpRequestException e)
+                {
+                    // TODO: Handle more exceptions
+                    // Remove the task which is causing the exception
+
+                    Console.WriteLine("Couldn't connect to the robot");
+                    Console.WriteLine("Check your network, dns settings, robot is up, etc.");
+                    Console.WriteLine("Please see error log (enter location here) for more details");
+                    // Store the detailed error in the error log
+                    Console.WriteLine(e);
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"Connection Problems: '{e}'");
+            }
+
+            Thread.Sleep(2000);
         }
     }
 }

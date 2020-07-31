@@ -36,10 +36,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="log4net.config">
+    <None Update="config\log4net.config">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="plc_config.xml">
+    <None Update="config\plc_config.xml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
