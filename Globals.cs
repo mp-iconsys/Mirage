@@ -10,9 +10,9 @@ using Twilio.Types;
 using log4net;
 using log4net.Config;
 using System.IO;
-using Mirage.plc;
 using Mirage;
 using static Globals.DebugLevel;
+using System.Collections.Generic;
 
 public static class Globals
 {
@@ -34,16 +34,16 @@ public static class Globals
     //  Used For Logging & Debugging                           |     
     //=========================================================|
     public static int debugLevel = 0;
-    public static string emailAlert;
     private static readonly Type AREA = typeof(Globals);
     public static ILog log = LogManager.GetLogger(AREA);
 
     //=========================================================|
     //  For Sending SMS Alerts                                 |     
     //=========================================================|
-    private const string accountSid = "ACc9a9248dd2a1f6d6e673148e73cfc2f9";
-    private const string authToken = "b57abe0211b4fde95bf7ae159eb75e2d";
+    private static string accountSid; //= "ACc9a9248dd2a1f6d6e673148e73cfc2f9";
+    private static string authToken; //= "b57abe0211b4fde95bf7ae159eb75e2d";
     private static string phone_rx;
+    private static List<string> phone_numbers;
     private static string phone_twilio;
 
     /// <summary>
@@ -92,14 +92,24 @@ public static class Globals
     public static void readAllSettings()
     {
         // Begins logging to the console and file
-        var logRepository = LogManager.GetRepository(System.Reflection.Assembly.GetEntryAssembly());
-        XmlConfigurator.Configure(logRepository, new FileInfo(@"config\log4net.config"));
+        try
+        {
+            var logRepository = LogManager.GetRepository(System.Reflection.Assembly.GetEntryAssembly());
+            XmlConfigurator.Configure(logRepository, new FileInfo(@"config\log4net.config"));
+        }
+        catch (Exception exception)
+        {
+            Console.WriteLine("Failed To Read Logger Configuration.");
+            Console.WriteLine(exception);
+        }
 
         logger(AREA, INFO, "Starting Mirage Data Harvester v0.01");
         logger(AREA, DEBUG, "==== Obtaining Settings ====");
 
         try
         {
+            connectToDB();
+
             fleetManagerAuthToken = new AuthenticationHeaderValue("Basic", "moo");
             fleetManagerIP = "192.168.0.1";
 
@@ -110,36 +120,37 @@ public static class Globals
                 logger(AREA, ERROR, "AppSettings Branch Within App.config Is Empty");
                 logger(AREA, ERROR, "Terminating the application.");
 
-                // Send an email alert???
-                // Send an SMS message
-                keepRunning = false;
                 gracefulTermination("Failed to read application settings, on start-up. Check app.config.exe file. App will terminate");
             }
             else
             {
-                // Default type is string, so cast as appropriate
-                debugLevel = int.Parse(ConfigurationManager.AppSettings["debugLevel"]);
-                pollInterval = int.Parse(ConfigurationManager.AppSettings["pollInterval"]); 
-                sizeOfFleet = int.Parse(ConfigurationManager.AppSettings["sizeOfFleet"]);
-                emailAlert = ConfigurationManager.AppSettings["emailAlert"];
+                debugLevel      = int.Parse(ConfigurationManager.AppSettings["debugLevel"]);
+                pollInterval    = int.Parse(ConfigurationManager.AppSettings["pollInterval"]); 
+                sizeOfFleet     = int.Parse(ConfigurationManager.AppSettings["sizeOfFleet"]);
                 resumingSession = bool.Parse(ConfigurationManager.AppSettings["resumingSession"]);
-                phone_rx = ConfigurationManager.AppSettings["phone_rx"];
-                phone_twilio = ConfigurationManager.AppSettings["phone_twilio"];
+                phone_rx        = ConfigurationManager.AppSettings["phone_rx"];
+                phone_twilio    = ConfigurationManager.AppSettings["phone_twilio"];
 
                 Console.WriteLine("Do you want to start a new session? (y/n)");
                 string newSession = Console.ReadLine();
 
                 if (newSession == "y")
+                { 
                     resumingSession = false;
+                }
                 else if (newSession == "n")
+                { 
                     resumingSession = true;
+                }
                 else
+                { 
                     Console.WriteLine("The answer must be either 'y' or 'n'");
-                // goto -> above
+                    // goto -> above
+                }
 
-                Console.WriteLine("The fleet has {0} robots", sizeOfFleet);
-                Console.WriteLine("Polling occurs every {0} seconds", int.Parse(ConfigurationManager.AppSettings["pollInterval"]));
-                Console.WriteLine("Debug Level is set to {0}", debugLevel);
+                logger(AREA, INFO, "The Fleet Has " + sizeOfFleet + " Robotsr");
+                logger(AREA, INFO, "Data Is Sarvested Every " + pollInterval + " Seconds");
+                logger(AREA, INFO, "Debug Level Is" + debugLevel);
 
                 foreach (var key in appSettings.AllKeys)
                 {
@@ -152,7 +163,6 @@ public static class Globals
         catch (ConfigurationErrorsException exception)
         {
             logger(AREA, DEBUG, "Couldn't Read App Settings. Error: ", exception);
-
             gracefulTermination("Failed to read application settings, on start-up. App will terminate");
         }
 
@@ -175,7 +185,7 @@ public static class Globals
     }
 
     /// <summary>
-    /// Establishes a connection to master database. If not available, it switches over to a local DB.
+    /// Establishes a connection to master database. If not available, it switches over to a local slave DB.
     /// </summary>
     public static void connectToDB()
     {
@@ -199,14 +209,75 @@ public static class Globals
                 db.Open();
 
                 logger(AREA, INFO, "Connected To Slave DB");
+                sendSMS("Failed to connect to both master database.");
             }
             catch (MySqlException e)
             {
                 logger(AREA, ERROR, "Local connection failed with error: ", e);
-                // Print MySQL exception
-                // Send email and terminate process?
-                keepRunning = false;
+                sendSMS("Failed to connect to both master and slave databases. Check if they're up and if the network is blocked.");
             }
+        }
+    }
+
+    /// <summary>
+    /// Obtains application settings from the Database
+    /// </summary>
+    public static void readSettingsFromDB()
+    {
+        //=========================================================|
+        //  Read App Configuration                                 |     
+        //=========================================================|
+        string sql = "SELECT * FROM app_config;";
+        using var cmd = new MySqlCommand(sql, db);
+        using MySqlDataReader rdr = cmd.ExecuteReader();
+
+        while (rdr.Read())
+        {
+            logger(AREA, DEBUG, "Row: " + rdr.GetInt32(0) + " - Variable: " + rdr.GetString(1) + " - Value: " + rdr.GetString(2));
+
+            if(rdr.GetString(1) == "pollingInterval")
+            {
+                pollInterval = Int32.Parse(rdr.GetString(2));
+            }
+            else if (rdr.GetString(1) == "debugLevel")
+            {
+                debugLevel = Int32.Parse(rdr.GetString(2));
+            }
+            else if (rdr.GetString(1) == "sizeOfFleet")
+            {
+                sizeOfFleet = Int32.Parse(rdr.GetString(2));
+            }
+            else if (rdr.GetString(1) == "resumingSession")
+            {
+                resumingSession = Boolean.Parse(rdr.GetString(2));
+            }
+            else if (rdr.GetString(1) == "twilioSid")
+            {
+                accountSid = rdr.GetString(2);
+            }
+            else if (rdr.GetString(1) == "twilioAuthToken")
+            {
+                authToken = rdr.GetString(2);
+            }
+            else if (rdr.GetString(1) == "twilioPhone")
+            {
+                phone_twilio = rdr.GetString(2);
+            }
+        }
+
+        //=========================================================|
+        //  Read SMS Phone Numbers For Alerts                      |     
+        //=========================================================|
+        sql = "SELECT * FROM alert_phone_numbers;";
+        using var cmd1 = new MySqlCommand(sql, db);
+        using MySqlDataReader rdr1 = cmd1.ExecuteReader();
+        int i = 0;
+
+        while (rdr.Read())
+        {
+            logger(AREA, DEBUG, "Row: " + rdr.GetInt32(0) + " - Number: " + rdr.GetString(1));
+            phone_numbers[i] = rdr.GetString(1);
+            i++;
         }
     }
 
@@ -243,12 +314,14 @@ public static class Globals
     /// </summary>
     public static void closeComms()
     {
-        logger(AREA, DEBUG, "==== Closing Socket Connections ====");
+        logger(AREA, DEBUG, "==== Closing Connections ====");
 
         try
         {
             comms.Dispose();
             SiemensPLC.disconnect();
+
+            logger(AREA, INFO, "Closed Communications");
         }
         catch(NullReferenceException exception)
         {
@@ -259,7 +332,7 @@ public static class Globals
             logger(AREA, ERROR, "Couldn't close comms because of the following exception: ", exception);
         }
 
-        logger(AREA, INFO, "==== Closed Communications ====");
+        logger(AREA, DEBUG, "==== Finished Closing Connections ====");
     }
 
     /// <summary>
@@ -278,6 +351,8 @@ public static class Globals
     /// <param name="cmd"></param>
     public static void issueQuery(MySqlCommand cmd)
     {
+        logger(AREA, DEBUG, "==== Closing Connections ====");
+
         int rowsAffected = 0;
 
         try
@@ -305,6 +380,8 @@ public static class Globals
             Console.WriteLine("Failed To Insert");
             Console.WriteLine(e);
         }
+
+        logger(AREA, DEBUG, "==== Closing Connections ====");
     }
 
     /// <summary>
@@ -350,6 +427,8 @@ public static class Globals
                 to: new PhoneNumber(phone_rx),
                 from: new PhoneNumber(phone_twilio),
                 body: message);
+
+            logger(AREA, INFO, "Sending An SMS Alert: " + message);
         }
         catch (Exception exception)
         {

@@ -2,12 +2,9 @@
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
-using Mirage.plc;
 using static Globals;
 using static Globals.DebugLevel;
 
-namespace Mirage
-{
     class Program
     {
         //=========================================================|
@@ -19,7 +16,7 @@ namespace Mirage
         {
             readAllSettings();
 
-            connectToDB();
+            //connectToDB();
 
             setUpDefaultComms();
 
@@ -40,49 +37,49 @@ namespace Mirage
                 logger(AREA, DEBUG, "==== Loop " + ++i + " Starting ====");
                 logger(AREA, DEBUG, "Current Stopwatch Time: " + timer.Elapsed.TotalSeconds);
 
-                /*                SiemensPLC.poll();
+            SiemensPLC.poll();
 
-                                if (SiemensPLC.newMsg)
-                                {
-                                    logger(AREA, DEBUG, "==== New Task From PLC ====");
+            if (SiemensPLC.newMsg)
+            {
+                logger(AREA, DEBUG, "==== New Task From PLC ====");
 
-                                    SiemensPLC.updateTaskStatus(Status.StartedProcessing);
+                SiemensPLC.updateTaskStatus(Globals.TaskStatus.StartedProcessing);
 
-                                    switch (SiemensPLC.task)
-                                    {
-                                        case Tasks.GetScheduleStatus:
-                                            getScheduleStatus();
-                                            break;
-                                        case Tasks.SendMissionToScheduler:
-                                            sendMissionToScheduler();
-                                            break;
-                                        case Tasks.CreateMission:
-                                            createMission();
-                                            break;
-                                        case Tasks.ClearScheduler:
-                                            clearScheduler();
-                                            break;
-                                        case Tasks.GetBattery:
-                                            getBattery();
-                                            break;
-                                        case Tasks.GetDistance:
-                                            getDistance();
-                                            break;
-                                        case Tasks.GetRobotStatus:
-                                            getRobotStatus();
-                                            break;
-                                        default:
-                                            unknownMission();
-                                            break;
-                                    }
+                switch (SiemensPLC.task)
+                {
+                    case Tasks.GetScheduleStatus:
+                        getScheduleStatus();
+                        break;
+                    case Tasks.SendMissionToScheduler:
+                        sendMissionToScheduler();
+                        break;
+                    case Tasks.CreateMission:
+                        createMission();
+                        break;
+                    case Tasks.ClearScheduler:
+                        clearScheduler();
+                        break;
+                    case Tasks.GetBattery:
+                        getBattery();
+                        break;
+                    case Tasks.GetDistance:
+                        getDistance();
+                        break;
+                    case Tasks.GetRobotStatus:
+                        getRobotStatus();
+                        break;
+                    default:
+                        unknownMission();
+                        break;
+                }
 
-                                    SiemensPLC.checkResponse();
-                                }
+                SiemensPLC.checkResponse();
+            }
 
-                                SiemensPLC.checkConnectivity();*/
+            SiemensPLC.checkConnectivity();
 
-                // Poll MiR Fleet - async operation that happens every pollInterval
-                if (timer.Elapsed.Seconds >= pollInterval)
+            // Poll MiR Fleet - async operation that happens every pollInterval
+            if (timer.Elapsed.Seconds >= pollInterval)
                 {
                     logger(AREA, INFO, timer.Elapsed.TotalSeconds + " seconds since last poll. Poll interval is: " + pollInterval);
                     timer.Restart();
@@ -98,38 +95,6 @@ namespace Mirage
 
             gracefulTermination();
         }
-
-        /*        public static async void pollRobots()
-                {
-                    try
-                    {
-                        try
-                        { 
-                            mirFleet.issueGetRequests("status");
-                            await mirFleet.saveFleetStatusAsync();
-
-                            mirFleet.issueGetRequests("registers");
-                            await mirFleet.saveFleetRegistersAsync();
-                        }
-                        catch (HttpRequestException e)
-                        {
-                            // TODO: Handle more exceptions
-                            // Remove the task which is causing the exception
-
-                            Console.WriteLine("Couldn't connect to the robot");
-                            Console.WriteLine("Check your network, dns settings, robot is up, etc.");
-                            Console.WriteLine("Please see error log (enter location here) for more details");
-                            // Store the detailed error in the error log
-                            Console.WriteLine(e);
-                        }
-                    }
-                    catch (WebException e)
-                    {
-                        Console.WriteLine($"Connection Problems: '{e}'");
-                    }
-                }*/
-
-
 
         /// <summary>
         /// 
@@ -247,5 +212,4 @@ namespace Mirage
 
         }
     }
-}
 

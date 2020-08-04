@@ -11,8 +11,6 @@ using Mirage.rest;
 using static Globals;
 using static Globals.DebugLevel;
 
-namespace Mirage
-{
     // TODO: Clean-up so we're a bit more tidy
     public class Robot
     {
@@ -415,4 +413,3 @@ namespace Mirage
             logger(AREA, DEBUG, "==== Finished Saving Registers ====");
         }
     }
-}

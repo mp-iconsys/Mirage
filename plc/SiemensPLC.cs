@@ -4,8 +4,6 @@ using static Globals;
 using static Globals.DebugLevel;
 using static DotNetSiemensPLCToolBoxLibrary.Communication.LibNoDave.libnodave;
 
-namespace Mirage.plc
-{
     /// <summary>
     /// Contains all the methods and data related to a Siemens PLC.
     /// </summary>
@@ -578,4 +576,3 @@ namespace Mirage.plc
             logger(AREA, DEBUG, "==== PLC Disconnection Completed ====");
         }
     }
-}
