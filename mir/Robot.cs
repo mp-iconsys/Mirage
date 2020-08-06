@@ -83,7 +83,7 @@ using static Globals.DebugLevel;
             {
                 // We're resuming an existing session so fetch the robot connection details from a database
                 string query = "SELECT IP, AUTH FROM robot WHERE ROBOT_ID =" + id;
-                var getRobotData = new MySqlCommand(query, Globals.db);
+                var getRobotData = new MySqlCommand(query, db);
 
                 using (MySqlDataReader reader = getRobotData.ExecuteReader())
                 {

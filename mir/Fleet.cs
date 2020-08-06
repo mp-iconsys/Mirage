@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
 using static Globals;
@@ -27,18 +28,6 @@ namespace Mirage
         /// <summary>
         /// 
         /// </summary>
-        public Fleet()
-        {
-            robots = new Robot[sizeOfFleet];
-            httpResponseTasks = new Task<HttpResponseMessage>[sizeOfFleet];
-
-            instantiateRobots(sizeOfFleet);
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="sizeOfFleet"></param>
         public Fleet(int sizeOfFleet)
         {
             robots = new Robot[sizeOfFleet];
@@ -51,7 +40,32 @@ namespace Mirage
         /// 
         /// </summary>
         /// <param name="sizeOfFleet"></param>
+        public Fleet(int sizeOfFleet, string fleetManagerIP, AuthenticationHeaderValue fleetManagerAuthToken)
+        {
+            robots = new Robot[sizeOfFleet];
+            httpResponseTasks = new Task<HttpResponseMessage>[sizeOfFleet];
+
+            instantiateRobots(sizeOfFleet, fleetManagerIP, fleetManagerAuthToken);
+        }
+
+        /// <summary>
+        /// Instantiates the mir fleet without the fleet manager.
+        /// </summary>
+        /// <param name="sizeOfFleet"></param>
         public void instantiateRobots(int sizeOfFleet)
+        {
+            for (int i = 0; i < sizeOfFleet; i++)
+            {
+                // Instantiate the robots - Don't touch the tasks yet
+                robots[i] = new Robot(i);
+            }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="sizeOfFleet"></param>
+        public void instantiateRobots(int sizeOfFleet, string fleetManagerIP, AuthenticationHeaderValue fleetManagerAuthToken)
         {
             fleetManager = new Robot(fleetManagerIP, fleetManagerAuthToken);
 

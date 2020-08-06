@@ -25,9 +25,8 @@ public static class Globals
     public static int sizeOfFleet;
     public static MySqlConnection db;
     public static HttpClient comms;
-
-    public static string fleetManagerIP;
     public static AuthenticationHeaderValue fleetManagerAuthToken;
+    public static string fleetManagerIP;
     public static Fleet mirFleet;
 
     //=========================================================|
@@ -40,10 +39,10 @@ public static class Globals
     //=========================================================|
     //  For Sending SMS Alerts                                 |     
     //=========================================================|
+    private static List<string> phone_numbers;
     private static string accountSid; //= "ACc9a9248dd2a1f6d6e673148e73cfc2f9";
     private static string authToken; //= "b57abe0211b4fde95bf7ae159eb75e2d";
     private static string phone_rx;
-    private static List<string> phone_numbers;
     private static string phone_twilio;
 
     /// <summary>
@@ -110,55 +109,7 @@ public static class Globals
         {
             connectToDB();
 
-            fleetManagerAuthToken = new AuthenticationHeaderValue("Basic", "moo");
-            fleetManagerIP = "192.168.0.1";
-
-            var appSettings = ConfigurationManager.AppSettings;
-
-            if (appSettings.Count == 0)
-            {
-                logger(AREA, ERROR, "AppSettings Branch Within App.config Is Empty");
-                logger(AREA, ERROR, "Terminating the application.");
-
-                gracefulTermination("Failed to read application settings, on start-up. Check app.config.exe file. App will terminate");
-            }
-            else
-            {
-                debugLevel      = int.Parse(ConfigurationManager.AppSettings["debugLevel"]);
-                pollInterval    = int.Parse(ConfigurationManager.AppSettings["pollInterval"]); 
-                sizeOfFleet     = int.Parse(ConfigurationManager.AppSettings["sizeOfFleet"]);
-                resumingSession = bool.Parse(ConfigurationManager.AppSettings["resumingSession"]);
-                phone_rx        = ConfigurationManager.AppSettings["phone_rx"];
-                phone_twilio    = ConfigurationManager.AppSettings["phone_twilio"];
-
-                Console.WriteLine("Do you want to start a new session? (y/n)");
-                string newSession = Console.ReadLine();
-
-                if (newSession == "y")
-                { 
-                    resumingSession = false;
-                }
-                else if (newSession == "n")
-                { 
-                    resumingSession = true;
-                }
-                else
-                { 
-                    Console.WriteLine("The answer must be either 'y' or 'n'");
-                    // goto -> above
-                }
-
-                logger(AREA, INFO, "The Fleet Has " + sizeOfFleet + " Robotsr");
-                logger(AREA, INFO, "Data Is Sarvested Every " + pollInterval + " Seconds");
-                logger(AREA, INFO, "Debug Level Is" + debugLevel);
-
-                foreach (var key in appSettings.AllKeys)
-                {
-                    logger(AREA, DEBUG, key + " is set to " + appSettings[key]);
-                }
-
-                logger(AREA, INFO, "Settings Fetched Successfully");
-            }
+            readSettingsFromDB();
         }
         catch (ConfigurationErrorsException exception)
         {
@@ -179,7 +130,16 @@ public static class Globals
         //=========================================================|
         //  Initialize Fleet Container                             |     
         //=========================================================|
-        mirFleet = new Fleet();
+        if (fleetManagerIP != null && fleetManagerAuthToken != null)
+        {
+            logger(AREA, INFO, "Fleet Data Assigned");
+            mirFleet = new Fleet(sizeOfFleet, fleetManagerIP, fleetManagerAuthToken);
+        }
+        else
+        {
+            logger(AREA, INFO, "No Fleet Data");
+            mirFleet = new Fleet(sizeOfFleet);
+        }
 
         logger(AREA, DEBUG, "==== Finished Obtaining Settings ====");
     }
@@ -220,64 +180,88 @@ public static class Globals
     }
 
     /// <summary>
-    /// Obtains application settings from the Database
+    /// Obtains application, phone numbers and fleet manager settings from the Database.
     /// </summary>
     public static void readSettingsFromDB()
     {
         //=========================================================|
         //  Read App Configuration                                 |     
         //=========================================================|
-        string sql = "SELECT * FROM app_config;";
-        using var cmd = new MySqlCommand(sql, db);
-        using MySqlDataReader rdr = cmd.ExecuteReader();
+        try
+        { 
+            string sql = "SELECT * FROM app_config;";
+            using var cmd = new MySqlCommand(sql, db);
+            using MySqlDataReader rdr = cmd.ExecuteReader();
 
-        while (rdr.Read())
+            while (rdr.Read())
+            {
+                logger(AREA, DEBUG, "Row: " + rdr.GetInt32(0) + " - Variable: " + rdr.GetString(1) + " - Value: " + rdr.GetString(2));
+
+                if(rdr.GetString(1) == "pollingInterval")
+                {
+                    pollInterval = Int32.Parse(rdr.GetString(2));
+                }
+                else if (rdr.GetString(1) == "debugLevel")
+                {
+                    debugLevel = Int32.Parse(rdr.GetString(2));
+                }
+                else if (rdr.GetString(1) == "sizeOfFleet")
+                {
+                    sizeOfFleet = Int32.Parse(rdr.GetString(2));
+                }
+                else if (rdr.GetString(1) == "resumingSession")
+                {
+                    resumingSession = Boolean.Parse(rdr.GetString(2));
+                }
+                else if (rdr.GetString(1) == "twilioSid")
+                {
+                    accountSid = rdr.GetString(2);
+                }
+                else if (rdr.GetString(1) == "twilioAuthToken")
+                {
+                    authToken = rdr.GetString(2);
+                }
+                else if (rdr.GetString(1) == "twilioPhone")
+                {
+                    phone_twilio = rdr.GetString(2);
+                }
+                else if (rdr.GetString(1) == "fleetManagerIP")
+                {
+                    fleetManagerIP = rdr.GetString(2);
+                }
+                else if (rdr.GetString(1) == "fleetManagerAuthToken")
+                {
+                    fleetManagerAuthToken = new AuthenticationHeaderValue("Basic", rdr.GetString(2));
+                }
+            }
+        }
+        catch
         {
-            logger(AREA, DEBUG, "Row: " + rdr.GetInt32(0) + " - Variable: " + rdr.GetString(1) + " - Value: " + rdr.GetString(2));
 
-            if(rdr.GetString(1) == "pollingInterval")
-            {
-                pollInterval = Int32.Parse(rdr.GetString(2));
-            }
-            else if (rdr.GetString(1) == "debugLevel")
-            {
-                debugLevel = Int32.Parse(rdr.GetString(2));
-            }
-            else if (rdr.GetString(1) == "sizeOfFleet")
-            {
-                sizeOfFleet = Int32.Parse(rdr.GetString(2));
-            }
-            else if (rdr.GetString(1) == "resumingSession")
-            {
-                resumingSession = Boolean.Parse(rdr.GetString(2));
-            }
-            else if (rdr.GetString(1) == "twilioSid")
-            {
-                accountSid = rdr.GetString(2);
-            }
-            else if (rdr.GetString(1) == "twilioAuthToken")
-            {
-                authToken = rdr.GetString(2);
-            }
-            else if (rdr.GetString(1) == "twilioPhone")
-            {
-                phone_twilio = rdr.GetString(2);
-            }
         }
 
         //=========================================================|
         //  Read SMS Phone Numbers For Alerts                      |     
         //=========================================================|
-        sql = "SELECT * FROM alert_phone_numbers;";
-        using var cmd1 = new MySqlCommand(sql, db);
-        using MySqlDataReader rdr1 = cmd1.ExecuteReader();
-        int i = 0;
-
-        while (rdr.Read())
+        try
         {
-            logger(AREA, DEBUG, "Row: " + rdr.GetInt32(0) + " - Number: " + rdr.GetString(1));
-            phone_numbers[i] = rdr.GetString(1);
-            i++;
+            phone_numbers = new List<string>();
+
+            string sql = "SELECT * FROM alert_phone_numbers;";
+            using var cmd = new MySqlCommand(sql, db);
+            using MySqlDataReader rdr = cmd.ExecuteReader();
+            int i = 0;
+
+            while (rdr.Read())
+            {
+                logger(AREA, DEBUG, "Row: " + rdr.GetInt32(0) + ", Index: " + i + ", Phone Number: " + rdr.GetString(1));
+                phone_numbers.Add(rdr.GetString(1));
+                i++;
+            }
+        }
+        catch (Exception exception)
+        {
+            logger(AREA, ERROR, "Couldn't fetch phone numbers. Error is: ", exception);
         }
     }
 
@@ -422,11 +406,15 @@ public static class Globals
         logger(AREA, DEBUG, "==== Sending SMS Alert ====");
 
         try
-        { 
-            MessageResource.Create(
-                to: new PhoneNumber(phone_rx),
-                from: new PhoneNumber(phone_twilio),
-                body: message);
+        {
+            
+            for (int i = 0; i < phone_numbers.Count; i++)
+            {
+                MessageResource.Create(
+                   to: new PhoneNumber(phone_numbers[i]),
+                   from: new PhoneNumber(phone_twilio),
+                   body: message);
+            }
 
             logger(AREA, INFO, "Sending An SMS Alert: " + message);
         }
