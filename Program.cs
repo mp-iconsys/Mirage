@@ -16,8 +16,6 @@ using static Globals.DebugLevel;
         {
             readAllSettings();
 
-            //connectToDB();
-
             setUpDefaultComms();
 
             mirFleet.getInitialFleetData();
@@ -37,49 +35,49 @@ using static Globals.DebugLevel;
                 logger(AREA, DEBUG, "==== Loop " + ++i + " Starting ====");
                 logger(AREA, DEBUG, "Current Stopwatch Time: " + timer.Elapsed.TotalSeconds);
 
-            SiemensPLC.poll();
+                SiemensPLC.poll();
 
-            if (SiemensPLC.newMsg)
-            {
-                logger(AREA, DEBUG, "==== New Task From PLC ====");
-
-                SiemensPLC.updateTaskStatus(Globals.TaskStatus.StartedProcessing);
-
-                switch (SiemensPLC.task)
+                if (SiemensPLC.newMsg)
                 {
-                    case Tasks.GetScheduleStatus:
-                        getScheduleStatus();
-                        break;
-                    case Tasks.SendMissionToScheduler:
-                        sendMissionToScheduler();
-                        break;
-                    case Tasks.CreateMission:
-                        createMission();
-                        break;
-                    case Tasks.ClearScheduler:
-                        clearScheduler();
-                        break;
-                    case Tasks.GetBattery:
-                        getBattery();
-                        break;
-                    case Tasks.GetDistance:
-                        getDistance();
-                        break;
-                    case Tasks.GetRobotStatus:
-                        getRobotStatus();
-                        break;
-                    default:
-                        unknownMission();
-                        break;
+                    logger(AREA, DEBUG, "==== New Task From PLC ====");
+
+                    SiemensPLC.updateTaskStatus(Globals.TaskStatus.StartedProcessing);
+
+                    switch (SiemensPLC.task)
+                    {
+                        case Tasks.GetScheduleStatus:
+                            getScheduleStatus();
+                            break;
+                        case Tasks.SendMissionToScheduler:
+                            sendMissionToScheduler();
+                            break;
+                        case Tasks.CreateMission:
+                            createMission();
+                            break;
+                        case Tasks.ClearScheduler:
+                            clearScheduler();
+                            break;
+                        case Tasks.GetBattery:
+                            getBattery();
+                            break;
+                        case Tasks.GetDistance:
+                            getDistance();
+                            break;
+                        case Tasks.GetRobotStatus:
+                            getRobotStatus();
+                            break;
+                        default:
+                            unknownMission();
+                            break;
+                    }
+
+                    SiemensPLC.checkResponse();
                 }
 
-                SiemensPLC.checkResponse();
-            }
+                SiemensPLC.checkConnectivity();
 
-            SiemensPLC.checkConnectivity();
-
-            // Poll MiR Fleet - async operation that happens every pollInterval
-            if (timer.Elapsed.Seconds >= pollInterval)
+                // Poll MiR Fleet - async operation that happens every pollInterval
+                if (timer.Elapsed.Seconds >= pollInterval)
                 {
                     logger(AREA, INFO, timer.Elapsed.TotalSeconds + " seconds since last poll. Poll interval is: " + pollInterval);
                     timer.Restart();

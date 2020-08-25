@@ -26,7 +26,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="config\" />
     <Folder Include="logs\" />
     <Folder Include="src\" />
   </ItemGroup>
@@ -41,7 +40,7 @@
     <None Update="config\log4net.config">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="config\plc_config.xml">
+    <None Update="config\plc.config">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>

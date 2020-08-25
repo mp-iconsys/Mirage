@@ -70,14 +70,14 @@ using static DotNetSiemensPLCToolBoxLibrary.Communication.LibNoDave.libnodave;
             try
             {
                 XmlDocument doc = new XmlDocument();
-                            doc.Load(@"config\plc_config.xml");
+                            doc.Load(@"config\plc.config");
 
-                IP = doc.DocumentElement.SelectSingleNode("/plc/connectionString/ip").InnerText;
-                port = short.Parse(doc.DocumentElement.SelectSingleNode("/plc/connectionString/port").InnerText);
-                rack = short.Parse(doc.DocumentElement.SelectSingleNode("/plc/connectionString/rack").InnerText);
-                slot = short.Parse(doc.DocumentElement.SelectSingleNode("/plc/connectionString/slot").InnerText);
-                taskControlDB = short.Parse(doc.DocumentElement.SelectSingleNode("/plc/data/taskControlDB").InnerText);
-                dataStorageDB = short.Parse(doc.DocumentElement.SelectSingleNode("/plc/data/dataStorageDB").InnerText);
+                IP = doc.DocumentElement.SelectSingleNode("/configuration/plc/connectionString/ip").InnerText;
+                port = short.Parse(doc.DocumentElement.SelectSingleNode("/configuration/plc/connectionString/port").InnerText);
+                rack = short.Parse(doc.DocumentElement.SelectSingleNode("/configuration/plc/connectionString/rack").InnerText);
+                slot = short.Parse(doc.DocumentElement.SelectSingleNode("/configuration/plc/connectionString/slot").InnerText);
+                taskControlDB = short.Parse(doc.DocumentElement.SelectSingleNode("/configuration/plc/data/taskControlDB").InnerText);
+                dataStorageDB = short.Parse(doc.DocumentElement.SelectSingleNode("/configuration/plc/data/dataStorageDB").InnerText);
 
                 logger(AREA, DEBUG, "IP : " + IP);
                 logger(AREA, DEBUG, "Port : " + port);

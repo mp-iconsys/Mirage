@@ -42,7 +42,6 @@ public static class Globals
     private static List<string> phone_numbers;
     private static string accountSid; //= "ACc9a9248dd2a1f6d6e673148e73cfc2f9";
     private static string authToken; //= "b57abe0211b4fde95bf7ae159eb75e2d";
-    private static string phone_rx;
     private static string phone_twilio;
 
     /// <summary>
@@ -101,6 +100,8 @@ public static class Globals
             Console.WriteLine("Failed To Read Logger Configuration.");
             Console.WriteLine(exception);
         }
+
+
 
         logger(AREA, INFO, "Starting Mirage Data Harvester v0.01");
         logger(AREA, DEBUG, "==== Obtaining Settings ====");
@@ -250,13 +251,11 @@ public static class Globals
             string sql = "SELECT * FROM alert_phone_numbers;";
             using var cmd = new MySqlCommand(sql, db);
             using MySqlDataReader rdr = cmd.ExecuteReader();
-            int i = 0;
 
             while (rdr.Read())
             {
-                logger(AREA, DEBUG, "Row: " + rdr.GetInt32(0) + ", Index: " + i + ", Phone Number: " + rdr.GetString(1));
+                logger(AREA, DEBUG, "Row: " + rdr.GetInt32(0) + ", Phone Number: " + rdr.GetString(1));
                 phone_numbers.Add(rdr.GetString(1));
-                i++;
             }
         }
         catch (Exception exception)
@@ -281,14 +280,14 @@ public static class Globals
             comms.DefaultRequestHeaders.Add("Accept-Language", "en_US");
             comms.Timeout = TimeSpan.FromMinutes(10);
 
-            logger(AREA, INFO, "MiR HTTP Connections Established");
+            logger(AREA, INFO, "MiR HTTP Connection Established");
         }
         catch(Exception exception)
         {
             logger(AREA, ERROR, "Failed to set up an HTTP Connection. Error: ", exception);
         }
 
-        //SiemensPLC.establishConnection();
+        SiemensPLC.establishConnection();
 
         logger(AREA, DEBUG, "==== Connections Established ====");
     }
