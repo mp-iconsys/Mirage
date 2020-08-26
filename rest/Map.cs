@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Collections.Generic;
 using MySql.Data.MySqlClient;
 using static Globals;
+using static Globals.DebugLevel;
 
 namespace Mirage.rest
 {
@@ -30,12 +31,39 @@ namespace Mirage.rest
         public string Url { get; set; }
         public int Map_id { get; set; }
 
+        //=========================================================|
+        //  Used For Logging & Debugging                           |     
+        //=========================================================|
+        private static readonly Type AREA = typeof(Map);
+
         /// <summary>
-        /// 
+        /// Prints map data from memory to the log file and console.
         /// </summary>
         public void print()
         {
-            Console.WriteLine();
+            logger(AREA, INFO, "");
+            logger(AREA, INFO, "==== Printing Map: " + Map_id + " ====");
+            logger(AREA, INFO, "Created_by: " + Created_by);
+            logger(AREA, INFO, "Created_by_id: " + Created_by_id);
+            logger(AREA, INFO, "Created_by_name: " + Created_by_name);
+            logger(AREA, INFO, "Guid: " + Guid);
+            logger(AREA, INFO, "map: " + map);
+            logger(AREA, INFO, "Metadata: " + Metadata);
+            logger(AREA, INFO, "Name: " + Name);
+            logger(AREA, INFO, "One_way_map: " + One_way_map);
+            logger(AREA, INFO, "Origin_theta: " + Origin_theta);
+            logger(AREA, INFO, "Origin_x: " + Origin_x);
+            logger(AREA, INFO, "Origin_y: " + Origin_y);
+            logger(AREA, INFO, "Path_guides: " + Path_guides);
+            logger(AREA, INFO, "Paths: " + Paths);
+            logger(AREA, INFO, "Positions: " + Positions);
+            logger(AREA, INFO, "Resolution: " + Resolution);
+            logger(AREA, INFO, "Session_id: " + Session_id);
+            logger(AREA, INFO, "Url: " + Url);
+            logger(AREA, INFO, "==== Finished Printing Map: " + Map_id + " ====");
+            logger(AREA, INFO, "");
+
+/*            Console.WriteLine();
             Console.WriteLine("==== PRINTING MAP NO: " + Map_id + " ====");
             Console.WriteLine("Created_by: " + Created_by);
             Console.WriteLine("Created_by_id: " + Created_by_id);
@@ -55,17 +83,17 @@ namespace Mirage.rest
             Console.WriteLine("Session_id: " + Session_id);
             Console.WriteLine("Url: " + Url);
             Console.WriteLine("==== END OF MAP PRINT NO: " + Map_id + " ====");
-            Console.WriteLine();
+            Console.WriteLine();*/
         }
 
         /// <summary>
-        /// 
+        /// Saves map data to memory, based on the HTTP Response data.
         /// </summary>
         /// <param name="response"></param>
         public void saveToMemory(HttpResponseMessage response) {}
 
         /// <summary>
-        /// 
+        /// Saves map to the database.
         /// </summary>
         /// <param name="robotID"></param>
         public void saveToDB(int robotID)
@@ -97,7 +125,7 @@ namespace Mirage.rest
             catch (Exception exception)
             {
                 cmd.Dispose();
-                Console.WriteLine(exception);
+                logger(AREA, ERROR, "MySQL Quert Error: ", exception);
             }
         }
 

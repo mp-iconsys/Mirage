@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using MySql.Data.MySqlClient;
 using Newtonsoft.Json;
 using static Globals;
+using static Globals.DebugLevel;
 
 namespace Mirage.rest
 {
@@ -41,6 +42,11 @@ namespace Mirage.rest
         public User_prompt user_prompt { get; set; }
         public Velocity velocity { get; set; }
 
+        //=========================================================|
+        //  Used For Logging & Debugging                           |     
+        //=========================================================|
+        private static readonly Type AREA = typeof(Status);
+
         public Status() { }
 
         /// <summary>
@@ -48,19 +54,21 @@ namespace Mirage.rest
         /// </summary>
         public void print()
         {
-            Console.WriteLine("mode_id: " + mode_id);
-            Console.WriteLine("state_id: " + state_id);
-            Console.WriteLine("uptime: " + uptime);
-            Console.WriteLine("battery_time_remaining: " + battery_time_remaining);
-            Console.WriteLine("battery_percentage: " + battery_percentage);
-            Console.WriteLine("distance_to_next_target: " + distance_to_next_target);
-            Console.WriteLine("allowed_methods: " + allowed_methods);
-            Console.WriteLine("footprint: " + footprint);
-            Console.WriteLine("joystick_low_speed_mode_enabled: " + joystick_low_speed_mode_enabled);
-            Console.WriteLine("joystick_web_session_id: " + joystick_web_session_id);
-            Console.WriteLine("moved: " + moved);
-            Console.WriteLine("velocity linear: " + velocity.linear);
-            Console.WriteLine("velocity angular: " + velocity.angular);
+            logger(AREA, INFO, "");
+            logger(AREA, INFO, "mode_id: " + mode_id);
+            logger(AREA, INFO, "state_id: " + state_id);
+            logger(AREA, INFO, "uptime: " + uptime);
+            logger(AREA, INFO, "battery_time_remaining: " + battery_time_remaining);
+            logger(AREA, INFO, "battery_percentage: " + battery_percentage);
+            logger(AREA, INFO, "distance_to_next_target: " + distance_to_next_target);
+            logger(AREA, INFO, "allowed_methods: " + allowed_methods);
+            logger(AREA, INFO, "footprint: " + footprint);
+            logger(AREA, INFO, "joystick_low_speed_mode_enabled: " + joystick_low_speed_mode_enabled);
+            logger(AREA, INFO, "joystick_web_session_id: " + joystick_web_session_id);
+            logger(AREA, INFO, "moved: " + moved);
+            logger(AREA, INFO, "velocity linear: " + velocity.linear);
+            logger(AREA, INFO, "velocity angular: " + velocity.angular);
+            logger(AREA, INFO, "");
         }
 
         /// <summary>
@@ -156,7 +164,7 @@ namespace Mirage.rest
             catch (Exception exception)
             {
                 cmd.Dispose();
-                Console.WriteLine(exception);
+                logger(AREA, ERROR, "MySQL Quert Error: ", exception);
             }
         }
 

@@ -18,17 +18,24 @@ namespace Mirage.rest
         public string Value { get; set; }
         public string Default { get; set; }
 
+        //=========================================================|
+        //  Used For Logging & Debugging                           |     
+        //=========================================================|
+        private static readonly Type AREA = typeof(Setting);
+
         /// <summary>
         /// 
         /// </summary>
         public void print()
         {
-            Console.WriteLine("ID: " + Id);
-            Console.WriteLine("Name: " + Name);
-            Console.WriteLine("Parent_name: " + Parent_name);
-            Console.WriteLine("Url: " + Url);
-            Console.WriteLine("Value: " + Value);
-            Console.WriteLine("Default: " + Default);
+            logger(AREA, INFO, "");
+            logger(AREA, INFO, "ID: " + Id);
+            logger(AREA, INFO, "Name: " + Name);
+            logger(AREA, INFO, "Parent_name: " + Parent_name);
+            logger(AREA, INFO, "Url: " + Url);
+            logger(AREA, INFO, "Value: " + Value);
+            logger(AREA, INFO, "Default: " + Default);
+            logger(AREA, INFO, "");
         }
 
         /// <summary>
@@ -71,7 +78,7 @@ namespace Mirage.rest
             catch (Exception exception)
             {
                 cmd.Dispose();
-                Console.WriteLine(exception);
+                logger(AREA, ERROR, "MySQL Quert Error: ", exception);
             }
         }
 

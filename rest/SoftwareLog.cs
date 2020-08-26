@@ -5,6 +5,7 @@ using System.Data;
 using System.Net.Http;
 using System.Text;
 using static Globals;
+using static Globals.DebugLevel;
 
 namespace Mirage.rest
 {
@@ -19,19 +20,26 @@ namespace Mirage.rest
         public string To { get; set; }
         public string Url { get; set; }
 
+        //=========================================================|
+        //  Used For Logging & Debugging                           |     
+        //=========================================================|
+        private static readonly Type AREA = typeof(SoftwareLog);
+
         /// <summary>
         /// 
         /// </summary>
         public void print()
         {
-            Console.WriteLine("Action: " + Action);
-            Console.WriteLine("End_time: " + End_time);
-            Console.WriteLine("From: " + From);
-            Console.WriteLine("Guid: " + Guid);
-            Console.WriteLine("Start_time: " + Start_time);
-            Console.WriteLine("State: " + State);
-            Console.WriteLine("To: " + To);
-            Console.WriteLine("Url: " + Url);
+            logger(AREA, INFO, "");
+            logger(AREA, INFO, "Action: " + Action);
+            logger(AREA, INFO, "End_time: " + End_time);
+            logger(AREA, INFO, "From: " + From);
+            logger(AREA, INFO, "Guid: " + Guid);
+            logger(AREA, INFO, "Start_time: " + Start_time);
+            logger(AREA, INFO, "State: " + State);
+            logger(AREA, INFO, "To: " + To);
+            logger(AREA, INFO, "Url: " + Url);
+            logger(AREA, INFO, "");
         }
 
         /// <summary>
@@ -78,7 +86,7 @@ namespace Mirage.rest
             catch (Exception exception)
             {
                 cmd.Dispose();
-                Console.WriteLine(exception);
+                logger(AREA, ERROR, "MySQL Quert Error: ", exception);
             }
         }
 

@@ -5,6 +5,7 @@ using System.Net.Http;
 using Newtonsoft.Json;
 using MySql.Data.MySqlClient;
 using static Globals;
+using static Globals.DebugLevel;
 
 namespace Mirage.rest
 {
@@ -15,15 +16,22 @@ namespace Mirage.rest
         public string url { get; set; }
         public float value { get; set; }
 
+        //=========================================================|
+        //  Used For Logging & Debugging                           |     
+        //=========================================================|
+        private static readonly Type AREA = typeof(Register);
+
         /// <summary>
         /// 
         /// </summary>
         public void print()
         {
-            Console.WriteLine("ID: " + id);
-            Console.WriteLine("Label: " + label);
-            Console.WriteLine("url: " + url);
-            Console.WriteLine("value: " + value);
+            logger(AREA, INFO, "");
+            logger(AREA, INFO, "ID: " + id);
+            logger(AREA, INFO, "Label: " + label);
+            logger(AREA, INFO, "Url: " + url);
+            logger(AREA, INFO, "Value: " + value);
+            logger(AREA, INFO, "");
         }
 
         /// <summary>
@@ -61,7 +69,7 @@ namespace Mirage.rest
             catch (Exception exception)
             {
                 cmd.Dispose();
-                Console.WriteLine(exception);
+                logger(AREA, ERROR, "MySQL Quert Error: ", exception);
             }
         }
 

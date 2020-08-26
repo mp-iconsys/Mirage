@@ -4,6 +4,7 @@ using System.Text;
 using System.Net.Http;
 using MySql.Data.MySqlClient;
 using static Globals;
+using static Globals.DebugLevel;
 
 namespace Mirage.rest
 {
@@ -15,6 +16,11 @@ namespace Mirage.rest
         public string url;
         public string uri_suffix = "missions";
         public string missionNumberString;
+
+        //=========================================================|
+        //  Used For Logging & Debugging                           |     
+        //=========================================================|
+        private static readonly Type AREA = typeof(Mission);
 
         public Mission() { }
 
@@ -52,12 +58,14 @@ namespace Mirage.rest
         /// </summary>
         public void print()
         {
-            Console.WriteLine("Mission No: " + missionNumber);
-            Console.WriteLine("GUID: " + guid);
-            Console.WriteLine("Name: " + name);
-            Console.WriteLine("Url: " + url);
-            Console.WriteLine("URI Suffix: " + uri_suffix);
-            Console.WriteLine("missionNumberString: " + missionNumberString);
+            logger(AREA, INFO, "");
+            logger(AREA, INFO, "Mission No: " + missionNumber);
+            logger(AREA, INFO, "GUID: " + guid);
+            logger(AREA, INFO, "Name: " + name);
+            logger(AREA, INFO, "Url: " + url);
+            logger(AREA, INFO, "URI Suffix: " + uri_suffix);
+            logger(AREA, INFO, "missionNumberString: " + missionNumberString);
+            logger(AREA, INFO, "");
         }
 
         /// <summary>
@@ -94,7 +102,7 @@ namespace Mirage.rest
             catch (Exception exception)
             {
                 cmd.Dispose();
-                Console.WriteLine(exception);
+                logger(AREA, ERROR, "MySQL Quert Error: ", exception);
             }
         }
 

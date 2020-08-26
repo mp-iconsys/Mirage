@@ -61,7 +61,7 @@ using static DotNetSiemensPLCToolBoxLibrary.Communication.LibNoDave.libnodave;
         private static readonly Type AREA = typeof(SiemensPLC);
 
         /// <summary>
-        /// Opens the plc_config file and sets static variables such as IP.
+        /// Opens the plc.config file and sets static variables such as IP.
         /// </summary>
         public static void initialize()
         {
@@ -255,14 +255,11 @@ using static DotNetSiemensPLCToolBoxLibrary.Communication.LibNoDave.libnodave;
         }
 
         /// <summary>
-        /// A function to write data to a PLC at the end of an operation
-        /// Should write three values:
-        /// - if the assigned task was successful
-        /// - the serial number of the task
-        /// - data to be used for the PLC (batter life, etc)
-        ///
-        /// Defined on generic types so it can take floats, ints, strings 
+        /// Writes data to the Siemens PLC Data Storage block and updates the Status Code.
         /// </summary>
+        /// <param name="type">The variable name we want to write to the PLC.</param>
+        /// <param name="statusCode">Status code based on the HTTP request.</param>
+        /// <param name="data">The data obtained from the MiR/Fleet.</param>
         public static void writeData(string type, int statusCode, float data)
         {
             logger(AREA, DEBUG, "==== Starting To Write Data ====");
@@ -336,11 +333,11 @@ using static DotNetSiemensPLCToolBoxLibrary.Communication.LibNoDave.libnodave;
         }
 
         /// <summary>
-        /// 
+        /// Writes data to the Siemens PLC Data Storage block and updates the Status Code.
         /// </summary>
-        /// <param name="type"></param>
-        /// <param name="statusCode"></param>
-        /// <param name="data"></param>
+        /// <param name="type">The variable name we want to write to the PLC.</param>
+        /// <param name="statusCode">Status code based on the HTTP request.</param>
+        /// <param name="data">The data obtained from the MiR/Fleet.</param>
         public static void writeData(string type, int statusCode, string data)
         {
             logger(AREA, DEBUG, "==== Starting To Write Data ====");
@@ -516,7 +513,8 @@ using static DotNetSiemensPLCToolBoxLibrary.Communication.LibNoDave.libnodave;
         }
 
         /// <summary>
-        /// Tries to reconnect to a PLC if the connection drops. If it does, and connectivity counter is below 15, it sends and email.
+        /// Tries to reconnect to a PLC if the connection drops. 
+        /// If it does, and connectivity counter is below 15, it sends an email alert.
         /// </summary>
         public static void checkConnectivity()
         {

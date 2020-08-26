@@ -11,8 +11,8 @@ using log4net;
 using log4net.Config;
 using System.IO;
 using Mirage;
-using static Globals.DebugLevel;
 using System.Collections.Generic;
+using static Globals.DebugLevel;
 
 public static class Globals
 {
@@ -100,8 +100,6 @@ public static class Globals
             Console.WriteLine("Failed To Read Logger Configuration.");
             Console.WriteLine(exception);
         }
-
-
 
         logger(AREA, INFO, "Starting Mirage Data Harvester v0.01");
         logger(AREA, DEBUG, "==== Obtaining Settings ====");
@@ -280,7 +278,7 @@ public static class Globals
             comms.DefaultRequestHeaders.Add("Accept-Language", "en_US");
             comms.Timeout = TimeSpan.FromMinutes(10);
 
-            logger(AREA, INFO, "MiR HTTP Connection Established");
+            logger(AREA, INFO, "MiR HTTP Header Created");
         }
         catch(Exception exception)
         {
@@ -321,16 +319,6 @@ public static class Globals
     /// <summary>
     /// 
     /// </summary>
-    /// <param name="json"></param>
-    public static void logJSON(string json)
-    {
-        Console.WriteLine(json);
-        //issueInsertQuery("INSERT INTO mir.logger(DATA) values ('" + MySqlHelper.EscapeString(json) + "');");
-    }
-
-    /// <summary>
-    /// 
-    /// </summary>
     /// <param name="cmd"></param>
     public static void issueQuery(MySqlCommand cmd)
     {
@@ -344,24 +332,17 @@ public static class Globals
             cmd.Prepare();
             rowsAffected = cmd.ExecuteNonQuery();
 
-            //Console.WriteLine("Rows Affected: " + rowsAffected);
-
             if (rowsAffected == 0)
             {
                 // Query Worked (for transactions and procedures)
-                //Console.WriteLine("Insert Query Hasn't Been Stored");
-            }
-            else if (debugLevel > 0)
-            {
-                Console.WriteLine("Insert Query Stored Successfully");
+                logger(AREA, DEBUG, "MySQL Transaction Was Successful");
             }
 
             cmd.Dispose();
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            Console.WriteLine("Failed To Insert");
-            Console.WriteLine(e);
+            logger(AREA, ERROR, "MySQL Query Failed with error: ", exception);
         }
 
         logger(AREA, DEBUG, "==== Closing Connections ====");

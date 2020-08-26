@@ -77,9 +77,9 @@ namespace Mirage
         }
 
         /// <summary>
-        /// 
+        /// Issues HTTP Get Requests to all MiR robots in memory.
         /// </summary>
-        /// <param name="type"></param>
+        /// <param name="type">Defines the request type</param>
         public void issueGetRequests(string type)
         {
             for (int i = 0; i < sizeOfFleet; i++)
@@ -92,25 +92,20 @@ namespace Mirage
                     }
                     catch (HttpRequestException exception)
                     {
-                        // TODO: Handle more exceptions
-                        // Remove the task which is causing the exception
-
-                        Console.WriteLine("Couldn't connect to the robot");
-                        Console.WriteLine("Check your network, dns settings, robot is up, etc.");
-                        Console.WriteLine("Please see error log (enter location here) for more details");
-                        // Store the detailed error in the error log
-                        Console.WriteLine(exception);
+                        // TODO: Remove the task which is causing the exception
+                        logger(AREA, ERROR, "HTTP Request Error. Couln't connect to the MiR robots.");
+                        logger(AREA, ERROR, "Check your network, dns settings, robot is up, etc. Error: ", exception);
                     }
                 }
                 catch (System.Net.WebException exception)
                 {
-                    Console.WriteLine($"Connection Problems: '{exception}'");
+                    logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
                 }
             }
         }
 
         /// <summary>
-        /// Sync method that issues a get request and saves data in memory
+        /// Sync method that issues a get request and saves data in memory. Used to issue tasks as a middleman for the PLC.
         /// </summary>
         /// <param name="type"></param>
         /// <param name="robotID"></param>
@@ -140,15 +135,15 @@ namespace Mirage
                 {
                     // TODO: Handle more exceptions
                     // Remove the task which is causing the exception
-                    logger(AREA, ERROR, "Couldn't Connect To The Robot. Check Your Network, DNS Settings, Robot Status, etc.");
-                    logger(AREA, ERROR, "The Error Is: ", exception);
+                    logger(AREA, ERROR, "HTTP Request Error. Couln't connect to the MiR robots.");
+                    logger(AREA, ERROR, "Check your network, dns settings, robot is up, etc. Error: ", exception);
 
                     functionStatus = Globals.TaskStatus.CouldntProcessRequest;
                 }
             }
             catch (System.Net.WebException exception)
             {
-                logger(AREA, ERROR, "Connection Problems: ", exception);
+                logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
 
                 functionStatus = Globals.TaskStatus.CouldntProcessRequest;
             }
@@ -170,7 +165,7 @@ namespace Mirage
             {
                 functionStatus = Globals.TaskStatus.CouldntProcessRequest;
 
-                logger(AREA, ERROR, "Connection Problems: ", exception);
+                logger(AREA, ERROR, "Connection Error: ", exception);
             }
 
             if (type == "status")
@@ -279,21 +274,17 @@ namespace Mirage
                     mirFleet.issueGetRequests("registers");
                     await mirFleet.saveFleetRegistersAsync();
                 }
-                catch (HttpRequestException e)
+                catch (HttpRequestException exception)
                 {
                     // TODO: Handle more exceptions
-                    // Remove the task which is causing the exception
-
-                    Console.WriteLine("Couldn't connect to the robot");
-                    Console.WriteLine("Check your network, dns settings, robot is up, etc.");
-                    Console.WriteLine("Please see error log (enter location here) for more details");
-                    // Store the detailed error in the error log
-                    Console.WriteLine(e);
+                    // TODO: Remove the task which is causing the exception
+                    logger(AREA, ERROR, "HTTP Request Error. Couln't connect to the MiR robots.");
+                    logger(AREA, ERROR, "Check your network, dns settings, robot is up, etc. Error: ", exception);
                 }
             }
-            catch (Exception e)
+            catch (Exception exception)
             {
-                Console.WriteLine($"Connection Problems: '{e}'");
+                logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
             }
         }
 
@@ -309,21 +300,17 @@ namespace Mirage
                     mirFleet.issueGetRequests("/software/logs");
                     mirFleet.saveSoftwareLogsAsync().Wait();
                 }
-                catch (HttpRequestException e)
+                catch (HttpRequestException exception)
                 {
                     // TODO: Handle more exceptions
-                    // Remove the task which is causing the exception
-
-                    Console.WriteLine("Couldn't connect to the robot");
-                    Console.WriteLine("Check your network, dns settings, robot is up, etc.");
-                    Console.WriteLine("Please see error log (enter location here) for more details");
-                    // Store the detailed error in the error log
-                    Console.WriteLine(e);
+                    // TODO: Remove the task which is causing the exception
+                    logger(AREA, ERROR, "HTTP Request Error. Couln't connect to the MiR robots.");
+                    logger(AREA, ERROR, "Check your network, dns settings, robot is up, etc. Error: ", exception);
                 }
             }
-            catch (Exception e)
+            catch (Exception exception)
             {
-                Console.WriteLine($"Connection Problems: '{e}'");
+                logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
             }
 
             Thread.Sleep(2000);
@@ -335,21 +322,17 @@ namespace Mirage
                     mirFleet.issueGetRequests("maps");
                     mirFleet.saveMapsAsync().Wait();
                 }
-                catch (HttpRequestException e)
+                catch (HttpRequestException exception)
                 {
                     // TODO: Handle more exceptions
-                    // Remove the task which is causing the exception
-
-                    Console.WriteLine("Couldn't connect to the robot");
-                    Console.WriteLine("Check your network, dns settings, robot is up, etc.");
-                    Console.WriteLine("Please see error log (enter location here) for more details");
-                    // Store the detailed error in the error log
-                    Console.WriteLine(e);
+                    // TODO: Remove the task which is causing the exception
+                    logger(AREA, ERROR, "HTTP Request Error. Couln't connect to the MiR robots.");
+                    logger(AREA, ERROR, "Check your network, dns settings, robot is up, etc. Error: ", exception);
                 }
             }
-            catch (Exception e)
+            catch (Exception exception)
             {
-                Console.WriteLine($"Connection Problems: '{e}'");
+                logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
             }
 
             Thread.Sleep(2000);
@@ -361,21 +344,17 @@ namespace Mirage
                     mirFleet.issueGetRequests("settings");
                     mirFleet.saveSettingsAsync().Wait();
                 }
-                catch (HttpRequestException e)
+                catch (HttpRequestException exception)
                 {
                     // TODO: Handle more exceptions
-                    // Remove the task which is causing the exception
-
-                    Console.WriteLine("Couldn't connect to the robot");
-                    Console.WriteLine("Check your network, dns settings, robot is up, etc.");
-                    Console.WriteLine("Please see error log (enter location here) for more details");
-                    // Store the detailed error in the error log
-                    Console.WriteLine(e);
+                    // TODO: Remove the task which is causing the exception
+                    logger(AREA, ERROR, "HTTP Request Error. Couln't connect to the MiR robots.");
+                    logger(AREA, ERROR, "Check your network, dns settings, robot is up, etc. Error: ", exception);
                 }
             }
-            catch (Exception e)
+            catch (Exception exception)
             {
-                Console.WriteLine($"Connection Problems: '{e}'");
+                logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
             }
 
             Thread.Sleep(2000);
@@ -387,21 +366,17 @@ namespace Mirage
                     mirFleet.issueGetRequests("settings/advanced");
                     mirFleet.saveSettingsAsync().Wait();
                 }
-                catch (HttpRequestException e)
+                catch (HttpRequestException exception)
                 {
                     // TODO: Handle more exceptions
-                    // Remove the task which is causing the exception
-
-                    Console.WriteLine("Couldn't connect to the robot");
-                    Console.WriteLine("Check your network, dns settings, robot is up, etc.");
-                    Console.WriteLine("Please see error log (enter location here) for more details");
-                    // Store the detailed error in the error log
-                    Console.WriteLine(e);
+                    // TODO: Remove the task which is causing the exception
+                    logger(AREA, ERROR, "HTTP Request Error. Couln't connect to the MiR robots.");
+                    logger(AREA, ERROR, "Check your network, dns settings, robot is up, etc. Error: ", exception);
                 }
             }
-            catch (Exception e)
+            catch (Exception exception)
             {
-                Console.WriteLine($"Connection Problems: '{e}'");
+                logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
             }
 
             Thread.Sleep(2000);
@@ -413,21 +388,17 @@ namespace Mirage
                     mirFleet.issueGetRequests("missions");
                     mirFleet.saveMissionsAsync().Wait();
                 }
-                catch (HttpRequestException e)
+                catch (HttpRequestException exception)
                 {
                     // TODO: Handle more exceptions
-                    // Remove the task which is causing the exception
-
-                    Console.WriteLine("Couldn't connect to the robot");
-                    Console.WriteLine("Check your network, dns settings, robot is up, etc.");
-                    Console.WriteLine("Please see error log (enter location here) for more details");
-                    // Store the detailed error in the error log
-                    Console.WriteLine(e);
+                    // TODO: Remove the task which is causing the exception
+                    logger(AREA, ERROR, "HTTP Request Error. Couln't connect to the MiR robots.");
+                    logger(AREA, ERROR, "Check your network, dns settings, robot is up, etc. Error: ", exception);
                 }
             }
-            catch (Exception e)
+            catch (Exception exception)
             {
-                Console.WriteLine($"Connection Problems: '{e}'");
+                logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
             }
 
             Thread.Sleep(2000);
