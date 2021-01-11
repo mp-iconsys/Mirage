@@ -51,28 +51,6 @@ namespace Mirage.rest
             logger(AREA, INFO, "active: " + active);
             logger(AREA, INFO, "==== Finished RobotGroup Print ====");
             logger(AREA, INFO, "");
-
-            /*            Console.WriteLine();
-                        Console.WriteLine("==== PRINTING MAP NO: " + Map_id + " ====");
-                        Console.WriteLine("Created_by: " + Created_by);
-                        Console.WriteLine("Created_by_id: " + Created_by_id);
-                        Console.WriteLine("Created_by_name: " + Created_by_name);
-                        Console.WriteLine("Guid: " + Guid);
-                        Console.WriteLine("map: " + map);
-                        Console.WriteLine("Metadata: " + Metadata);
-                        Console.WriteLine("Name: " + Name);
-                        Console.WriteLine("One_way_map: " + One_way_map);
-                        Console.WriteLine("Origin_theta: " + Origin_theta);
-                        Console.WriteLine("Origin_x: " + Origin_x);
-                        Console.WriteLine("Origin_y: " + Origin_y);
-                        Console.WriteLine("Path_guides: " + Path_guides);
-                        Console.WriteLine("Paths: " + Paths);
-                        Console.WriteLine("Positions: " + Positions);
-                        Console.WriteLine("Resolution: " + Resolution);
-                        Console.WriteLine("Session_id: " + Session_id);
-                        Console.WriteLine("Url: " + Url);
-                        Console.WriteLine("==== END OF MAP PRINT NO: " + Map_id + " ====");
-                        Console.WriteLine();*/
         }
 
         public void saveToMemory(HttpResponseMessage response) { }
