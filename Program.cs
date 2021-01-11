@@ -12,13 +12,16 @@ using static Globals.DebugLevel;
         //=========================================================|
         private static readonly Type AREA = typeof(Program);
 
+        // For testing fire alarms
+        public static bool alarm_on = true;
+
         public static async Task Main(string[] args)
         {
             readAllSettings();
 
             setUpDefaultComms();
 
-            mirFleet.getInitialFleetData();
+            //mirFleet.getInitialFleetData();
 
             logger(AREA, DEBUG, "==== Starting Main Loop ====");
 
@@ -34,7 +37,7 @@ using static Globals.DebugLevel;
             {
                 logger(AREA, DEBUG, "==== Loop " + ++i + " Starting ====");
                 logger(AREA, DEBUG, "Current Stopwatch Time: " + timer.Elapsed.TotalSeconds);
-
+            /*
                 SiemensPLC.poll();
 
                 if (SiemensPLC.newMsg)
@@ -75,10 +78,14 @@ using static Globals.DebugLevel;
                 }
 
                 SiemensPLC.checkConnectivity();
-
+            */
                 // Poll MiR Fleet - async operation that happens every pollInterval
                 if (timer.Elapsed.Seconds >= pollInterval)
                 {
+                //sendFireAlarm();
+                //sendRobotGroup();
+                getRobotGroup();
+
                     logger(AREA, INFO, timer.Elapsed.TotalSeconds + " seconds since last poll. Poll interval is: " + pollInterval);
                     timer.Restart();
                     mirFleet.pollRobots();
@@ -111,7 +118,22 @@ using static Globals.DebugLevel;
         /// <summary>
         /// 
         /// </summary>
-        private static void sendMissionToScheduler()
+        private static void getRobotGroup()
+        {
+            logger(AREA, INFO, "==== Get Robot Group Data ====");
+
+            int restStatus = mirFleet.issueGetRequest("robots/" + 0, 666);
+            mirFleet.fleetManager.Group.print();
+
+            //SiemensPLC.writeData("mission_schedule", restStatus, mirFleet.robots[SiemensPLC.robotID].s.mission_text);
+
+            logger(AREA, DEBUG, "==== Obtained Scheduler Status ====");
+        }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    private static void sendMissionToScheduler()
         {
             logger(AREA, INFO, "==== Send Mission To Scheduler ====");
 
@@ -125,7 +147,42 @@ using static Globals.DebugLevel;
         /// <summary>
         /// 
         /// </summary>
-        private static void createMission()
+        private static void sendFireAlarm()
+        {
+            logger(AREA, INFO, "==== Send Fire Alarm To Scheduler ====");
+
+            // Need to add whether to turn alarm on/off and which alarm to affect from PLC
+            int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.FireAlarm.putRequest(Program.alarm_on, 1));
+
+        //SiemensPLC.updateTaskStatus(restStatus);
+            logger(AREA, DEBUG, "Status: " + restStatus);
+            logger(AREA, DEBUG, "==== Fire Alarm Sent ====");
+
+            Program.alarm_on = !Program.alarm_on;
+        }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    private static void sendRobotGroup()
+    {
+        logger(AREA, INFO, "==== Send (Change) Robot Group To Scheduler ====");
+
+        int robotID = 1;
+        int robotGroupID = 2;
+
+        // Need to add whether to turn alarm on/off and which alarm to affect from PLC
+        int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Group.putRequest(robotID, robotGroupID));
+
+        //SiemensPLC.updateTaskStatus(restStatus);
+        logger(AREA, DEBUG, "Status: " + restStatus);
+        logger(AREA, DEBUG, "==== Robot Group Changed ====");
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    private static void createMission()
         {
             logger(AREA, INFO, "==== Create New Mission In Robot " + SiemensPLC.robotID + " ====");
 

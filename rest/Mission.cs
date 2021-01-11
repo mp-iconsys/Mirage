@@ -180,7 +180,7 @@ namespace Mirage.rest
             HttpRequestMessage request = new HttpRequestMessage
             {
                 Content = new StringContent("", Encoding.UTF8, "application/json"),
-                Method = HttpMethod.Delete,
+                Method = HttpMethod.Put,
                 RequestUri = new Uri("mission_scheduler")
             };
 

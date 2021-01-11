@@ -28,10 +28,13 @@ using static Globals.DebugLevel;
         public List<Mission> Missions { get; set; }
         public Status s { get; set; }
 
-        //=========================================================|
-        //  Used For Logging & Debugging                           |     
-        //=========================================================|
-        private static readonly Type AREA = typeof(Robot);
+        public FireAlarms FireAlarm { get; set; }
+        public RobotGroup Group { get; set; }
+
+    //=========================================================|
+    //  Used For Logging & Debugging                           |     
+    //=========================================================|
+    private static readonly Type AREA = typeof(Robot);
 
         /// <summary>
         /// Instantiate with connection details
@@ -42,6 +45,7 @@ using static Globals.DebugLevel;
 
             Registers = new List<Register>(new Register[200]);
             s = new Status();
+
         }
 
         /// <summary>
@@ -70,6 +74,8 @@ using static Globals.DebugLevel;
 
             Registers = new List<Register>(new Register[200]);
             s = new Status();
+            FireAlarm = new FireAlarms();
+            Group = new RobotGroup();
         }
 
         /// <summary>
@@ -192,13 +198,17 @@ using static Globals.DebugLevel;
         /// <returns></returns>
         public int sendRESTdata(HttpRequestMessage request)
         {
+            formConnection();
+
             int statusCode = 0;
 
             try
             {
                 HttpResponseMessage result = comms.SendAsync(request).Result;
 
-                if (result.IsSuccessStatusCode)
+                Console.WriteLine("Base Address: " + comms.BaseAddress);
+
+            if (result.IsSuccessStatusCode)
                 {
                     statusCode = (int)result.StatusCode;
 
@@ -257,7 +267,36 @@ using static Globals.DebugLevel;
         /// 
         /// </summary>
         /// <param name="response"></param>
-        public void saveMaps(HttpResponseMessage response)
+        public void saveRobotGroup(HttpResponseMessage response)
+        {
+            logger(AREA, DEBUG, "==== Saving Robot Group Data ====");
+
+            try
+            {
+                Group = JsonConvert.DeserializeObject<RobotGroup>(response.Content.ReadAsStringAsync().Result);
+
+                Group.print();
+
+/*                for (int i = 0; i < SoftwareLogs.Count; i++)
+                {
+                    SoftwareLogs[i].saveToDB(id);
+                }*/
+            }
+            catch (Exception exception)
+            {
+                logger(AREA, ERROR, "Failed to decode JSON data: ", exception);
+                logger(AREA, ERROR, response.Content.ReadAsStringAsync().Result);
+            }
+
+            logger(AREA, DEBUG, "==== Finished Saving Software Logs ====");
+        }
+
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="response"></param>
+    public void saveMaps(HttpResponseMessage response)
         {
             logger(AREA, DEBUG, "==== Saving Maps ====");
 

@@ -122,7 +122,12 @@ namespace Mirage
                 {
                     if (type == "mission_scheduler" || robotID == 666)
                     {
-                        logger(AREA, DEBUG, "Sending " + type + " To Mission Scheduler");
+                        logger(AREA, DEBUG, "Sending " + type + " To Fleet Manager");
+                        fleetResponseTask = fleetManager.sendGetRequest(type);
+                    }
+                    else if(type == "robots" || robotID == 666)
+                    {
+                        logger(AREA, DEBUG, "Sending " + type + " To Fleet Manager");
                         fleetResponseTask = fleetManager.sendGetRequest(type);
                     }
                     else
