@@ -84,14 +84,16 @@ using static Globals.DebugLevel;
                 {
                 //sendFireAlarm();
                 //sendRobotGroup();
-                getRobotGroup();
+                //getRobotGroup();
 
-                    logger(AREA, INFO, timer.Elapsed.TotalSeconds + " seconds since last poll. Poll interval is: " + pollInterval);
+                calculationsAndReporting();
+
+                logger(AREA, INFO, timer.Elapsed.TotalSeconds + " seconds since last poll. Poll interval is: " + pollInterval);
                     timer.Restart();
                     mirFleet.pollRobots();
                 }
 
-                calculationsAndReporting();
+                //calculationsAndReporting();
 
                 logger(AREA, DEBUG, "==== Loop " + i + " Finished ====");
 
@@ -264,6 +266,18 @@ using static Globals.DebugLevel;
         /// </summary>
         private static void calculationsAndReporting()
         {
+
+        reports.reportingPass();
+
+        // Fetch the data from the database (which report, what the duration is)
+        //reports.checkReportTriggers();
+
+        // Get the data and store it
+
+        // Create a spreadsheet and populate with data
+        //reports.generateReport1();
+
+        // Send an update to DB saying we've generated the spreadsheet
 
         }
     }

@@ -13,6 +13,7 @@ using System.IO;
 using Mirage;
 using System.Collections.Generic;
 using static Globals.DebugLevel;
+using Mirage.Reporting;
 
 public static class Globals
 {
@@ -28,6 +29,7 @@ public static class Globals
     public static AuthenticationHeaderValue fleetManagerAuthToken;
     public static string fleetManagerIP;
     public static Fleet mirFleet;
+    public static Reporting reports = new Reporting();
 
     //=========================================================|
     //  Used For Logging & Debugging                           |     

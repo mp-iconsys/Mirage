@@ -22,6 +22,7 @@
     <PackageReference Include="log4net.Csv" Version="1.0.1" />
     <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="5.2.7" />
     <PackageReference Include="MySql.Data" Version="8.0.21" />
+    <PackageReference Include="NPOI" Version="2.5.2" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="4.7.0" />
     <PackageReference Include="Twilio" Version="5.45.0" />
   </ItemGroup>
