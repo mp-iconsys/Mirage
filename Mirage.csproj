@@ -3,12 +3,20 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp3.1</TargetFramework>
+    <ApplicationIcon>favicon.ico</ApplicationIcon>
+    <Authors>Mikolaj Paliszewski</Authors>
+    <Company>Iconsys</Company>
+    <PackageIcon>favicon.ico</PackageIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Remove="robot\**" />
     <EmbeddedResource Remove="robot\**" />
     <None Remove="robot\**" />
+    <None Include="graphics\favicon.ico">
+      <Pack>True</Pack>
+      <PackagePath></PackagePath>
+    </None>
   </ItemGroup>
 
   <ItemGroup>
@@ -29,11 +37,13 @@
 
   <ItemGroup>
     <Folder Include="logs\" />
-    <Folder Include="src\" />
   </ItemGroup>
 
   <ItemGroup>
     <Content Update="C:\Users\PaliszewskiM\.nuget\packages\dotnetprojects.dotnetsiemensplctoolboxlibrary\4.0.370\contentFiles\any\netstandard2.1\libnodave_jfkmod.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Update="C:\Users\PaliszewskiM\.nuget\packages\dotnetprojects.dotnetsiemensplctoolboxlibrary\4.0.370\contentFiles\any\netstandard2.1\libnodave_jfkmod64.dll">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
@@ -45,6 +55,19 @@
     <None Update="config\plc.config">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="docs\PLC Comms.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="README.md">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="reports\test.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
+
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="; Move all assemblies and related files to lib folder&#xD;&#xA;ROBOCOPY &quot;$(TargetDir) &quot; &quot;$(TargetDir)lib\ &quot; /XF *.exe *.config *.md *.json *.pdb  *.manifest libnodave_jfkmod64.dll libnodave_jfkmod.dll Mirage.dll /XD lib logs docs config reports/E /IS /MOVE&#xD;&#xA;if %25errorlevel%25 leq 4 exit 0 else exit %25errorlevel%25" />
+  </Target>
 
 </Project>

@@ -5,39 +5,41 @@ using System.Threading.Tasks;
 using static Globals;
 using static Globals.DebugLevel;
 
-    class Program
+class Program
+{
+    //=========================================================|
+    //  Used For Logging                                       |     
+    //=========================================================|
+    private static readonly Type AREA = typeof(Program);
+
+    // For testing fire alarms
+    public static bool alarm_on = true;
+
+    public static async Task Main(string[] args)
     {
-        //=========================================================|
-        //  Used For Logging                                       |     
-        //=========================================================|
-        private static readonly Type AREA = typeof(Program);
+        readAllSettings();
 
-        // For testing fire alarms
-        public static bool alarm_on = true;
+        setUpDefaultComms();
 
-        public static async Task Main(string[] args)
+        //mirFleet.getInitialFleetData();
+
+        logger(AREA, DEBUG, "==== Starting Main Loop ====");
+
+        long i = 0;
+
+        Stopwatch timer = new Stopwatch();
+        timer.Start();
+
+        //====================================================|
+        //  M A I N      L O O P                              |
+        //====================================================|
+        while (keepRunning)
         {
-            readAllSettings();
+            logger(AREA, DEBUG, "==== Loop " + ++i + " Starting ====");
+            logger(AREA, DEBUG, "Current Stopwatch Time: " + timer.Elapsed.TotalSeconds);
 
-            setUpDefaultComms();
-
-            //mirFleet.getInitialFleetData();
-
-            logger(AREA, DEBUG, "==== Starting Main Loop ====");
-
-            long i = 0;
-
-            Stopwatch timer = new Stopwatch();
-            timer.Start();
-
-            //====================================================|
-            //  M A I N      L O O P                              |
-            //====================================================|
-            while (keepRunning)
+            if (SiemensPLC.plcConnected)
             {
-                logger(AREA, DEBUG, "==== Loop " + ++i + " Starting ====");
-                logger(AREA, DEBUG, "Current Stopwatch Time: " + timer.Elapsed.TotalSeconds);
-            /*
                 SiemensPLC.poll();
 
                 if (SiemensPLC.newMsg)
@@ -76,12 +78,17 @@ using static Globals.DebugLevel;
 
                     SiemensPLC.checkResponse();
                 }
+            }
+            else
+            {
+                logger(AREA, ERROR, "==== PLC Is Not Connected ====");
+            }
 
-                SiemensPLC.checkConnectivity();
-            */
-                // Poll MiR Fleet - async operation that happens every pollInterval
-                if (timer.Elapsed.Seconds >= pollInterval)
-                {
+            SiemensPLC.checkConnectivity();
+
+            // Poll MiR Fleet - async operation that happens every pollInterval
+            if (timer.Elapsed.Seconds >= pollInterval)
+            {
                 //sendFireAlarm();
                 //sendRobotGroup();
                 //getRobotGroup();
@@ -89,79 +96,80 @@ using static Globals.DebugLevel;
                 calculationsAndReporting();
 
                 logger(AREA, INFO, timer.Elapsed.TotalSeconds + " seconds since last poll. Poll interval is: " + pollInterval);
-                    timer.Restart();
-                    mirFleet.pollRobots();
-                }
 
-                //calculationsAndReporting();
-
-                logger(AREA, DEBUG, "==== Loop " + i + " Finished ====");
-
-                Thread.Sleep(500);
+                timer.Restart();
+                mirFleet.pollRobots();
             }
 
-            gracefulTermination();
+            //calculationsAndReporting();
+
+            logger(AREA, DEBUG, "==== Loop " + i + " Finished ====");
+
+            Thread.Sleep(500);
         }
 
-        /// <summary>
-        /// 
-        /// </summary>
-        private static void getScheduleStatus()
-        {
-            logger(AREA, INFO, "==== Get Schedule Status ====");
+        gracefulTermination();
+    }
 
-            int restStatus = mirFleet.issueGetRequest("mission_scheduler/" + SiemensPLC.robotID, SiemensPLC.robotID);
+    /// <summary>
+    /// 
+    /// </summary>
+    private static void getScheduleStatus()
+    {
+        logger(AREA, INFO, "==== Get Schedule Status ====");
 
-            SiemensPLC.writeData("mission_schedule", restStatus, mirFleet.robots[SiemensPLC.robotID].s.mission_text);
+        int restStatus = mirFleet.issueGetRequest("mission_scheduler/" + SiemensPLC.robotID, SiemensPLC.robotID);
 
-            logger(AREA, DEBUG, "==== Obtained Scheduler Status ====");
-        }
+        SiemensPLC.writeData("mission_schedule", restStatus, mirFleet.robots[SiemensPLC.robotID].s.mission_text);
 
-        /// <summary>
-        /// 
-        /// </summary>
-        private static void getRobotGroup()
-        {
-            logger(AREA, INFO, "==== Get Robot Group Data ====");
+        logger(AREA, DEBUG, "==== Obtained Scheduler Status ====");
+    }
 
-            int restStatus = mirFleet.issueGetRequest("robots/" + 0, 666);
-            mirFleet.fleetManager.Group.print();
+    /// <summary>
+    /// 
+    /// </summary>
+    private static void getRobotGroup()
+    {
+        logger(AREA, INFO, "==== Get Robot Group Data ====");
 
-            //SiemensPLC.writeData("mission_schedule", restStatus, mirFleet.robots[SiemensPLC.robotID].s.mission_text);
+        int restStatus = mirFleet.issueGetRequest("robots/" + 0, 666);
+        mirFleet.fleetManager.Group.print();
 
-            logger(AREA, DEBUG, "==== Obtained Scheduler Status ====");
-        }
+        //SiemensPLC.writeData("mission_schedule", restStatus, mirFleet.robots[SiemensPLC.robotID].s.mission_text);
+
+        logger(AREA, DEBUG, "==== Obtained Scheduler Status ====");
+    }
 
     /// <summary>
     /// 
     /// </summary>
     private static void sendMissionToScheduler()
-        {
-            logger(AREA, INFO, "==== Send Mission To Scheduler ====");
+    {
+        logger(AREA, INFO, "==== Send Mission To Scheduler ====");
 
-            int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Missions[0].postRequest());
+        int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Missions[0].postRequest());
 
-            SiemensPLC.updateTaskStatus(restStatus);
+        SiemensPLC.updateTaskStatus(restStatus);
 
-            logger(AREA, DEBUG, "==== Mission Sent ====");
-        }
+        logger(AREA, DEBUG, "==== Mission Sent ====");
+    }
 
-        /// <summary>
-        /// 
-        /// </summary>
-        private static void sendFireAlarm()
-        {
-            logger(AREA, INFO, "==== Send Fire Alarm To Scheduler ====");
+    /// <summary>
+    /// 
+    /// </summary>
+    private static void sendFireAlarm()
+    {
+        logger(AREA, INFO, "==== Send Fire Alarm To Scheduler ====");
 
-            // Need to add whether to turn alarm on/off and which alarm to affect from PLC
-            int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.FireAlarm.putRequest(Program.alarm_on, 1));
+        // Need to add whether to turn alarm on/off and which alarm to affect from PLC
+        int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.FireAlarm.putRequest(Program.alarm_on, 1));
 
         //SiemensPLC.updateTaskStatus(restStatus);
-            logger(AREA, DEBUG, "Status: " + restStatus);
-            logger(AREA, DEBUG, "==== Fire Alarm Sent ====");
+        logger(AREA, DEBUG, "Status: " + restStatus);
+        logger(AREA, DEBUG, "==== Fire Alarm Sent ====");
 
-            Program.alarm_on = !Program.alarm_on;
-        }
+        Program.alarm_on = !Program.alarm_on;
+    }
 
     /// <summary>
     /// 
@@ -185,100 +193,88 @@ using static Globals.DebugLevel;
     /// 
     /// </summary>
     private static void createMission()
-        {
-            logger(AREA, INFO, "==== Create New Mission In Robot " + SiemensPLC.robotID + " ====");
+    {
+        logger(AREA, INFO, "==== Create New Mission In Robot " + SiemensPLC.robotID + " ====");
 
-            int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Missions[0].createMission(SiemensPLC.parameter));
+        int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Missions[0].createMission(SiemensPLC.parameter));
 
-            SiemensPLC.updateTaskStatus(restStatus);
+        SiemensPLC.updateTaskStatus(restStatus);
 
-            logger(AREA, DEBUG, "==== Created New Mission ====");
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        private static void clearScheduler()
-        {
-            logger(AREA, INFO, "==== Clear Mission Schedule ====");
-
-            int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Missions[0].deleteRequest());
-
-            SiemensPLC.updateTaskStatus(restStatus);
-
-            logger(AREA, DEBUG, "==== Cleared Mission Scheduler ====");
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        private static void getBattery()
-        {
-            Console.WriteLine("==== Get Battery Life ====");
-
-            int restStatus = mirFleet.issueGetRequest("status", SiemensPLC.robotID);
-
-            SiemensPLC.writeData("battery", restStatus, mirFleet.robots[SiemensPLC.robotID].s.battery_percentage);
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        private static void getDistance()
-        {
-            logger(AREA, INFO, "==== Get Distance Travelled ====");
-
-            int restStatus = mirFleet.issueGetRequest("status", SiemensPLC.robotID);
-
-            SiemensPLC.writeData("moved", restStatus, mirFleet.robots[SiemensPLC.robotID].s.moved);
-
-            logger(AREA, DEBUG, "==== Distance Travelled Status Fetched And Saved ====");
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        private static void getRobotStatus()
-        {
-            logger(AREA, INFO, "==== Get Mission Status ====");
-
-            int restStatus = mirFleet.issueGetRequest("status", SiemensPLC.robotID);
-
-            SiemensPLC.writeData("mission_text", restStatus, mirFleet.robots[SiemensPLC.robotID].s.mission_text);
-
-            logger(AREA, DEBUG, "==== Mission Status Fetched And Saved ====");
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        private static void unknownMission()
-        {
-            logger(AREA, ERROR, "==== Unknown Mission ====");
-
-            SiemensPLC.updateTaskStatus(Globals.TaskStatus.CouldntProcessRequest);
-
-            // Issue an alert
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        private static void calculationsAndReporting()
-        {
-
-        reports.reportingPass();
-
-        // Fetch the data from the database (which report, what the duration is)
-        //reports.checkReportTriggers();
-
-        // Get the data and store it
-
-        // Create a spreadsheet and populate with data
-        //reports.generateReport1();
-
-        // Send an update to DB saying we've generated the spreadsheet
-
-        }
+        logger(AREA, DEBUG, "==== Created New Mission ====");
     }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    private static void clearScheduler()
+    {
+        logger(AREA, INFO, "==== Clear Mission Schedule ====");
+
+        int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Missions[0].deleteRequest());
+
+        SiemensPLC.updateTaskStatus(restStatus);
+
+        logger(AREA, DEBUG, "==== Cleared Mission Scheduler ====");
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    private static void getBattery()
+    {
+        Console.WriteLine("==== Get Battery Life ====");
+
+        int restStatus = mirFleet.issueGetRequest("status", SiemensPLC.robotID);
+
+        SiemensPLC.writeData("battery", restStatus, mirFleet.robots[SiemensPLC.robotID].s.battery_percentage);
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    private static void getDistance()
+    {
+        logger(AREA, INFO, "==== Get Distance Travelled ====");
+
+        int restStatus = mirFleet.issueGetRequest("status", SiemensPLC.robotID);
+
+        SiemensPLC.writeData("moved", restStatus, mirFleet.robots[SiemensPLC.robotID].s.moved);
+
+        logger(AREA, DEBUG, "==== Distance Travelled Status Fetched And Saved ====");
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    private static void getRobotStatus()
+    {
+        logger(AREA, INFO, "==== Get Mission Status ====");
+
+        int restStatus = mirFleet.issueGetRequest("status", SiemensPLC.robotID);
+
+        SiemensPLC.writeData("mission_text", restStatus, mirFleet.robots[SiemensPLC.robotID].s.mission_text);
+
+        logger(AREA, DEBUG, "==== Mission Status Fetched And Saved ====");
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    private static void unknownMission()
+    {
+        logger(AREA, ERROR, "==== Unknown Mission ====");
+
+        SiemensPLC.updateTaskStatus(Globals.TaskStatus.CouldntProcessRequest);
+
+        // Issue an alert
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    private static void calculationsAndReporting()
+    {
+        reports.reportingPass();
+    }
+}
 
