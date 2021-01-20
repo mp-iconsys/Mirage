@@ -87,7 +87,9 @@ public static class Globals
     }
 
     /// <summary>
-    /// Reads settings from various config files. They are: log4net.config, plc_config.xml and App.config.
+    /// Reads settings from the DB or config files.
+    /// The files are used as a backup in case DB is not available.
+    /// They are: log4net.config, plc.config and App.config, located in /config
     /// </summary>
     public static void readAllSettings()
     {
@@ -103,7 +105,7 @@ public static class Globals
             Console.WriteLine(exception);
         }
 
-        logger(AREA, INFO, "Starting Mirage Data Harvester v0.01");
+        logger(AREA, INFO, "Starting Mirage v0.01");
         logger(AREA, DEBUG, "==== Obtaining Settings ====");
 
         try
@@ -138,7 +140,7 @@ public static class Globals
         }
         else
         {
-            logger(AREA, INFO, "No Fleet Data");
+            logger(AREA, INFO, "Fleet Data Missing Or Fleet Not Used");
             mirFleet = new Fleet(sizeOfFleet);
         }
 
@@ -146,7 +148,7 @@ public static class Globals
     }
 
     /// <summary>
-    /// Establishes a connection to master database. If not available, it switches over to a local slave DB.
+    /// Establishes a connection to master database. If not available, it switches over to a local slave.
     /// </summary>
     public static void connectToDB()
     {
@@ -162,7 +164,7 @@ public static class Globals
         catch (MySqlException exception)
         {
             logger(AREA, ERROR, "Master DB connection failed with error: ", exception);
-            logger(AREA, INFO, "Attempting to connect to local server");
+            logger(AREA, INFO, "Attempting to connect to slave");
 
             try
             {
@@ -170,7 +172,7 @@ public static class Globals
                 db.Open();
 
                 logger(AREA, INFO, "Connected To Slave DB");
-                sendSMS("Failed to connect to both master database.");
+                sendSMS("Failed to connect to master database.");
             }
             catch (MySqlException e)
             {
@@ -348,6 +350,48 @@ public static class Globals
         }
 
         logger(AREA, DEBUG, "==== Closing Connections ====");
+    }
+
+    /// <summary>
+    /// Checks if configuration has been changed on the database and re-implements the app parameters.
+    /// </summary>
+    public static void checkConfigChanges()
+    {
+        try
+        {
+            bool updateConfigs = false;
+
+            string sql = "SELECT process FROM app_update;";
+            using var cmd = new MySqlCommand(sql, db);
+            using MySqlDataReader rdr = cmd.ExecuteReader();
+
+            while(rdr.Read())
+            {
+                if(rdr.GetInt16(0) == 0)
+                {
+                    updateConfigs = true;
+                }
+                else if(rdr.GetInt16(0) == 1)
+                {
+                    updateConfigs = false;
+                }
+                else
+                {
+
+                }
+            }
+
+            if(updateConfigs)
+            {
+                logger(AREA, INFO, "==== Updating Runtime Parameters From DB ====");
+
+                readSettingsFromDB();
+            }
+        }
+        catch(Exception e)
+        {
+            logger(AREA, ERROR, "Failed Runtime Parameter Update Check");
+        }
     }
 
     /// <summary>

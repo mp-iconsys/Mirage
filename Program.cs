@@ -12,16 +12,13 @@ class Program
     //=========================================================|
     private static readonly Type AREA = typeof(Program);
 
-    // For testing fire alarms
-    public static bool alarm_on = true;
-
     public static async Task Main(string[] args)
     {
         readAllSettings();
 
         setUpDefaultComms();
 
-        //mirFleet.getInitialFleetData();
+        mirFleet.getInitialFleetData();
 
         logger(AREA, DEBUG, "==== Starting Main Loop ====");
 
@@ -89,10 +86,6 @@ class Program
             // Poll MiR Fleet - async operation that happens every pollInterval
             if (timer.Elapsed.Seconds >= pollInterval)
             {
-                //sendFireAlarm();
-                //sendRobotGroup();
-                //getRobotGroup();
-
                 calculationsAndReporting();
 
                 logger(AREA, INFO, timer.Elapsed.TotalSeconds + " seconds since last poll. Poll interval is: " + pollInterval);
@@ -101,11 +94,11 @@ class Program
                 mirFleet.pollRobots();
             }
 
-            //calculationsAndReporting();
+            checkConfigChanges();
 
             logger(AREA, DEBUG, "==== Loop " + i + " Finished ====");
 
-            Thread.Sleep(500);
+            Thread.Sleep(500); // Remove in live deployment
         }
 
         gracefulTermination();
@@ -162,13 +155,13 @@ class Program
         logger(AREA, INFO, "==== Send Fire Alarm To Scheduler ====");
 
         // Need to add whether to turn alarm on/off and which alarm to affect from PLC
-        int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.FireAlarm.putRequest(Program.alarm_on, 1));
+        //int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.FireAlarm.putRequest(Program.alarm_on, 1));
 
         //SiemensPLC.updateTaskStatus(restStatus);
-        logger(AREA, DEBUG, "Status: " + restStatus);
+        //logger(AREA, DEBUG, "Status: " + restStatus);
         logger(AREA, DEBUG, "==== Fire Alarm Sent ====");
 
-        Program.alarm_on = !Program.alarm_on;
+        //Program.alarm_on = !Program.alarm_on;
     }
 
     /// <summary>
@@ -275,6 +268,11 @@ class Program
     private static void calculationsAndReporting()
     {
         reports.reportingPass();
+    }
+
+    private static void checkConfigChanges()
+    {
+
     }
 }
 
