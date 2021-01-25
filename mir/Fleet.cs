@@ -26,8 +26,9 @@ namespace Mirage
         private static readonly Type AREA = typeof(Fleet);
 
         /// <summary>
-        /// 
+        /// Initializes the robot fleet, Fleet Manager excluded
         /// </summary>
+        /// /// <param name="sizeOfFleet">Number of robots in the fleet</param>
         public Fleet(int sizeOfFleet)
         {
             robots = new Robot[sizeOfFleet];
@@ -37,9 +38,11 @@ namespace Mirage
         }
 
         /// <summary>
-        /// 
+        /// Initializes the robot fleet including the Fleet Manager
         /// </summary>
-        /// <param name="sizeOfFleet"></param>
+        /// <param name="sizeOfFleet">Number of robots in the fleet</param>
+        /// <param name="fleetManagerIP">The IP of the Fleet Manager</param>
+        /// <param name="fleetManagerAuthToken">Authentication Token of the Fleet Manager</param>
         public Fleet(int sizeOfFleet, string fleetManagerIP, AuthenticationHeaderValue fleetManagerAuthToken)
         {
             robots = new Robot[sizeOfFleet];
@@ -62,9 +65,11 @@ namespace Mirage
         }
 
         /// <summary>
-        /// 
+        /// Instantiates the mir fleet including the fleet manager.
         /// </summary>
-        /// <param name="sizeOfFleet"></param>
+        /// <param name="sizeOfFleet">Number of robots in the fleet</param>
+        /// <param name="fleetManagerIP">The IP of the Fleet Manager</param>
+        /// <param name="fleetManagerAuthToken">Authentication Token of the Fleet Manager</param>
         public void instantiateRobots(int sizeOfFleet, string fleetManagerIP, AuthenticationHeaderValue fleetManagerAuthToken)
         {
             fleetManager = new Robot(fleetManagerIP, fleetManagerAuthToken);
@@ -298,6 +303,8 @@ namespace Mirage
         /// </summary>
         public void getInitialFleetData()
         {
+            int waitPeriod = 200; // So we don't DDOS our own robots
+
             try
             {
                 try
@@ -318,7 +325,7 @@ namespace Mirage
                 logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
             }
 
-            Thread.Sleep(2000);
+            Thread.Sleep(waitPeriod);
 
             try
             {
@@ -340,7 +347,7 @@ namespace Mirage
                 logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
             }
 
-            Thread.Sleep(2000);
+            Thread.Sleep(waitPeriod);
 
             try
             {
@@ -362,7 +369,7 @@ namespace Mirage
                 logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
             }
 
-            Thread.Sleep(2000);
+            Thread.Sleep(waitPeriod);
 
             try
             {
@@ -384,7 +391,7 @@ namespace Mirage
                 logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
             }
 
-            Thread.Sleep(2000);
+            Thread.Sleep(waitPeriod);
 
             try
             {
@@ -406,7 +413,7 @@ namespace Mirage
                 logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
             }
 
-            Thread.Sleep(2000);
+            Thread.Sleep(waitPeriod);
         }
     }
 }

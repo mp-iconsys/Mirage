@@ -7,6 +7,8 @@
     <Authors>Mikolaj Paliszewski</Authors>
     <Company>Iconsys</Company>
     <PackageIcon>favicon.ico</PackageIcon>
+    <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+    <DockerfileContext>.</DockerfileContext>
   </PropertyGroup>
 
   <ItemGroup>
@@ -29,6 +31,7 @@
     <PackageReference Include="log4net" Version="2.0.8" />
     <PackageReference Include="log4net.Csv" Version="1.0.1" />
     <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="5.2.7" />
+    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.10.9" />
     <PackageReference Include="MySql.Data" Version="8.0.21" />
     <PackageReference Include="NPOI" Version="2.5.2" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="4.7.0" />

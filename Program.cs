@@ -269,10 +269,5 @@ class Program
     {
         reports.reportingPass();
     }
-
-    private static void checkConfigChanges()
-    {
-
-    }
 }
 

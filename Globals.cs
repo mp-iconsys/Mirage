@@ -267,8 +267,8 @@ public static class Globals
     }
 
     /// <summary>
-    /// Establishes default communications with the PLC and standard headers for HTTP REST traffic.
-    /// </summary>
+        /// Establishes default communications with the PLC and standard headers for HTTP REST traffic.
+        /// </summary>
     public static void setUpDefaultComms()
     {
         logger(AREA, DEBUG, "==== Setting Up Connection Details ====");
@@ -385,7 +385,22 @@ public static class Globals
             {
                 logger(AREA, INFO, "==== Updating Runtime Parameters From DB ====");
 
+                try 
+                {
+                    cmd.Dispose();
+                    rdr.Close();
+                }
+                catch
+                {
+
+                }
+
                 readSettingsFromDB();
+
+                logger(AREA, DEBUG, "==== Reset Updates ====");
+
+                using var cmd1 = new MySqlCommand("UPDATE app_update SET PROCESS = 1;", db);
+                issueQuery(cmd1);
             }
         }
         catch(Exception e)

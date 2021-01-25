@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Mirage": {
+      "commandName": "Project"
+    },
+    "Docker": {
+      "commandName": "Docker"
+    }
+  }
+}
