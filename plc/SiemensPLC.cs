@@ -4,6 +4,8 @@ using MySql.Data.MySqlClient;
 using static Globals;
 using static Globals.DebugLevel;
 using static DotNetSiemensPLCToolBoxLibrary.Communication.LibNoDave.libnodave;
+using System.Collections.Generic;
+using Mirage.plc;
 
 /// <summary>
 /// Contains all the methods and data related to a Siemens PLC.
@@ -50,6 +52,20 @@ class SiemensPLC
     public static int task;
     public static int status;
     public static int parameter;
+
+    //=========================================================|
+    //  Contains the structure for the robots.                 |
+    //  Both Task Control and Data are in the same DB.         |
+    //=========================================================|
+    public static RobotBlock fleetBlock;
+    public static int fleetID = 666;
+    public static int fleetBlockControlParameters = 4;
+    public static int fleetBlockSize;
+
+    public static RobotBlock[] robots;
+    public static int noOfRobots;
+    public static int robotBlockSize;
+    public static int robotBlockControlParameters = 4;
 
     //=========================================================|
     //  Message helper parameters                              |
@@ -114,6 +130,18 @@ class SiemensPLC
                 {
                     live = Boolean.Parse(rdr.GetString(2));
                 }
+                else if (rdr.GetString(1) == "NoOfRobots")
+                {
+                    noOfRobots = Int32.Parse(rdr.GetString(2));
+                }
+                else if (rdr.GetString(1) == "RobotBlockSize")
+                {
+                    robotBlockSize = Int32.Parse(rdr.GetString(2));
+                }
+                else if (rdr.GetString(1) == "FleetBlockSIze")
+                {
+                    fleetBlockSize = Int32.Parse(rdr.GetString(2));
+                }
             }
         }
         catch (Exception e)
@@ -123,7 +151,7 @@ class SiemensPLC
         }
 
         // If we don't have all the configs from the database, read from the file
-        if (rowcount < 7)
+        if (rowcount < 9)
         {
             try
             {
@@ -150,6 +178,164 @@ class SiemensPLC
             {
                 keepRunning = false;
                 logger(AREA, ERROR, "Failed to load PLC configuration file. Mirage will terminate. Exception : ", exception);
+            }
+        }
+
+        logger(AREA, DEBUG, "==== Getting Robot Area Block Structure ====");
+
+        rowcount = 0;
+
+        // Alrigh, we're setting up corresponding data blocks for talking with PLC
+        try
+        {
+            //=========================================================|
+            //  Instantiate fleet block                                |
+            //=========================================================|
+            fleetBlock = new RobotBlock(fleetID, 0, fleetBlockSize);
+
+            //=========================================================|
+            //  Get Parameters from DB                                 |
+            //=========================================================|
+            try
+            {
+                string sql = "SELECT * FROM plc_fleet_block;";
+                using var cmd = new MySqlCommand(sql, db);
+                using MySqlDataReader rdr = cmd.ExecuteReader();
+
+                // This is reading the parameters
+                while (rdr.Read())
+                {
+                    logger(AREA, DEBUG, "Row: " + rdr.GetInt32(0) + " - Parameter: " + rdr.GetString(1) + " - Size: " + rdr.GetString(2) + " - Datatype: " + rdr.GetString(3));
+
+                        string param_name = rdr.GetString(1);
+                        int param_size = Int32.Parse(rdr.GetString(2));
+                        int param_offset = fleetBlock.Offset;
+
+                        if (rdr.GetString(3) == "INT")
+                        {
+                            if (rowcount != 0)
+                            {
+                                // The offset for the current parameter is equal to:
+                                //  Robot Offset + Previous Parameter Offset + Previous Parameter Size
+                                param_offset = fleetBlock.Param[rowcount - 1].getOffset() + fleetBlock.Param[rowcount - 1].getSize();
+                            }
+
+                            Parameter_INT temp = new Parameter_INT(param_name, param_size, param_offset);
+
+                            fleetBlock.Param.Add(temp);
+                        }
+                        else if (rdr.GetString(3) == "FLOAT")
+                        {
+                            if (rowcount != 0)
+                            {
+                                // The offset for the current parameter is equal to:
+                                //  Robot Offset + Previous Parameter Offset + Previous Parameter Size
+                                param_offset = fleetBlock.Param[rowcount - 1].getOffset() + fleetBlock.Param[rowcount - 1].getSize();
+                            }
+
+                            Parameter_FLOAT temp = new Parameter_FLOAT(param_name, param_size, param_offset);
+
+                            fleetBlock.Param.Add(temp);
+                        }
+
+                    rowcount++;
+                }
+            }
+            catch(Exception)
+            {
+
+            }
+
+            //=========================================================|
+            //  Instantiate robot array                                |
+            //=========================================================|
+            robots = new RobotBlock[noOfRobots];
+
+            for (int i = 0; i < noOfRobots; i++)
+            {   
+                int id = i;
+                int offset = (fleetBlockSize + robotBlockSize) + (i * robotBlockSize);
+
+                robots[i] = new RobotBlock(id, offset);
+            }
+
+            //=========================================================|
+            //  Get Robot Parameters from DB                           |
+            //=========================================================|
+            try
+            {
+                rowcount = 0;
+
+                string sql = "SELECT * FROM plc_robot_block;";
+                using var cmd = new MySqlCommand(sql, db);
+                using MySqlDataReader rdr = cmd.ExecuteReader();
+
+                // This is reading the parameters
+                while (rdr.Read())
+                {
+                    logger(AREA, DEBUG, "Row: " + rdr.GetInt32(0) + " - Parameter: " + rdr.GetString(1) + " - Size: " + rdr.GetString(2) + " - Datatype: " + rdr.GetString(3));
+
+                    for (int i = 0; i < noOfRobots; i++)
+                    {
+                        string param_name = rdr.GetString(1);
+                        int param_size = Int32.Parse(rdr.GetString(2));
+                        int param_offset = robots[i].Offset;
+
+                        if (rdr.GetString(3) == "INT")
+                        {
+                            if (rowcount != 0)
+                            {
+                                // The offset for the current parameter is equal to:
+                                //  Robot Offset + Previous Parameter Offset + Previous Parameter Size
+                                param_offset = robots[i].Param[rowcount - 1].getOffset() + robots[i].Param[rowcount - 1].getSize();
+                            }
+
+                            Parameter_INT temp = new Parameter_INT(param_name, param_size, param_offset);
+
+                            robots[i].Param.Add(temp);
+                        }
+                        else if(rdr.GetString(3) == "FLOAT")
+                        {
+                            if (rowcount != 0)
+                            {
+                                // The offset for the current parameter is equal to:
+                                //  Robot Offset + Previous Parameter Offset + Previous Parameter Size
+                                param_offset = robots[i].Param[rowcount - 1].getOffset() + robots[i].Param[rowcount - 1].getSize();
+                            }
+
+                            Parameter_FLOAT temp = new Parameter_FLOAT(param_name, param_size, param_offset);
+
+                            robots[i].Param.Add(temp);
+                        }
+                    }
+
+                    rowcount++;
+                }
+            }
+            catch(Exception)
+            {
+
+            }
+        }
+        catch (Exception e)
+        {
+            logger(AREA, ERROR, "==== Failed To Fetch Robot Block Data From Database ====");
+            logger(AREA, ERROR, "Exception: ", e);
+        }
+
+        //=========================================================|
+        //  Check all the parameters are OK                        |
+        //=========================================================|
+        for (int j = 0; j < fleetBlock.Param.Count; j++)
+        {
+            fleetBlock.Param[j].print();
+        }
+
+        for (int i = 0; i < noOfRobots; i++)
+        {
+            for(int j = 0; j < robots[0].Param.Count; j++ )
+            { 
+                robots[i].Param[j].print();
             }
         }
 
@@ -509,6 +695,386 @@ class SiemensPLC
 
         logger(AREA, INFO, "==== Completed Data Write ====");
     }
+
+    /// <summary>
+    /// Polls the PLC for data regarding new tasks or missions.
+    /// </summary>
+    public static void newPoll()
+    {
+        logger(AREA, DEBUG, "==== Starting To Poll ====");
+
+        if (live)
+        {
+            int serialNumber, task, robotID, status, parameter, memoryres;
+            byte[] memoryBuffer = new byte[20];
+
+            try
+            {
+                // readBytes(Area, Data Block Number (in PLC), Start Byte, Length, Byte Container)
+                memoryres = dc.readBytes(daveDB, taskControlDB, 0, 20, memoryBuffer);
+
+                if (memoryres == 0)
+                {
+                    logger(AREA, DEBUG, BitConverter.ToString(memoryBuffer));
+
+                    byte[] tempBytesForConversion = new byte[4] { memoryBuffer[0], memoryBuffer[1], memoryBuffer[2], memoryBuffer[3] };
+
+                    // Need to reverse the bytes to get actual values
+                    if (BitConverter.IsLittleEndian) { Array.Reverse(tempBytesForConversion); }
+
+                    serialNumber = BitConverter.ToInt32(tempBytesForConversion, 0);
+
+                    // Only change memory if the PLC is making a new request
+                    if (serialNumber != SiemensPLC.serialNumber)
+                    {
+                        // This determines which MiR to affect
+                        tempBytesForConversion = new byte[4] { memoryBuffer[4], memoryBuffer[5], memoryBuffer[6], memoryBuffer[7] };
+                        if (BitConverter.IsLittleEndian)
+                            Array.Reverse(tempBytesForConversion);
+                        robotID = BitConverter.ToInt32(tempBytesForConversion, 0);
+
+                        // This determines which action to perform
+                        tempBytesForConversion = new byte[4] { memoryBuffer[8], memoryBuffer[9], memoryBuffer[10], memoryBuffer[11] };
+                        if (BitConverter.IsLittleEndian)
+                            Array.Reverse(tempBytesForConversion);
+                        task = BitConverter.ToInt32(tempBytesForConversion, 0);
+
+                        // This is the status of the request - should be 0
+                        tempBytesForConversion = new byte[4] { memoryBuffer[12], memoryBuffer[13], memoryBuffer[14], memoryBuffer[15] };
+                        if (BitConverter.IsLittleEndian)
+                            Array.Reverse(tempBytesForConversion);
+                        status = BitConverter.ToInt32(tempBytesForConversion, 0);
+
+                        // Additional data, such as mission number, etc
+                        tempBytesForConversion = new byte[4] { memoryBuffer[16], memoryBuffer[17], memoryBuffer[18], memoryBuffer[19] };
+                        if (BitConverter.IsLittleEndian)
+                            Array.Reverse(tempBytesForConversion);
+                        parameter = BitConverter.ToInt32(tempBytesForConversion, 0);
+
+                        newMsg = true;
+                        SiemensPLC.status = status;
+                        SiemensPLC.task = task;
+                        SiemensPLC.robotID = robotID;
+                        SiemensPLC.serialNumber = serialNumber;
+                        SiemensPLC.parameter = parameter;
+
+                        logger(AREA, DEBUG, "Status : " + status);
+                        logger(AREA, DEBUG, "Task : " + task);
+                        logger(AREA, DEBUG, "Robot ID : " + robotID);
+                        logger(AREA, DEBUG, "Serial No : " + serialNumber);
+                        logger(AREA, DEBUG, "Parameter : " + parameter);
+                    }
+                    else
+                    {
+                        newMsg = false;
+                    }
+                }
+                else
+                {
+                    logger(AREA, ERROR, "Failed to Poll");
+                    logger(AREA, ERROR, daveStrerror(memoryres));
+                    plcConnectionErrors++;
+                    newMsg = false;
+                }
+
+            }
+            catch (NullReferenceException exception)
+            {
+                logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
+                plcConnectionErrors++;
+                newMsg = false;
+
+                establishConnection();
+            }
+            catch (Exception exception)
+            {
+                logger(AREA, ERROR, "Polling Failed. Error : ", exception);
+                plcConnectionErrors++;
+                newMsg = false;
+            }
+        }
+        else
+        {
+            logger(AREA, INFO, "Simulating Messages From Console");
+
+            if (!newMsg)
+            {
+                Console.WriteLine("Enter SerialNumber: ");
+                SiemensPLC.serialNumber = Int32.Parse(Console.ReadLine());
+
+                Console.WriteLine("Enter Task: ");
+                SiemensPLC.task = Int32.Parse(Console.ReadLine());
+
+                Console.WriteLine("Enter Robot ID: ");
+                SiemensPLC.robotID = Int32.Parse(Console.ReadLine());
+
+                Console.WriteLine("Enter Parameter: ");
+                SiemensPLC.parameter = Int32.Parse(Console.ReadLine());
+
+                SiemensPLC.status = 0;
+                SiemensPLC.newMsg = true;
+            }
+        }
+
+        logger(AREA, DEBUG, "==== Completed Polling ====");
+    }
+
+    public static void readFleetHeader()
+    {
+        logger(AREA, DEBUG, "==== Reading Fleet Header====");
+
+        if (live)
+        {
+            int memoryres;
+            byte[] memoryBuffer = new byte[fleetBlockControlParameters * 2];
+
+            try
+            {
+                // readBytes(Area, Data Block Number (in PLC), Start Byte, Length, Byte Container)
+                memoryres = dc.readBytes(daveDB, taskControlDB, fleetBlock.Offset, fleetBlockControlParameters*2, memoryBuffer);
+
+                //=========================================================|
+                //  Memoryres - return code from Libnodave:                |
+                //    0 - Obtained Data                                    |
+                //  < 0 - Error detected by Libnodave                      |
+                //  > 0 - Error from the PLC                               |
+                //=========================================================|
+                if (memoryres == 0)
+                {
+                    logger(AREA, DEBUG, BitConverter.ToString(memoryBuffer));
+
+                    for(int i = 0; i < fleetBlockControlParameters; i++)
+                    {
+                        int size = 2;
+                        int byte1 = i * size;
+                        int byte2 = (i * size) + 1;
+
+                        byte[] tempBytesForConversion = new byte[2] { memoryBuffer[byte1], memoryBuffer[byte2] };
+
+                        // Need to reverse the bytes to get actual values
+                        if (BitConverter.IsLittleEndian) 
+                            { Array.Reverse(tempBytesForConversion); }
+
+                        fleetBlock.Param[i].setValue(BitConverter.ToInt16(tempBytesForConversion, 0)); 
+                    }
+
+                    if (fleetBlock.Param[0].getValue() == 10)
+                    { 
+                        newMsg = true;
+
+                        for(int i = 0; i < fleetBlockControlParameters; i++)
+                        {
+                            fleetBlock.Param[i].print();
+                        }
+                    }
+                    else if(fleetBlock.Param[0].getValue() == 0)
+                    {
+                        logger(AREA, DEBUG, "No New Fleet Tasks From PLC");
+                        newMsg = false;
+                    }
+                }
+                else
+                {
+                    logger(AREA, ERROR, "Failed to Poll");
+                    logger(AREA, ERROR, daveStrerror(memoryres));
+                    plcConnectionErrors++;
+                    newMsg = false;
+                }
+
+            }
+            catch (NullReferenceException exception)
+            {
+                logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
+                plcConnectionErrors++;
+                newMsg = false;
+
+                establishConnection();
+            }
+            catch (Exception exception)
+            {
+                logger(AREA, ERROR, "Polling Failed. Error : ", exception);
+                plcConnectionErrors++;
+                newMsg = false;
+            }
+        }
+        else
+        {
+            logger(AREA, INFO, "Simulating Messages From Console");
+
+            if (!newMsg)
+            {
+                Console.WriteLine("Enter SerialNumber: ");
+                SiemensPLC.serialNumber = Int32.Parse(Console.ReadLine());
+
+                Console.WriteLine("Enter Task: ");
+                SiemensPLC.task = Int32.Parse(Console.ReadLine());
+
+                Console.WriteLine("Enter Robot ID: ");
+                SiemensPLC.robotID = Int32.Parse(Console.ReadLine());
+
+                Console.WriteLine("Enter Parameter: ");
+                SiemensPLC.parameter = Int32.Parse(Console.ReadLine());
+
+                SiemensPLC.status = 0;
+                SiemensPLC.newMsg = true;
+            }
+        }
+
+        logger(AREA, DEBUG, "==== Completed Fleet Header ====");
+    }
+
+    public static void readRobots()
+    {
+        logger(AREA, DEBUG, "==== Reading Robot Task Control ====");
+
+        if (live)
+        {
+            // TODO: Check the size of robotBlockSize buffer. 
+            // If bigger than 222, break down into robots?
+
+            int memoryres;
+            byte[] memoryBuffer = new byte[robotBlockSize * 5];
+
+            try
+            {
+                // readBytes(Area, Data Block Number (in PLC), Start Byte, Length, Byte Container)
+                memoryres = dc.readBytes(daveDB, taskControlDB, robots[0].Offset, robotBlockSize*5, memoryBuffer);
+
+                //=========================================================|
+                //  Memoryres - return code from Libnodave:                |
+                //    0 - Obtained Data                                    |
+                //  < 0 - Error detected by Libnodave                      |
+                //  > 0 - Error from the PLC                               |
+                //=========================================================|
+                if (memoryres == 0)
+                {
+                    logger(AREA, DEBUG, BitConverter.ToString(memoryBuffer));
+
+                    //================================================================| 
+                    // For each robot, go through the first (control) parameters.     |
+                    // Read them and save the data in the robotBlock structure.       |
+                    // If any TaskStatus is 10, that means we've got tasks to do.     |
+                    //================================================================|
+                    for (int r = 0; r < noOfRobots; r++)
+                    {
+                        int byteOffset = robots[r].Offset;
+
+                        for (int i = 0; i < robotBlockControlParameters; i++)
+                        {
+                            int size = 2; // Can also be obtained from the parameters themselves
+                            int byte1 = byteOffset + (i * size);
+                            int byte2 = byteOffset + (i * size) + 1;
+
+                            byte[] tempBytesForConversion = new byte[2] { memoryBuffer[byte1], memoryBuffer[byte2] };
+
+                            // Need to reverse the bytes to get actual values
+                            if (BitConverter.IsLittleEndian)
+                            { Array.Reverse(tempBytesForConversion); }
+
+                            robots[r].Param[i].setValue(BitConverter.ToInt16(tempBytesForConversion, 0));
+                        }
+
+                        if (robots[r].Param[0].getValue() == 10)
+                        {
+                            newMsg = true;
+
+                            logger(AREA, INFO, "Robot " + r + " Has A New Task. Paramaters: ");
+
+                            for (int i = 0; i < fleetBlockControlParameters; i++)
+                            {
+                                robots[r].Param[i].print();
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    logger(AREA, ERROR, "Failed to Poll");
+                    logger(AREA, ERROR, daveStrerror(memoryres));
+                    plcConnectionErrors++;
+                    newMsg = false;
+                }
+
+            }
+            catch (NullReferenceException exception)
+            {
+                logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
+                plcConnectionErrors++;
+                newMsg = false;
+
+                establishConnection();
+            }
+            catch (Exception exception)
+            {
+                logger(AREA, ERROR, "Polling Failed. Error : ", exception);
+                plcConnectionErrors++;
+                newMsg = false;
+            }
+        }
+        else
+        {
+            logger(AREA, INFO, "Simulating Messages From Console");
+
+            if (!newMsg)
+            {
+                Console.WriteLine("Enter SerialNumber: ");
+                SiemensPLC.serialNumber = Int32.Parse(Console.ReadLine());
+
+                Console.WriteLine("Enter Task: ");
+                SiemensPLC.task = Int32.Parse(Console.ReadLine());
+
+                Console.WriteLine("Enter Robot ID: ");
+                SiemensPLC.robotID = Int32.Parse(Console.ReadLine());
+
+                Console.WriteLine("Enter Parameter: ");
+                SiemensPLC.parameter = Int32.Parse(Console.ReadLine());
+
+                SiemensPLC.status = 0;
+                SiemensPLC.newMsg = true;
+            }
+        }
+
+        logger(AREA, DEBUG, "==== Completed Robot Task Control ====");
+    }
+
+    public static void writeFleetBlock()
+    {
+        PDU p2 = (PDU)dc.prepareWriteRequest();
+
+        //  Go through all the Write Parameters
+        //  First, convert all the values to Bytes
+        //  Then reverse cause fuck Siemens
+        //  Then add to the PDU as a write request
+        for(int i = fleetBlockControlParameters; i < fleetBlock.Param.Count; i++)
+        {
+            byte[] tempBytes = BitConverter.GetBytes(fleetBlock.Param[i].getValue());
+
+            if (BitConverter.IsLittleEndian) 
+                { Array.Reverse(tempBytes); }
+
+            p2.addVarToWriteRequest(daveDB, dataStorageDB, fleetBlock.Param[i].getOffset(), fleetBlock.Param[i].getSize(), tempBytes);
+        }
+    }
+
+/*
+    public static void readDataFromPLC()
+    {
+        PDU p;
+        resultSet rs;
+        DotNetSiemensPLCToolBoxLibrary.Communication.LibNoDave.libnodave.
+        
+        davePrepareReadRequest64(dc, p*);
+
+
+
+        davePrepareReadRequest64(dc, &p);
+        daveAddVarToReadRequest(&p, daveInputs, 0, 0, 1);
+        daveAddVarToReadRequest(&p, daveFlags, 0, 0, 4);
+        daveAddVarToReadRequest(&p, daveDB, 6, 20, 2);
+        daveAddVarToReadRequest(&p, daveFlags, 0, 12, 2);
+        res = dc.daveExecReadRequest(dc, &p, &rs);
+    }*/
+
 
     /// <summary>
     /// Updates the PLC Task Status memory, in the Task Control Data Block.

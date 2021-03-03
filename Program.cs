@@ -16,9 +16,11 @@ class Program
     {
         readAllSettings();
 
+        mirFleet.getInitialFleetData();
+
         setUpDefaultComms();
 
-        mirFleet.getInitialFleetData();
+        Console.WriteLine("Enter SerialNumber: ");
 
         logger(AREA, DEBUG, "==== Starting Main Loop ====");
 
