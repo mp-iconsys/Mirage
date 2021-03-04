@@ -47,36 +47,75 @@ class Program
 
                     SiemensPLC.updateTaskStatus(Globals.TaskStatus.StartedProcessing);
 
-                    switch (SiemensPLC.task)
+                    if (SiemensPLC.fleetBlock.getTaskStatus() == Globals.TaskStatus.StartedProcessing)
                     {
-                        case Tasks.GetScheduleStatus:
-                            getScheduleStatus();
-                            break;
-                        case Tasks.SendMissionToScheduler:
-                            sendMissionToScheduler();
-                            break;
-                        case Tasks.CreateMission:
-                            createMission();
-                            break;
-                        case Tasks.ClearScheduler:
-                            clearScheduler();
-                            break;
-                        case Tasks.GetBattery:
-                            getBattery();
-                            break;
-                        case Tasks.GetDistance:
-                            getDistance();
-                            break;
-                        case Tasks.GetRobotStatus:
-                            getRobotStatus();
-                            break;
-                        default:
-                            unknownMission();
-                            break;
+                        switch (SiemensPLC.fleetBlock.getTaskNumber())
+                        {
+                            case Tasks.GetScheduleStatus:
+                                getScheduleStatus();
+                                break;
+                            case Tasks.SendMissionToScheduler:
+                                sendMissionToScheduler();
+                                break;
+                            case Tasks.CreateMission:
+                                createMission();
+                                break;
+                            case Tasks.ClearScheduler:
+                                clearScheduler();
+                                break;
+                            case Tasks.GetBattery:
+                                getBattery();
+                                break;
+                            case Tasks.GetDistance:
+                                getDistance();
+                                break;
+                            case Tasks.GetRobotStatus:
+                                getRobotStatus();
+                                break;
+                            default:
+                                unknownMission();
+                                break;
+                        }
+                    }
+
+                    for (int j = 0; j < Globals.sizeOfFleet; j ++)
+                    {
+                        if (SiemensPLC.robots[j].getTaskStatus() == Globals.TaskStatus.StartedProcessing)
+                        {
+                            switch (SiemensPLC.robots[j].getTaskNumber())
+                            {
+                                case Tasks.GetScheduleStatus:
+                                    getScheduleStatus();
+                                    break;
+                                case Tasks.SendMissionToScheduler:
+                                    sendMissionToScheduler();
+                                    break;
+                                case Tasks.CreateMission:
+                                    createMission();
+                                    break;
+                                case Tasks.ClearScheduler:
+                                    clearScheduler();
+                                    break;
+                                case Tasks.GetBattery:
+                                    getBattery();
+                                    break;
+                                case Tasks.GetDistance:
+                                    getDistance();
+                                    break;
+                                case Tasks.GetRobotStatus:
+                                    getRobotStatus();
+                                    break;
+                                default:
+                                    unknownMission();
+                                    break;
+                            }
+                        }
                     }
 
                     SiemensPLC.checkResponse();
                 }
+
+                // Now fetch data for the PLC
             }
             else
             {

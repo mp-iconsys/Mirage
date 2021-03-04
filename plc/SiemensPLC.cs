@@ -407,118 +407,9 @@ class SiemensPLC
     {
         logger(AREA, DEBUG, "==== Starting To Poll ====");
 
-        if(live)
-        {
-            int serialNumber, task, robotID, status, parameter, memoryres;
-            byte[] memoryBuffer = new byte[20];
+        readFleetHeader();
 
-            try
-            {
-                // readBytes(Area, Data Block Number (in PLC), Start Byte, Length, Byte Container)
-                memoryres = dc.readBytes(daveDB, taskControlDB, 0, 20, memoryBuffer);
-
-                if (memoryres == 0)
-                {
-                    logger(AREA, DEBUG, BitConverter.ToString(memoryBuffer));
-
-                    byte[] tempBytesForConversion = new byte[4] { memoryBuffer[0], memoryBuffer[1], memoryBuffer[2], memoryBuffer[3] };
-
-                    // Need to reverse the bytes to get actual values
-                    if (BitConverter.IsLittleEndian) { Array.Reverse(tempBytesForConversion); }
-
-                    serialNumber = BitConverter.ToInt32(tempBytesForConversion, 0);
-
-                    // Only change memory if the PLC is making a new request
-                    if (serialNumber != SiemensPLC.serialNumber)
-                    {
-                        // This determines which MiR to affect
-                        tempBytesForConversion = new byte[4] { memoryBuffer[4], memoryBuffer[5], memoryBuffer[6], memoryBuffer[7] };
-                        if (BitConverter.IsLittleEndian)
-                            Array.Reverse(tempBytesForConversion);
-                        robotID = BitConverter.ToInt32(tempBytesForConversion, 0);
-
-                        // This determines which action to perform
-                        tempBytesForConversion = new byte[4] { memoryBuffer[8], memoryBuffer[9], memoryBuffer[10], memoryBuffer[11] };
-                        if (BitConverter.IsLittleEndian)
-                            Array.Reverse(tempBytesForConversion);
-                        task = BitConverter.ToInt32(tempBytesForConversion, 0);
-
-                        // This is the status of the request - should be 0
-                        tempBytesForConversion = new byte[4] { memoryBuffer[12], memoryBuffer[13], memoryBuffer[14], memoryBuffer[15] };
-                        if (BitConverter.IsLittleEndian)
-                            Array.Reverse(tempBytesForConversion);
-                        status = BitConverter.ToInt32(tempBytesForConversion, 0);
-
-                        // Additional data, such as mission number, etc
-                        tempBytesForConversion = new byte[4] { memoryBuffer[16], memoryBuffer[17], memoryBuffer[18], memoryBuffer[19] };
-                        if (BitConverter.IsLittleEndian)
-                            Array.Reverse(tempBytesForConversion);
-                        parameter = BitConverter.ToInt32(tempBytesForConversion, 0);
-
-                        newMsg = true;
-                        SiemensPLC.status = status;
-                        SiemensPLC.task = task;
-                        SiemensPLC.robotID = robotID;
-                        SiemensPLC.serialNumber = serialNumber;
-                        SiemensPLC.parameter = parameter;
-
-                        logger(AREA, DEBUG, "Status : " + status);
-                        logger(AREA, DEBUG, "Task : " + task);
-                        logger(AREA, DEBUG, "Robot ID : " + robotID);
-                        logger(AREA, DEBUG, "Serial No : " + serialNumber);
-                        logger(AREA, DEBUG, "Parameter : " + parameter);
-                    }
-                    else
-                    {
-                        newMsg = false;
-                    }
-                }
-                else
-                {
-                    logger(AREA, ERROR, "Failed to Poll");
-                    logger(AREA, ERROR, daveStrerror(memoryres));
-                    plcConnectionErrors++;
-                    newMsg = false;
-                }
-
-            }
-            catch (NullReferenceException exception)
-            {
-                logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
-                plcConnectionErrors++;
-                newMsg = false;
-
-                establishConnection();
-            }
-            catch (Exception exception)
-            {
-                logger(AREA, ERROR, "Polling Failed. Error : ", exception);
-                plcConnectionErrors++;
-                newMsg = false;
-            }
-        }
-        else
-        {
-            logger(AREA, INFO, "Simulating Messages From Console");
-
-            if (!newMsg)
-            {
-                Console.WriteLine("Enter SerialNumber: ");
-                SiemensPLC.serialNumber = Int32.Parse(Console.ReadLine());
-
-                Console.WriteLine("Enter Task: ");
-                SiemensPLC.task = Int32.Parse(Console.ReadLine());
-
-                Console.WriteLine("Enter Robot ID: ");
-                SiemensPLC.robotID = Int32.Parse(Console.ReadLine());
-
-                Console.WriteLine("Enter Parameter: ");
-                SiemensPLC.parameter = Int32.Parse(Console.ReadLine());
-
-                SiemensPLC.status = 0;
-                SiemensPLC.newMsg = true;
-            }
-        }
+        readRobots();
 
         logger(AREA, DEBUG, "==== Completed Polling ====");
     }
@@ -696,129 +587,6 @@ class SiemensPLC
         logger(AREA, INFO, "==== Completed Data Write ====");
     }
 
-    /// <summary>
-    /// Polls the PLC for data regarding new tasks or missions.
-    /// </summary>
-    public static void newPoll()
-    {
-        logger(AREA, DEBUG, "==== Starting To Poll ====");
-
-        if (live)
-        {
-            int serialNumber, task, robotID, status, parameter, memoryres;
-            byte[] memoryBuffer = new byte[20];
-
-            try
-            {
-                // readBytes(Area, Data Block Number (in PLC), Start Byte, Length, Byte Container)
-                memoryres = dc.readBytes(daveDB, taskControlDB, 0, 20, memoryBuffer);
-
-                if (memoryres == 0)
-                {
-                    logger(AREA, DEBUG, BitConverter.ToString(memoryBuffer));
-
-                    byte[] tempBytesForConversion = new byte[4] { memoryBuffer[0], memoryBuffer[1], memoryBuffer[2], memoryBuffer[3] };
-
-                    // Need to reverse the bytes to get actual values
-                    if (BitConverter.IsLittleEndian) { Array.Reverse(tempBytesForConversion); }
-
-                    serialNumber = BitConverter.ToInt32(tempBytesForConversion, 0);
-
-                    // Only change memory if the PLC is making a new request
-                    if (serialNumber != SiemensPLC.serialNumber)
-                    {
-                        // This determines which MiR to affect
-                        tempBytesForConversion = new byte[4] { memoryBuffer[4], memoryBuffer[5], memoryBuffer[6], memoryBuffer[7] };
-                        if (BitConverter.IsLittleEndian)
-                            Array.Reverse(tempBytesForConversion);
-                        robotID = BitConverter.ToInt32(tempBytesForConversion, 0);
-
-                        // This determines which action to perform
-                        tempBytesForConversion = new byte[4] { memoryBuffer[8], memoryBuffer[9], memoryBuffer[10], memoryBuffer[11] };
-                        if (BitConverter.IsLittleEndian)
-                            Array.Reverse(tempBytesForConversion);
-                        task = BitConverter.ToInt32(tempBytesForConversion, 0);
-
-                        // This is the status of the request - should be 0
-                        tempBytesForConversion = new byte[4] { memoryBuffer[12], memoryBuffer[13], memoryBuffer[14], memoryBuffer[15] };
-                        if (BitConverter.IsLittleEndian)
-                            Array.Reverse(tempBytesForConversion);
-                        status = BitConverter.ToInt32(tempBytesForConversion, 0);
-
-                        // Additional data, such as mission number, etc
-                        tempBytesForConversion = new byte[4] { memoryBuffer[16], memoryBuffer[17], memoryBuffer[18], memoryBuffer[19] };
-                        if (BitConverter.IsLittleEndian)
-                            Array.Reverse(tempBytesForConversion);
-                        parameter = BitConverter.ToInt32(tempBytesForConversion, 0);
-
-                        newMsg = true;
-                        SiemensPLC.status = status;
-                        SiemensPLC.task = task;
-                        SiemensPLC.robotID = robotID;
-                        SiemensPLC.serialNumber = serialNumber;
-                        SiemensPLC.parameter = parameter;
-
-                        logger(AREA, DEBUG, "Status : " + status);
-                        logger(AREA, DEBUG, "Task : " + task);
-                        logger(AREA, DEBUG, "Robot ID : " + robotID);
-                        logger(AREA, DEBUG, "Serial No : " + serialNumber);
-                        logger(AREA, DEBUG, "Parameter : " + parameter);
-                    }
-                    else
-                    {
-                        newMsg = false;
-                    }
-                }
-                else
-                {
-                    logger(AREA, ERROR, "Failed to Poll");
-                    logger(AREA, ERROR, daveStrerror(memoryres));
-                    plcConnectionErrors++;
-                    newMsg = false;
-                }
-
-            }
-            catch (NullReferenceException exception)
-            {
-                logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
-                plcConnectionErrors++;
-                newMsg = false;
-
-                establishConnection();
-            }
-            catch (Exception exception)
-            {
-                logger(AREA, ERROR, "Polling Failed. Error : ", exception);
-                plcConnectionErrors++;
-                newMsg = false;
-            }
-        }
-        else
-        {
-            logger(AREA, INFO, "Simulating Messages From Console");
-
-            if (!newMsg)
-            {
-                Console.WriteLine("Enter SerialNumber: ");
-                SiemensPLC.serialNumber = Int32.Parse(Console.ReadLine());
-
-                Console.WriteLine("Enter Task: ");
-                SiemensPLC.task = Int32.Parse(Console.ReadLine());
-
-                Console.WriteLine("Enter Robot ID: ");
-                SiemensPLC.robotID = Int32.Parse(Console.ReadLine());
-
-                Console.WriteLine("Enter Parameter: ");
-                SiemensPLC.parameter = Int32.Parse(Console.ReadLine());
-
-                SiemensPLC.status = 0;
-                SiemensPLC.newMsg = true;
-            }
-        }
-
-        logger(AREA, DEBUG, "==== Completed Polling ====");
-    }
-
     public static void readFleetHeader()
     {
         logger(AREA, DEBUG, "==== Reading Fleet Header====");
@@ -903,20 +671,12 @@ class SiemensPLC
 
             if (!newMsg)
             {
-                Console.WriteLine("Enter SerialNumber: ");
-                SiemensPLC.serialNumber = Int32.Parse(Console.ReadLine());
+                for (int i = 0; i < fleetBlockControlParameters; i++)
+                {
+                    fleetBlock.Param[i].simulateConsole();
+                }
 
-                Console.WriteLine("Enter Task: ");
-                SiemensPLC.task = Int32.Parse(Console.ReadLine());
-
-                Console.WriteLine("Enter Robot ID: ");
-                SiemensPLC.robotID = Int32.Parse(Console.ReadLine());
-
-                Console.WriteLine("Enter Parameter: ");
-                SiemensPLC.parameter = Int32.Parse(Console.ReadLine());
-
-                SiemensPLC.status = 0;
-                SiemensPLC.newMsg = true;
+                newMsg = true;
             }
         }
 
@@ -1017,19 +777,14 @@ class SiemensPLC
 
             if (!newMsg)
             {
-                Console.WriteLine("Enter SerialNumber: ");
-                SiemensPLC.serialNumber = Int32.Parse(Console.ReadLine());
+                for (int r = 0; r < noOfRobots; r++)
+                {
+                    for (int i = 0; i < robotBlockControlParameters; i++)
+                    {
+                        robots[r].Param[i].simulateConsole();
+                    }
+                }
 
-                Console.WriteLine("Enter Task: ");
-                SiemensPLC.task = Int32.Parse(Console.ReadLine());
-
-                Console.WriteLine("Enter Robot ID: ");
-                SiemensPLC.robotID = Int32.Parse(Console.ReadLine());
-
-                Console.WriteLine("Enter Parameter: ");
-                SiemensPLC.parameter = Int32.Parse(Console.ReadLine());
-
-                SiemensPLC.status = 0;
                 SiemensPLC.newMsg = true;
             }
         }
@@ -1039,22 +794,92 @@ class SiemensPLC
 
     public static void writeFleetBlock()
     {
-        PDU p2 = (PDU)dc.prepareWriteRequest();
+        logger(AREA, DEBUG, "==== Starting To Write Data ====");
 
-        //  Go through all the Write Parameters
-        //  First, convert all the values to Bytes
-        //  Then reverse cause fuck Siemens
-        //  Then add to the PDU as a write request
-        for(int i = fleetBlockControlParameters; i < fleetBlock.Param.Count; i++)
+        int result = 1;
+        resultSet rs = new resultSet();
+
+        if (live)
         {
-            byte[] tempBytes = BitConverter.GetBytes(fleetBlock.Param[i].getValue());
+            PDU p2 = (PDU)dc.prepareWriteRequest();
 
-            if (BitConverter.IsLittleEndian) 
+            //  Go through all the Write Parameters
+            //  First, convert all the values to Bytes
+            //  Then reverse cause fuck Siemens
+            //  Then add to the PDU as a write request
+            for (int i = fleetBlockControlParameters; i < fleetBlock.Param.Count; i++)
+            {
+                byte[] tempBytes = BitConverter.GetBytes(fleetBlock.Param[i].getValue());
+
+                if (BitConverter.IsLittleEndian)
                 { Array.Reverse(tempBytes); }
 
-            p2.addVarToWriteRequest(daveDB, dataStorageDB, fleetBlock.Param[i].getOffset(), fleetBlock.Param[i].getSize(), tempBytes);
+                p2.addVarToWriteRequest(daveDB, dataStorageDB, fleetBlock.Param[i].getOffset(), fleetBlock.Param[i].getSize(), tempBytes);
+            }
+
+            result = dc.execWriteRequest(p2, rs);
+
+            for (int i = 0; i < fleetBlock.Param.Count; i++)
+            {
+                result = rs.getErrorOfResult(i);
+                logger(AREA, DEBUG, "Error Code From: " + fleetBlock.Param[i].getName() + " Code Is: " + result);
+            }
+        }
+        else
+        {
+            logger(AREA, INFO, "==== Running In Sim Mode ====");
         }
     }
+
+    public static void writeRobotBlock(int robot)
+    {
+        logger(AREA, DEBUG, "==== Starting To Write Data For Robot " + robot + " ====");
+
+        int result = 1;
+        resultSet rs = new resultSet();
+
+        if (live)
+        {
+            PDU p2 = (PDU)dc.prepareWriteRequest();
+
+            //  Go through all the Write Parameters
+            //  First, convert all the values to Bytes
+            //  Then reverse cause fuck Siemens
+            //  Then add to the PDU as a write request
+            for (int i = robotBlockControlParameters; i < robots[robot].Param.Count; i++)
+            {
+                byte[] tempBytes;
+
+                if (robots[robot].Param[i].getSize() == 2)
+                {
+                    tempBytes = BitConverter.GetBytes(robots[robot].Param[i].getValue());
+                }
+                else
+                {
+                    tempBytes = BitConverter.GetBytes(robots[robot].Param[i].getFloat());
+                }
+
+                if (BitConverter.IsLittleEndian)
+                { Array.Reverse(tempBytes); }
+
+                p2.addVarToWriteRequest(daveDB, dataStorageDB, robots[robot].Param[i].getOffset(), robots[robot].Param[i].getSize(), tempBytes);
+            }
+
+            result = dc.execWriteRequest(p2, rs);
+
+            for (int i = 0; i < robots[robot].Param.Count; i++)
+            {
+                result = rs.getErrorOfResult(i);
+                logger(AREA, DEBUG, "Error Code From Robot: " + robot + " Param: " + robots[robot].Param[i].getName() + " Code Is: " + result);
+            }
+        }
+        else
+        {
+            logger(AREA, INFO, "==== Running In Sim Mode ====");
+        }
+    }
+
+
 
 /*
     public static void readDataFromPLC()
@@ -1094,6 +919,79 @@ class SiemensPLC
             try
             {
                 int result = dc.writeBytes(daveDB, taskControlDB, 12, 4, tempBytes);
+
+                if (result != 0)
+                {
+                    logger(AREA, ERROR, "Task Status Update Was Unsuccessful");
+                    logger(AREA, ERROR, daveStrerror(result));
+                    plcConnectionErrors++;
+                }
+                else
+                {
+                    logger(AREA, DEBUG, "Task Status Updated To " + status);
+                }
+            }
+            catch (NullReferenceException exception)
+            {
+                logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
+                establishConnection();
+            }
+            catch (Exception exception)
+            {
+                logger(AREA, ERROR, "Failed To Write To PLC. Exception: ", exception);
+                plcConnectionErrors++;
+            }
+        }
+        else
+        {
+            logger(AREA, INFO, "==== Running In Sim Mode ====");
+        }
+
+        logger(AREA, DEBUG, "==== Update Completed ====");
+    }
+
+    /// <summary>
+    /// Updates the PLC Task Status memory, in the Task Control Data Block.
+    /// </summary>
+    /// <param name="status">Designates Task Status Code: still processing, success, failure, etc.</param>
+    /// <param name="robot">Designates which robot or fleet to update</param>
+    /// See <see cref="Globals.TaskStatus"/> for possible task status codes.
+    public static void updateTaskStatus(int robot, int status)
+    {
+        logger(AREA, DEBUG, "==== Updating Task Status For " + robot + " ====");
+
+        int Task_Status_ID = 4;
+
+        if (live)
+        {
+            byte[] tempBytes;
+
+            if (robot == fleetID)
+            {
+                fleetBlock.Param[Task_Status_ID].setValue(status);
+
+            }
+            else
+            {
+                robots[robot].Param[Task_Status_ID].setValue(status);
+            }
+
+            tempBytes = BitConverter.GetBytes(status);
+
+            if (BitConverter.IsLittleEndian) { Array.Reverse(tempBytes); }
+
+            try
+            {
+                int result;
+
+                if (robot==fleetID)
+                {
+                    result = dc.writeBytes(daveDB, taskControlDB, fleetBlock.Param[Task_Status_ID].getOffset(), fleetBlock.Param[Task_Status_ID].getSize(), tempBytes);
+                }
+                else
+                {
+                    result = dc.writeBytes(daveDB, taskControlDB, robots[robot].Param[Task_Status_ID].getOffset(), robots[robot].Param[Task_Status_ID].getSize(), tempBytes);
+                }
 
                 if (result != 0)
                 {

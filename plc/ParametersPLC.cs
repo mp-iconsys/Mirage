@@ -42,6 +42,16 @@ namespace Mirage.plc
             this.Size = Size;
             Param = new List<IParameters>();
         }
+
+        public short getTaskStatus()
+        {
+            return Param[4].getValue();
+        }
+
+        public short getTaskNumber()
+        {
+            return Param[2].getValue();
+        }
     }
 
 /*    public class RobotBlock2
@@ -76,7 +86,7 @@ namespace Mirage.plc
         string Name { get; set; }
         int Size { get; set; }
         int Offset { get; set; }
-        int Value { get; set; }
+        Int16 Value { get; set; }
 
         public Parameter_INT() { }
 
@@ -93,7 +103,7 @@ namespace Mirage.plc
             Name = name;
             Size = size;
             Offset = offset;
-            Value = value;
+            Value = (short)value;
         }
 
         public void print()
@@ -113,12 +123,28 @@ namespace Mirage.plc
 
         public void setValue(int Value)
         {
-            this.Value = Value;
+            this.Value = (short)Value;
         }
 
-        public int getValue()
+        public Int16 getValue()
         {
             return Value;
+        }
+
+        public float getFloat()
+        {
+            return (float)-100.0;
+        }
+
+        public string getName()
+        {
+            return Name;
+        }
+
+        public void simulateConsole()
+        {
+            Console.WriteLine("Enter " + Name + ": ");
+            Value = Int16.Parse(Console.ReadLine());
         }
     }
 
@@ -172,9 +198,25 @@ namespace Mirage.plc
             this.Value = Value;
         }
 
-        public int getValue()
+        public Int16 getValue()
         {
             return -100;
+        }
+
+        public float getFloat()
+        {
+            return Value;
+        }
+
+        public string getName()
+        {
+            return Name;
+        }
+
+        public void simulateConsole()
+        {
+            Console.WriteLine("Enter " + Name + ": ");
+            Value = Int16.Parse(Console.ReadLine());
         }
     }
 
@@ -184,6 +226,10 @@ namespace Mirage.plc
         int getSize();
         int getOffset();
         void setValue(int Value);
-        int getValue();
+        Int16 getValue();
+        float getFloat();
+        string getName();
+
+        void simulateConsole();
     }
 }
