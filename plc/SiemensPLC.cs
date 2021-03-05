@@ -61,6 +61,7 @@ class SiemensPLC
     public static int fleetID = 666;
     public static int fleetBlockControlParameters = 4;
     public static int fleetBlockSize;
+    public static bool furtherMsg;
 
     public static RobotBlock[] robots;
     public static int noOfRobots;
@@ -626,7 +627,7 @@ class SiemensPLC
                         fleetBlock.Param[i].setValue(BitConverter.ToInt16(tempBytesForConversion, 0)); 
                     }
 
-                    if (fleetBlock.Param[0].getValue() == 10)
+                    if (fleetBlock.Param[0].getValue() == TaskStatus.AwaitingPickUp)
                     { 
                         newMsg = true;
 
@@ -634,10 +635,12 @@ class SiemensPLC
                         {
                             fleetBlock.Param[i].print();
                         }
+
+                        updateTaskStatus(fleetID, TaskStatus.TaskReceivedFromPLC);
                     }
                     else if(fleetBlock.Param[0].getValue() == 0)
                     {
-                        logger(AREA, DEBUG, "No New Fleet Tasks From PLC");
+                        logger(AREA, DEBUG, "PLC Fleet Block Idle");
                         newMsg = false;
                     }
                 }
@@ -648,7 +651,6 @@ class SiemensPLC
                     plcConnectionErrors++;
                     newMsg = false;
                 }
-
             }
             catch (NullReferenceException exception)
             {
@@ -671,9 +673,23 @@ class SiemensPLC
 
             if (!newMsg)
             {
-                for (int i = 0; i < fleetBlockControlParameters; i++)
+                for (int i = 0; i < fleetBlockControlParameters+1; i++)
                 {
                     fleetBlock.Param[i].simulateConsole();
+                }
+
+                string yn;
+
+                Console.WriteLine("Add Robot Commands Further On (y/n)");
+                yn = Console.ReadLine();
+
+                if(yn == "y" || yn == "Y")
+                {
+                    furtherMsg = true;
+                }
+                else if (yn == "n" || yn == "N")
+                {
+                    furtherMsg = false;
                 }
 
                 newMsg = true;
@@ -734,7 +750,7 @@ class SiemensPLC
                             robots[r].Param[i].setValue(BitConverter.ToInt16(tempBytesForConversion, 0));
                         }
 
-                        if (robots[r].Param[0].getValue() == 10)
+                        if (robots[r].Param[0].getValue() == TaskStatus.AwaitingPickUp)
                         {
                             newMsg = true;
 
@@ -744,6 +760,8 @@ class SiemensPLC
                             {
                                 robots[r].Param[i].print();
                             }
+
+                            updateTaskStatus(r, TaskStatus.TaskReceivedFromPLC);
                         }
                     }
                 }
@@ -775,26 +793,34 @@ class SiemensPLC
         {
             logger(AREA, INFO, "Simulating Messages From Console");
 
-            if (!newMsg)
+            if (furtherMsg)
             {
                 for (int r = 0; r < noOfRobots; r++)
                 {
-                    for (int i = 0; i < robotBlockControlParameters; i++)
+                    for (int i = 0; i < robotBlockControlParameters+1; i++)
                     {
                         robots[r].Param[i].simulateConsole();
                     }
                 }
 
-                SiemensPLC.newMsg = true;
+                newMsg = true;
             }
         }
 
         logger(AREA, DEBUG, "==== Completed Robot Task Control ====");
     }
 
-    public static void writeFleetBlock()
+    /// <summary>
+    /// Writes the PLC fleetBlock Parameters into PLC DB. This is used after a Task was completed by Mirage.
+    /// </summary>
+    /// <param name="TaskStatus"></param>
+    public static void writeFleetBlock(int TaskStatus)
     {
         logger(AREA, DEBUG, "==== Starting To Write Data ====");
+
+        // Copying the Mirage Memory into FleetBlock buffer
+        fleetBlock.Param[fleetBlockControlParameters].setValue(TaskStatus);
+        fleetMemoryToPLC();
 
         int result = 1;
         resultSet rs = new resultSet();
@@ -824,6 +850,9 @@ class SiemensPLC
                 result = rs.getErrorOfResult(i);
                 logger(AREA, DEBUG, "Error Code From: " + fleetBlock.Param[i].getName() + " Code Is: " + result);
             }
+
+            // If no error
+            //
         }
         else
         {
@@ -831,9 +860,17 @@ class SiemensPLC
         }
     }
 
-    public static void writeRobotBlock(int robot)
+    /// <summary>
+    /// Writes the PLC fleetBlock Parameters into PLC DB. This is used after a Task was completed by Mirage.
+    /// </summary>
+    /// <param name="TaskStatus"></param>
+    public static void writeRobotBlock(int robot, int TaskStatus)
     {
         logger(AREA, DEBUG, "==== Starting To Write Data For Robot " + robot + " ====");
+
+        // Copying the Mirage Memory into FleetBlock buffer
+        robots[robot].Param[robotBlockControlParameters].setValue(TaskStatus);
+        robotMemoryToPLC(robotID);
 
         int result = 1;
         resultSet rs = new resultSet();

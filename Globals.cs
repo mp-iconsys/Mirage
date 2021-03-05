@@ -76,14 +76,26 @@ public static class Globals
     /// </summary>
     public static class TaskStatus
     {
-        public const int Awaiting = 0;
-        public const int StartedProcessing = 1;
-        public const int CompletedNoErrors = 20;
-        public const int CompletedPartially = 21;
-        public const int PlcOK = 30;
-        public const int PlcError = 31;
+        public const int Idle = 0;
+        public const int AwaitingPickUp = 10;
+        public const int TaskReceivedFromPLC = 10;
+        public const int StartedProcessing = 20;
+        public const int CompletedNoErrors = 30;
+        public const int CompletedPartially = 30;
+        public const int FatalError = 40;
         public const int CouldntProcessRequest = 40;
-        public const int FatalError = 41;
+
+        public const int PlcOK = 0;
+        public const int PlcError = 0;
+
+        /*        public const int Awaiting = 0;
+                public const int StartedProcessing = 1;
+                public const int CompletedNoErrors = 20;
+                public const int CompletedPartially = 21;
+                public const int PlcOK = 30;
+                public const int PlcError = 31;
+                public const int CouldntProcessRequest = 40;
+                public const int FatalError = 41;*/
     }
 
     /// <summary>
@@ -129,6 +141,11 @@ public static class Globals
         //  Initialize SMS communication for alerts                |     
         //=========================================================|
         TwilioClient.Init(accountSid, authToken);
+
+        //=========================================================|
+        //  Initialize PLC comms and REST Header                   |     
+        //=========================================================|
+        setUpDefaultComms();
 
         //=========================================================|
         //  Initialize Fleet Container                             |     
@@ -465,6 +482,49 @@ public static class Globals
         }
 
         logger(AREA, DEBUG, "==== SMS Alert Sent ====");
+    }
+
+    /// <summary>
+    /// Copies the data from Mirage internal memory to PLC buffer
+    /// </summary>
+    public static void fleetMemoryToPLC()
+    {
+        // Copy the internal Fleet Data to PLC fleetBlock
+        SiemensPLC.fleetBlock.Param[SiemensPLC.fleetBlockControlParameters].setValue(mirFleet.returnParameter);
+
+        for (int i = SiemensPLC.fleetBlockControlParameters + 1; i < SiemensPLC.fleetBlockSize; i++)
+        {
+            SiemensPLC.fleetBlock.Param[i].setValue(mirFleet.groups[i]);
+        }
+    }
+
+    /// <summary>
+    /// Saves the internal Mirage memory of a single robot to the PLC buffer used for writes and reads
+    /// </summary>
+    public static void robotMemoryToPLC(int robotID)
+    {
+        SiemensPLC.robots[robotID].Param[5].setValue(mirFleet.robots[robotID].s.mode_id);
+        SiemensPLC.robots[robotID].Param[6].setValue(mirFleet.robots[robotID].s.mode_id);
+        SiemensPLC.robots[robotID].Param[7].setValue(mirFleet.robots[robotID].s.robot_group_id);
+        SiemensPLC.robots[robotID].Param[8].setValue(mirFleet.robots[robotID].s.state_id);
+        SiemensPLC.robots[robotID].Param[9].setValueDouble(mirFleet.robots[robotID].s.position.x);
+        SiemensPLC.robots[robotID].Param[10].setValueDouble(mirFleet.robots[robotID].s.position.y);
+        SiemensPLC.robots[robotID].Param[11].setValueDouble(mirFleet.robots[robotID].s.position.orientation);
+        SiemensPLC.robots[robotID].Param[12].setValueDouble(mirFleet.robots[robotID].s.moved);
+        SiemensPLC.robots[robotID].Param[13].setValueDouble(mirFleet.robots[robotID].s.battery_percentage);
+    }
+
+    /// <summary>
+    /// Saves the internal Mirage memory to the PLC buffer used for writes and reads
+    /// </summary>
+    public static void allMemoryToPLC()
+    {
+        fleetMemoryToPLC();
+
+        for (int i = 0; i < sizeOfFleet; i++)
+        {
+            robotMemoryToPLC(i);
+        }
     }
 
     /// <summary>

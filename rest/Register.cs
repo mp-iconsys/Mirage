@@ -54,6 +54,7 @@ namespace Mirage.rest
         /// <param name="robotID"></param>
         public void saveToDB(int robotID)
         {
+            // TODO: This takes forever - make it better
             MySqlCommand cmd = new MySqlCommand("store_register");
 
             try

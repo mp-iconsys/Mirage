@@ -20,6 +20,9 @@ namespace Mirage
         private Task<HttpResponseMessage>[] httpResponseTasks;
         private Task<HttpResponseMessage> fleetResponseTask;
 
+        public short returnParameter;
+        public short[] groups;
+
         //=========================================================|
         //  Used For Debugging                                     |     
         //=========================================================|
@@ -34,6 +37,9 @@ namespace Mirage
             robots = new Robot[sizeOfFleet];
             httpResponseTasks = new Task<HttpResponseMessage>[sizeOfFleet];
 
+            // Instantiates the group array
+            groups = new short[8] { 0, 0, 0, 0, 0, 0, 0, 0 };
+
             instantiateRobots(sizeOfFleet);
         }
 
@@ -47,6 +53,8 @@ namespace Mirage
         {
             robots = new Robot[sizeOfFleet];
             httpResponseTasks = new Task<HttpResponseMessage>[sizeOfFleet];
+
+            logger(AREA, DEBUG, "Assigned Basics");
 
             instantiateRobots(sizeOfFleet, fleetManagerIP, fleetManagerAuthToken);
         }
@@ -74,11 +82,15 @@ namespace Mirage
         {
             fleetManager = new Robot(fleetManagerIP, fleetManagerAuthToken);
 
+            logger(AREA, DEBUG, "Completed Fleet Assignment");
+
             for (int i = 0; i < sizeOfFleet; i++)
             {
                 // Instantiate the robots - Don't touch the tasks yet
                 robots[i] = new Robot(i);
             }
+
+            logger(AREA, DEBUG, "Completed Robot Assignment");
         }
 
         /// <summary>
@@ -281,8 +293,8 @@ namespace Mirage
                     mirFleet.issueGetRequests("status");
                     await mirFleet.saveFleetStatusAsync();
 
-                    mirFleet.issueGetRequests("registers");
-                    await mirFleet.saveFleetRegistersAsync();
+                    //mirFleet.issueGetRequests("registers");
+                    //await mirFleet.saveFleetRegistersAsync();
                 }
                 catch (HttpRequestException exception)
                 {

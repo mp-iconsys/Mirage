@@ -18,10 +18,6 @@ class Program
 
         mirFleet.getInitialFleetData();
 
-        setUpDefaultComms();
-
-        Console.WriteLine("Enter SerialNumber: ");
-
         logger(AREA, DEBUG, "==== Starting Main Loop ====");
 
         long i = 0;
@@ -45,10 +41,15 @@ class Program
                 {
                     logger(AREA, DEBUG, "==== New Task From PLC ====");
 
-                    SiemensPLC.updateTaskStatus(Globals.TaskStatus.StartedProcessing);
-
-                    if (SiemensPLC.fleetBlock.getTaskStatus() == Globals.TaskStatus.StartedProcessing)
+                    //====================================================|
+                    //  Fleet Manager Tasks                               |
+                    //====================================================|
+                    if (SiemensPLC.fleetBlock.getTaskStatus() == Globals.TaskStatus.TaskReceivedFromPLC)
                     {
+                        SiemensPLC.updateTaskStatus(SiemensPLC.fleetID, Globals.TaskStatus.StartedProcessing);
+
+                        int taskStatus = Globals.TaskStatus.StartedProcessing;
+
                         switch (SiemensPLC.fleetBlock.getTaskNumber())
                         {
                             case Tasks.GetScheduleStatus:
@@ -76,12 +77,28 @@ class Program
                                 unknownMission();
                                 break;
                         }
+
+                        SiemensPLC.writeFleetBlock(taskStatus);
+                    }
+                    else
+                    {
+                        logger(AREA, DEBUG, "Not A Fleet Data Task");
                     }
 
+                    //====================================================|
+                    //  Robot Tasks                                       |
+                    //====================================================|
                     for (int j = 0; j < Globals.sizeOfFleet; j ++)
                     {
-                        if (SiemensPLC.robots[j].getTaskStatus() == Globals.TaskStatus.StartedProcessing)
+                        if (SiemensPLC.robots[j].getTaskStatus() == Globals.TaskStatus.TaskReceivedFromPLC)
                         {
+                            SiemensPLC.updateTaskStatus(j, Globals.TaskStatus.StartedProcessing);
+
+                            logger(AREA, DEBUG, "Issuing Task For Robot: " + j);
+                            logger(AREA, DEBUG, "Task Number: " + SiemensPLC.robots[j].getTaskNumber());
+
+                            int taskStatus = Globals.TaskStatus.StartedProcessing;
+
                             switch (SiemensPLC.robots[j].getTaskNumber())
                             {
                                 case Tasks.GetScheduleStatus:
@@ -109,13 +126,15 @@ class Program
                                     unknownMission();
                                     break;
                             }
+
+                            SiemensPLC.writeRobotBlock(j, taskStatus);
                         }
                     }
 
                     SiemensPLC.checkResponse();
-                }
 
-                // Now fetch data for the PLC
+                    logger(AREA, DEBUG, "==== Completed Processing Tasks ====");
+                }
             }
             else
             {
@@ -123,6 +142,11 @@ class Program
             }
 
             SiemensPLC.checkConnectivity();
+
+            //====================================================|
+            //  Fetch High Frequency Data for the PLC             |
+            //====================================================|
+            //TODO: ...
 
             // Poll MiR Fleet - async operation that happens every pollInterval
             if (timer.Elapsed.Seconds >= pollInterval)

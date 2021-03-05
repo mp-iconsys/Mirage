@@ -14,6 +14,7 @@ namespace Mirage.rest
     {
         public int mode_id { get; set; }
         public int state_id { get; set; }
+        public int robot_group_id { get; set; }
         public int uptime { get; set; }
         public int battery_time_remaining { get; set; } // In seconds
         public float battery_percentage { get; set; }
@@ -78,7 +79,8 @@ namespace Mirage.rest
         public void saveToMemory(HttpResponseMessage response) 
         { 
             Status temp = JsonConvert.DeserializeObject<Status>(response.Content.ReadAsStringAsync().Result);
-            
+
+            robot_group_id = temp.robot_group_id;
             mode_id = temp.mode_id;
             state_id = temp.state_id;
             uptime = temp.uptime;

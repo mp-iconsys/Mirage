@@ -48,24 +48,16 @@ namespace Mirage.plc
             return Param[4].getValue();
         }
 
+        public short getPLCTaskStatus()
+        {
+            return Param[0].getValue();
+        }
+
         public short getTaskNumber()
         {
             return Param[2].getValue();
         }
     }
-
-/*    public class RobotBlock2
-    {
-        // ID of the block
-        public int ID;
-
-        // Offset of the blocks (total - this is the starting position of the read)
-        public int Offset;
-
-        // Parameter list
-        public int[] values;
-        public float[] values2;
-    }*/
 
     public class Parameters<T> where T : IParameters
     {
@@ -146,6 +138,16 @@ namespace Mirage.plc
             Console.WriteLine("Enter " + Name + ": ");
             Value = Int16.Parse(Console.ReadLine());
         }
+
+        public void setValueFloat(float Value)
+        {
+            this.Value = (short)Value;
+        }
+
+        public void setValueDouble(double Value)
+        {
+            this.Value = (short)Value;
+        }
     }
 
     public class Parameter_FLOAT : IParameters
@@ -198,6 +200,16 @@ namespace Mirage.plc
             this.Value = Value;
         }
 
+        public void setValueFloat(float Value)
+        {
+            this.Value = Value;
+        }
+
+        public void setValueDouble(double Value)
+        {
+            this.Value = (float)Value;
+        }
+
         public Int16 getValue()
         {
             return -100;
@@ -226,6 +238,8 @@ namespace Mirage.plc
         int getSize();
         int getOffset();
         void setValue(int Value);
+        void setValueFloat(float Value);
+        void setValueDouble(double Value);
         Int16 getValue();
         float getFloat();
         string getName();

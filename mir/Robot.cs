@@ -119,10 +119,7 @@ using static Globals.DebugLevel;
                 // So, first get sha256 of the pass, Concat to "username:" and then do base64 conversion
                 authValue = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes($"{apiUsername}:{ComputeSha256Hash(apiPassword)}")));
 
-                if (Globals.debugLevel > 1)
-                {
-                    Console.WriteLine(authValue);
-                }
+                logger(AREA, DEBUG, authValue.ToString());
 
                 // Store the data in the DB
                 //string query = "REPLACE INTO robot (`ROBOT_ID`, `IP`, `AUTH`) VALUES ('" + id + "', '" + ipAddress + "', '" + Convert.ToBase64String(Encoding.UTF8.GetBytes($"{apiUsername}:{ComputeSha256Hash(apiPassword)}")) + "');";
@@ -174,9 +171,14 @@ using static Globals.DebugLevel;
         /// </summary>
         public void formConnection()
         {
-            //comms.BaseAddress = new Uri("http://" + ipAddress + "/api/v2.0.0/"); -> hhtpClient is a singleton so we can only set the defaults once
+            //setUpDefaultComms();
+
+            //comms.BaseAddress = new Uri("http://" + ipAddress + "/api/v2.0.0/"); //-> hhtpClient is a singleton so we can only set the defaults once
+
             comms.DefaultRequestHeaders.Authorization = authValue; // This might cause problems if we're using many robots with different auth strings
-        }
+
+            logger(AREA, DEBUG, "Set the base address");
+    }
 
         /// <summary>
         /// This sends an async API get request to the robot to fetch data at the specified uri
