@@ -489,13 +489,26 @@ public static class Globals
     /// </summary>
     public static void fleetMemoryToPLC()
     {
-        // Copy the internal Fleet Data to PLC fleetBlock
-        SiemensPLC.fleetBlock.Param[SiemensPLC.fleetBlockControlParameters].setValue(mirFleet.returnParameter);
+        Console.ReadLine();
 
-        for (int i = SiemensPLC.fleetBlockControlParameters + 1; i < SiemensPLC.fleetBlockSize; i++)
+        // Copy the internal Fleet Data to PLC fleetBlock
+        SiemensPLC.fleetBlock.Param[SiemensPLC.fleetBlockControlParameters+1].setValue(mirFleet.returnParameter);
+
+        int j = 0;
+
+        for (int i = SiemensPLC.fleetBlockControlParameters + 2; i < SiemensPLC.fleetBlock.Param.Count; i++)
         {
-            SiemensPLC.fleetBlock.Param[i].setValue(mirFleet.groups[i]);
+            logger(AREA, DEBUG, "i: " + i + " - j: " + j + " - End At: " + SiemensPLC.fleetBlock.Param.Count);
+
+            SiemensPLC.fleetBlock.Param[i].setValue(mirFleet.groups[j]);
+            SiemensPLC.fleetBlock.Param[i].print();
+
+            j++;
         }
+
+        Console.ReadLine();
+
+        logger(AREA, DEBUG, "Finished Copying Mirage Internal Data to PLC Buffer");
     }
 
     /// <summary>
@@ -503,15 +516,49 @@ public static class Globals
     /// </summary>
     public static void robotMemoryToPLC(int robotID)
     {
+        logger(AREA, DEBUG, "Copying Mirage Internal Memory For Robot " + robotID + " to PLC Buffer");
+
+        logger(AREA, DEBUG, "Mode is: " + mirFleet.robots[robotID].s.mode_id);
+
+        SiemensPLC.robots[robotID].Param[5].print();
         SiemensPLC.robots[robotID].Param[5].setValue(mirFleet.robots[robotID].s.mode_id);
-        SiemensPLC.robots[robotID].Param[6].setValue(mirFleet.robots[robotID].s.mode_id);
-        SiemensPLC.robots[robotID].Param[7].setValue(mirFleet.robots[robotID].s.robot_group_id);
-        SiemensPLC.robots[robotID].Param[8].setValue(mirFleet.robots[robotID].s.state_id);
-        SiemensPLC.robots[robotID].Param[9].setValueDouble(mirFleet.robots[robotID].s.position.x);
-        SiemensPLC.robots[robotID].Param[10].setValueDouble(mirFleet.robots[robotID].s.position.y);
-        SiemensPLC.robots[robotID].Param[11].setValueDouble(mirFleet.robots[robotID].s.position.orientation);
-        SiemensPLC.robots[robotID].Param[12].setValueDouble(mirFleet.robots[robotID].s.moved);
-        SiemensPLC.robots[robotID].Param[13].setValueDouble(mirFleet.robots[robotID].s.battery_percentage);
+        SiemensPLC.robots[robotID].Param[5].print();
+
+        logger(AREA, DEBUG, "Robot Group is: " + mirFleet.robots[robotID].s.robot_group_id);
+
+        SiemensPLC.robots[robotID].Param[6].print();
+        SiemensPLC.robots[robotID].Param[6].setValue(mirFleet.robots[robotID].s.robot_group_id);
+        SiemensPLC.robots[robotID].Param[6].print();
+
+        logger(AREA, DEBUG, "Robot Status is: " + mirFleet.robots[robotID].s.state_id);
+        SiemensPLC.robots[robotID].Param[7].print();
+        SiemensPLC.robots[robotID].Param[7].setValue(mirFleet.robots[robotID].s.state_id);
+        SiemensPLC.robots[robotID].Param[7].print();
+
+        logger(AREA, DEBUG, "Robot Position X is: " + mirFleet.robots[robotID].s.position.x);
+        SiemensPLC.robots[robotID].Param[8].print();
+        SiemensPLC.robots[robotID].Param[8].setValueDouble(mirFleet.robots[robotID].s.position.x);
+        SiemensPLC.robots[robotID].Param[8].print();
+
+        SiemensPLC.robots[robotID].Param[9].print();
+        SiemensPLC.robots[robotID].Param[9].setValueDouble(mirFleet.robots[robotID].s.position.y);
+        SiemensPLC.robots[robotID].Param[9].print();
+
+        SiemensPLC.robots[robotID].Param[10].print();
+        SiemensPLC.robots[robotID].Param[10].setValueDouble(mirFleet.robots[robotID].s.position.orientation);
+        SiemensPLC.robots[robotID].Param[10].print();
+
+        Console.ReadLine();
+
+        SiemensPLC.robots[robotID].Param[11].print();
+        SiemensPLC.robots[robotID].Param[11].setValueDouble(mirFleet.robots[robotID].s.moved);
+        SiemensPLC.robots[robotID].Param[11].print();
+
+        SiemensPLC.robots[robotID].Param[12].print();
+        SiemensPLC.robots[robotID].Param[12].setValueDouble(mirFleet.robots[robotID].s.battery_percentage);
+        SiemensPLC.robots[robotID].Param[12].print();
+
+        logger(AREA, DEBUG, "Completed Copying Mirage Internal Memory For Robot " + robotID + " to PLC Buffer");
     }
 
     /// <summary>

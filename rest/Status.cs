@@ -20,7 +20,7 @@ namespace Mirage.rest
         public float battery_percentage { get; set; }
         public float distance_to_next_target { get; set; }
         public float moved { get; set; }
-        public string allowed_methods { get; set; }
+        //public string allowed_methods { get; set; }
         public string footprint { get; set; }
         public string joystick_low_speed_mode_enabled { get; set; }
         public string joystick_web_session_id { get; set; }
@@ -37,6 +37,10 @@ namespace Mirage.rest
         public string session_id { get; set; }
         public string state_text { get; set; }
         public string unloaded_map_changes { get; set; }
+
+
+        public List<string> allowed_methods { get; set; }
+
 
         public Position position { get; set; }
         public List<ErrorsItem> errors { get; set; } // Try without a list

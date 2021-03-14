@@ -37,6 +37,8 @@ class Program
             {
                 SiemensPLC.poll();
 
+                Console.ReadLine();
+
                 if (SiemensPLC.newMsg)
                 {
                     logger(AREA, DEBUG, "==== New Task From PLC ====");
@@ -48,33 +50,35 @@ class Program
                     {
                         SiemensPLC.updateTaskStatus(SiemensPLC.fleetID, Globals.TaskStatus.StartedProcessing);
 
+                        Console.ReadLine();
+
                         int taskStatus = Globals.TaskStatus.StartedProcessing;
 
                         switch (SiemensPLC.fleetBlock.getTaskNumber())
                         {
                             case Tasks.GetScheduleStatus:
-                                getScheduleStatus();
+                                taskStatus = getScheduleStatus();
                                 break;
                             case Tasks.SendMissionToScheduler:
-                                sendMissionToScheduler();
+                                taskStatus = sendMissionToScheduler(SiemensPLC.fleetBlock.getTaskParameter());
                                 break;
                             case Tasks.CreateMission:
-                                createMission();
+                                taskStatus = createMission();
                                 break;
                             case Tasks.ClearScheduler:
-                                clearScheduler();
+                                taskStatus = clearScheduler();
                                 break;
                             case Tasks.GetBattery:
-                                getBattery();
+                                taskStatus = getBattery();
                                 break;
                             case Tasks.GetDistance:
-                                getDistance();
+                                taskStatus = getDistance();
                                 break;
                             case Tasks.GetRobotStatus:
-                                getRobotStatus();
+                                taskStatus = getRobotStatus();
                                 break;
                             default:
-                                unknownMission();
+                                taskStatus = unknownMission(SiemensPLC.fleetID);
                                 break;
                         }
 
@@ -84,6 +88,10 @@ class Program
                     {
                         logger(AREA, DEBUG, "Not A Fleet Data Task");
                     }
+
+                    logger(AREA, DEBUG, "Finished Checking Fleet");
+
+                    Console.ReadLine();
 
                     //====================================================|
                     //  Robot Tasks                                       |
@@ -102,28 +110,28 @@ class Program
                             switch (SiemensPLC.robots[j].getTaskNumber())
                             {
                                 case Tasks.GetScheduleStatus:
-                                    getScheduleStatus();
+                                    taskStatus = getScheduleStatus();
                                     break;
                                 case Tasks.SendMissionToScheduler:
-                                    sendMissionToScheduler();
+                                    taskStatus = sendMissionToScheduler(SiemensPLC.robots[j].getTaskParameter());
                                     break;
                                 case Tasks.CreateMission:
-                                    createMission();
+                                    taskStatus = createMission();
                                     break;
                                 case Tasks.ClearScheduler:
-                                    clearScheduler();
+                                    taskStatus = clearScheduler();
                                     break;
                                 case Tasks.GetBattery:
-                                    getBattery();
+                                    taskStatus = getBattery(j);
                                     break;
                                 case Tasks.GetDistance:
-                                    getDistance();
+                                    taskStatus = getDistance(j);
                                     break;
                                 case Tasks.GetRobotStatus:
-                                    getRobotStatus();
+                                    taskStatus = getRobotStatus(j);
                                     break;
                                 default:
-                                    unknownMission();
+                                    taskStatus = unknownMission(j);
                                     break;
                             }
 
@@ -146,7 +154,12 @@ class Program
             //====================================================|
             //  Fetch High Frequency Data for the PLC             |
             //====================================================|
-            //TODO: ...
+            for(int k = 0; k < Globals.sizeOfFleet; k++)
+            {
+                getRobotStatus(k);
+
+                getRobotStatusFromFleet(k);
+            }
 
             // Poll MiR Fleet - async operation that happens every pollInterval
             if (timer.Elapsed.Seconds >= pollInterval)
@@ -172,7 +185,7 @@ class Program
     /// <summary>
     /// 
     /// </summary>
-    private static void getScheduleStatus()
+    private static int getScheduleStatus()
     {
         logger(AREA, INFO, "==== Get Schedule Status ====");
 
@@ -181,12 +194,14 @@ class Program
         SiemensPLC.writeData("mission_schedule", restStatus, mirFleet.robots[SiemensPLC.robotID].s.mission_text);
 
         logger(AREA, DEBUG, "==== Obtained Scheduler Status ====");
+
+        return restStatus;
     }
 
     /// <summary>
     /// 
     /// </summary>
-    private static void getRobotGroup()
+    private static int getRobotGroup()
     {
         logger(AREA, INFO, "==== Get Robot Group Data ====");
 
@@ -196,43 +211,60 @@ class Program
         //SiemensPLC.writeData("mission_schedule", restStatus, mirFleet.robots[SiemensPLC.robotID].s.mission_text);
 
         logger(AREA, DEBUG, "==== Obtained Scheduler Status ====");
+
+        return restStatus;
     }
 
     /// <summary>
-    /// 
+    /// This actually involves sending a mission to scheduler
     /// </summary>
-    private static void sendMissionToScheduler()
+    private static int sendMissionToScheduler(int mission_number)
     {
         logger(AREA, INFO, "==== Send Mission To Scheduler ====");
 
-        int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Missions[0].postRequest());
+        int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Missions[mission_number].postRequest());
 
-        SiemensPLC.updateTaskStatus(restStatus);
+        // Check the mission_scheduler we've just created to return with the robot ID
+        if (mirFleet.fleetManager.schedule.working_response)
+        {
+            restStatus = mirFleet.issueGetRequest("mission_scheduler/" + mirFleet.fleetManager.schedule.id, 666);
+
+            if (restStatus == Globals.TaskStatus.CompletedNoErrors)
+            {
+                mirFleet.returnParameter = (short)mirFleet.fleetManager.schedule.robot_id;
+            }
+        }
+
+        SiemensPLC.updateTaskStatus(SiemensPLC.fleetID, restStatus);
 
         logger(AREA, DEBUG, "==== Mission Sent ====");
+
+        return restStatus;
     }
 
     /// <summary>
     /// 
     /// </summary>
-    private static void sendFireAlarm()
+    private static int sendFireAlarm()
     {
         logger(AREA, INFO, "==== Send Fire Alarm To Scheduler ====");
 
         // Need to add whether to turn alarm on/off and which alarm to affect from PLC
-        //int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.FireAlarm.putRequest(Program.alarm_on, 1));
+        int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.FireAlarm.putRequest(true, 1));
 
         //SiemensPLC.updateTaskStatus(restStatus);
         //logger(AREA, DEBUG, "Status: " + restStatus);
         logger(AREA, DEBUG, "==== Fire Alarm Sent ====");
 
         //Program.alarm_on = !Program.alarm_on;
+
+        return restStatus;
     }
 
     /// <summary>
     /// 
     /// </summary>
-    private static void sendRobotGroup()
+    private static int sendRobotGroup()
     {
         logger(AREA, INFO, "==== Send (Change) Robot Group To Scheduler ====");
 
@@ -245,12 +277,14 @@ class Program
         //SiemensPLC.updateTaskStatus(restStatus);
         logger(AREA, DEBUG, "Status: " + restStatus);
         logger(AREA, DEBUG, "==== Robot Group Changed ====");
+
+        return restStatus;
     }
 
     /// <summary>
     /// 
     /// </summary>
-    private static void createMission()
+    private static int createMission()
     {
         logger(AREA, INFO, "==== Create New Mission In Robot " + SiemensPLC.robotID + " ====");
 
@@ -259,38 +293,69 @@ class Program
         SiemensPLC.updateTaskStatus(restStatus);
 
         logger(AREA, DEBUG, "==== Created New Mission ====");
+
+        return restStatus;
     }
 
     /// <summary>
     /// 
     /// </summary>
-    private static void clearScheduler()
+    private static int clearScheduler()
     {
         logger(AREA, INFO, "==== Clear Mission Schedule ====");
 
         int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Missions[0].deleteRequest());
 
-        SiemensPLC.updateTaskStatus(restStatus);
+        SiemensPLC.updateTaskStatus(SiemensPLC.fleetID, restStatus);
 
         logger(AREA, DEBUG, "==== Cleared Mission Scheduler ====");
+
+        return restStatus;
     }
 
     /// <summary>
     /// 
     /// </summary>
-    private static void getBattery()
+    private static int getBattery()
     {
         Console.WriteLine("==== Get Battery Life ====");
 
         int restStatus = mirFleet.issueGetRequest("status", SiemensPLC.robotID);
 
-        SiemensPLC.writeData("battery", restStatus, mirFleet.robots[SiemensPLC.robotID].s.battery_percentage);
+        //SiemensPLC.writeData("battery", restStatus, mirFleet.robots[SiemensPLC.robotID].s.battery_percentage);
+
+        return restStatus;
+    }
+
+    private static int getBattery(int robotID)
+    {
+        Console.WriteLine("==== Get Battery Life ====");
+
+        int restStatus = mirFleet.issueGetRequest("status", robotID);
+
+        //SiemensPLC.writeData("battery", restStatus, mirFleet.robots[SiemensPLC.robotID].s.battery_percentage);
+
+        return restStatus;
     }
 
     /// <summary>
     /// 
     /// </summary>
-    private static void getDistance()
+    private static int getDistance(int robotID)
+    {
+        logger(AREA, INFO, "==== Get Distance Travelled ====");
+
+        int restStatus = mirFleet.issueGetRequest("status", robotID);
+
+        logger(AREA, DEBUG, "==== Distance Travelled Status Fetched And Saved ====");
+
+        return restStatus;
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    private static int getDistance()
     {
         logger(AREA, INFO, "==== Get Distance Travelled ====");
 
@@ -299,12 +364,14 @@ class Program
         SiemensPLC.writeData("moved", restStatus, mirFleet.robots[SiemensPLC.robotID].s.moved);
 
         logger(AREA, DEBUG, "==== Distance Travelled Status Fetched And Saved ====");
+
+        return restStatus;
     }
 
     /// <summary>
     /// 
     /// </summary>
-    private static void getRobotStatus()
+    private static int getRobotStatus()
     {
         logger(AREA, INFO, "==== Get Mission Status ====");
 
@@ -313,17 +380,50 @@ class Program
         SiemensPLC.writeData("mission_text", restStatus, mirFleet.robots[SiemensPLC.robotID].s.mission_text);
 
         logger(AREA, DEBUG, "==== Mission Status Fetched And Saved ====");
+
+        return restStatus;
     }
 
     /// <summary>
     /// 
     /// </summary>
-    private static void unknownMission()
+    private static int getRobotStatus(int robotID)
+    {
+        logger(AREA, INFO, "==== Get Robot Status ====");
+
+        int restStatus = mirFleet.issueGetRequest("status", robotID);
+
+        SiemensPLC.writeRobotBlock(robotID);
+
+        logger(AREA, DEBUG, "==== Robot Status Fetched And Saved ====");
+
+        return restStatus;
+    }
+
+    private static int getRobotStatusFromFleet(int robotID)
+    {
+        logger(AREA, INFO, "==== Get Robot Status ====");
+
+        int restStatus = mirFleet.issueGetRequest("robotStatusFromFleet", robotID);
+
+        SiemensPLC.writeRobotBlock(robotID);
+
+        logger(AREA, DEBUG, "==== Robot Status Fetched And Saved ====");
+
+        return restStatus;
+    }
+
+
+    /// <summary>
+    /// 
+    /// </summary>
+    private static int unknownMission(int robotID)
     {
         logger(AREA, ERROR, "==== Unknown Mission ====");
 
-        SiemensPLC.updateTaskStatus(Globals.TaskStatus.CouldntProcessRequest);
+        SiemensPLC.updateTaskStatus(robotID, Globals.TaskStatus.CouldntProcessRequest);
 
+        return Globals.TaskStatus.CouldntProcessRequest;
         // Issue an alert
     }
 

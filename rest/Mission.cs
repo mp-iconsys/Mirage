@@ -5,6 +5,7 @@ using System.Net.Http;
 using MySql.Data.MySqlClient;
 using static Globals;
 using static Globals.DebugLevel;
+using Newtonsoft.Json;
 
 namespace Mirage.rest
 {
@@ -74,7 +75,41 @@ namespace Mirage.rest
         /// <param name="response"></param>
         public void saveToMemory(HttpResponseMessage response)
         {
+            Mission temp = JsonConvert.DeserializeObject<Mission>(response.Content.ReadAsStringAsync().Result);
 
+            guid = temp.guid;
+            name = temp.name;
+            url = temp.url;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="robotID"></param>
+        public void saveToDB(int robotID, int missionNo)
+        {
+            missionNumber = missionNo;
+            this.missionNumber = missionNo;
+
+            MySqlCommand cmd = new MySqlCommand("store_missions");
+
+            try
+            {
+                cmd.CommandType = CommandType.StoredProcedure;
+
+                cmd.Parameters.Add(new MySqlParameter("MISSION_ID", missionNumber));
+                cmd.Parameters.Add(new MySqlParameter("ROBOT_ID", robotID));
+                cmd.Parameters.Add(new MySqlParameter("GUID", guid));
+                cmd.Parameters.Add(new MySqlParameter("NAME", name));
+                cmd.Parameters.Add(new MySqlParameter("URL", url));
+
+                issueQuery(cmd);
+            }
+            catch (Exception exception)
+            {
+                cmd.Dispose();
+                logger(AREA, ERROR, "MySQL Quert Error: ", exception);
+            }
         }
 
         /// <summary>
@@ -193,14 +228,21 @@ namespace Mirage.rest
         /// <returns></returns>
         public HttpRequestMessage postRequest()
         {
-            string payload = "{\r\n  \"mission_id\": \"a5e518af-820d-11e9-8328-0000000000" + stringyfyMission(missionNumber) + "\"\r\n}";
+            string payload = "{\r\n  \"mission_id\": \"" + guid + "\"\r\n}";
+
+            logger(AREA, DEBUG, payload);
+
+            //string payload = "{\r\n  \"mission_id\": \"a5e518af-820d-11e9-8328-0000000000" + stringyfyMission(missionNumber) + "\"\r\n}";
 
             HttpRequestMessage request = new HttpRequestMessage
             {
                 Content = new StringContent(payload, Encoding.UTF8, "application/json"),
                 Method = HttpMethod.Post,
-                RequestUri = new Uri("mission_scheduler")
+                RequestUri = new Uri("http://192.168.1.195/api/v2.0.0/mission_scheduler")
+            //RequestUri = new Uri("mission_scheduler")
             };
+
+            logger(AREA, DEBUG, "Request Created");
 
             return request;
         }

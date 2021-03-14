@@ -11,25 +11,26 @@ using Mirage.rest;
 using static Globals;
 using static Globals.DebugLevel;
 
-    // TODO: Clean-up so we're a bit more tidy
-    public class Robot
-    {
-        private int id = 0;
-        private string ipAddress; // TODO: change to actual IPAddress class from .net library
-        private AuthenticationHeaderValue authValue;
+// TODO: Clean-up so we're a bit more tidy
+public class Robot
+{
+    private int id = 0;
+    private string ipAddress; // TODO: change to actual IPAddress class from .net library
+    private AuthenticationHeaderValue authValue;
 
-        //=========================================================|
-        //  Data which makes up the robot                          |     
-        //=========================================================|
-        private List<Register> Registers { get; set; }
-        private List<SoftwareLog> SoftwareLogs { get; set; }
-        private List<Map> Maps { get; set; }
-        private List<Setting> Settings { get; set; }
-        public List<Mission> Missions { get; set; }
-        public Status s { get; set; }
+    //=========================================================|
+    //  Data which makes up the robot                          |     
+    //=========================================================|
+    private List<Register> Registers { get; set; }
+    private List<SoftwareLog> SoftwareLogs { get; set; }
+    private List<Map> Maps { get; set; }
+    private List<Setting> Settings { get; set; }
+    public List<Mission> Missions { get; set; }
+    public Status s { get; set; }
+    public Scheduler schedule { get; set; }
+    public FireAlarms FireAlarm { get; set; }
+    public RobotGroup Group { get; set; }
 
-        public FireAlarms FireAlarm { get; set; }
-        public RobotGroup Group { get; set; }
 
     //=========================================================|
     //  Used For Logging & Debugging                           |     
@@ -45,6 +46,7 @@ using static Globals.DebugLevel;
 
             Registers = new List<Register>(new Register[200]);
             s = new Status();
+            schedule = new Scheduler();
 
         }
 
@@ -60,6 +62,7 @@ using static Globals.DebugLevel;
 
             Registers = new List<Register>(new Register[200]);
             s = new Status();
+            schedule = new Scheduler();
         }
 
         /// <summary>
@@ -76,6 +79,7 @@ using static Globals.DebugLevel;
             s = new Status();
             FireAlarm = new FireAlarms();
             Group = new RobotGroup();
+            schedule = new Scheduler();
         }
 
         /// <summary>
@@ -177,6 +181,7 @@ using static Globals.DebugLevel;
 
             comms.DefaultRequestHeaders.Authorization = authValue; // This might cause problems if we're using many robots with different auth strings
 
+            logger(AREA, DEBUG, "The IP is: " + ipAddress);
             logger(AREA, DEBUG, "Set the base address");
     }
 
@@ -200,7 +205,7 @@ using static Globals.DebugLevel;
         /// <returns></returns>
         public int sendRESTdata(HttpRequestMessage request)
         {
-            formConnection();
+            //formConnection();
 
             int statusCode = 0;
 
@@ -208,27 +213,44 @@ using static Globals.DebugLevel;
             {
                 HttpResponseMessage result = comms.SendAsync(request).Result;
 
+                logger(AREA, DEBUG, "Status Code: " + result.StatusCode);
+
                 Console.WriteLine("Base Address: " + comms.BaseAddress);
 
-            if (result.IsSuccessStatusCode)
+                if (result.IsSuccessStatusCode)
                 {
                     statusCode = (int)result.StatusCode;
 
-                    if (statusCode > 199 && statusCode < 400)
+                    schedule = JsonConvert.DeserializeObject<Scheduler>(result.Content.ReadAsStringAsync().Result);
+                    schedule.working_response = true;
+
+                    if (result.StatusCode.ToString() == "BadRequest")
                     {
-                        Console.WriteLine("Data Sent Successfully");
+                        logger(AREA, DEBUG, "Bad Request - Failed to process");
+                        statusCode = Globals.TaskStatus.CouldntProcessRequest;
+                    }
+                    else if ((statusCode > 199 && statusCode < 400) || result.StatusCode == System.Net.HttpStatusCode.OK)
+                    {
+                        logger(AREA, DEBUG, "Data Sent Successfully");
                         statusCode = Globals.TaskStatus.CompletedNoErrors;
                     }
                     else if (statusCode > 399)
                     {
-                        Console.WriteLine("Data send did not succeed");
+                        logger(AREA, DEBUG, "Data send did not succeed");
                         statusCode = Globals.TaskStatus.CouldntProcessRequest;
                     }
                     else
                     {
-                        Console.WriteLine("Unknown Error");
+                        logger(AREA, DEBUG, "Unknown Error");
                         statusCode = Globals.TaskStatus.FatalError;
                     }
+                }
+                else
+                {
+                    logger(AREA, DEBUG, "Bad Request - Failed to process");
+                    statusCode = Globals.TaskStatus.CouldntProcessRequest;
+
+                    schedule.working_response = false;
                 }
             }
             catch (Exception exception)
@@ -238,7 +260,7 @@ using static Globals.DebugLevel;
 
             return statusCode;
         }
-
+        
         /// <summary>
         /// 
         /// </summary>
@@ -393,10 +415,12 @@ using static Globals.DebugLevel;
             {
                 Missions = JsonConvert.DeserializeObject<List<Mission>>(response.Content.ReadAsStringAsync().Result);
 
+            logger(AREA, DEBUG, "no of missions is: " + Missions.Count);
+
                 for (int i = 0; i < Missions.Count; i++)
                 {
-                    //Missions[i].print();
-                    Missions[i].saveToDB(id);
+                    Missions[i].saveToDB(id, i);
+                    Missions[i].print();       
                 }
             }
             catch (Exception exception)
@@ -426,6 +450,7 @@ using static Globals.DebugLevel;
                 logger(AREA, ERROR, response.Content.ReadAsStringAsync().Result);
             }
         }
+
 
         /// <summary>
         /// 

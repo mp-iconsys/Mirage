@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading;
@@ -20,13 +21,15 @@ namespace Mirage
         private Task<HttpResponseMessage>[] httpResponseTasks;
         private Task<HttpResponseMessage> fleetResponseTask;
 
-        public short returnParameter;
-        public short[] groups;
+        public short returnParameter = 15;
+        public short[] groups = new short[8] { 1, 2, 3, 4, 5, 6, 7, 8 };
+        public int[] robotMapping;
 
-        //=========================================================|
-        //  Used For Debugging                                     |     
-        //=========================================================|
-        private static readonly Type AREA = typeof(Fleet);
+
+    //=========================================================|
+    //  Used For Debugging                                     |     
+    //=========================================================|
+    private static readonly Type AREA = typeof(Fleet);
 
         /// <summary>
         /// Initializes the robot fleet, Fleet Manager excluded
@@ -35,10 +38,11 @@ namespace Mirage
         public Fleet(int sizeOfFleet)
         {
             robots = new Robot[sizeOfFleet];
+            robotMapping = new int[1] { 4 };
             httpResponseTasks = new Task<HttpResponseMessage>[sizeOfFleet];
-
             // Instantiates the group array
             groups = new short[8] { 0, 0, 0, 0, 0, 0, 0, 0 };
+
 
             instantiateRobots(sizeOfFleet);
         }
@@ -52,8 +56,11 @@ namespace Mirage
         public Fleet(int sizeOfFleet, string fleetManagerIP, AuthenticationHeaderValue fleetManagerAuthToken)
         {
             robots = new Robot[sizeOfFleet];
+            robotMapping = new int[1] { 4 };
             httpResponseTasks = new Task<HttpResponseMessage>[sizeOfFleet];
 
+            // Instantiates the group array
+            groups = new short[8] { 0, 0, 0, 0, 0, 0, 0, 0 };
             logger(AREA, DEBUG, "Assigned Basics");
 
             instantiateRobots(sizeOfFleet, fleetManagerIP, fleetManagerAuthToken);
@@ -137,14 +144,29 @@ namespace Mirage
             {
                 try
                 {
-                    if (type == "mission_scheduler" || robotID == 666)
+                    if (type == "mission_scheduler" && robotID == 666)
+                    {
+                        logger(AREA, DEBUG, "Sending " + type + " Request To Fleet Manager");
+                        fleetResponseTask = fleetManager.sendGetRequest(type);
+                    }
+                    else if(type == "robots" && robotID == 666)
                     {
                         logger(AREA, DEBUG, "Sending " + type + " To Fleet Manager");
                         fleetResponseTask = fleetManager.sendGetRequest(type);
                     }
-                    else if(type == "robots" || robotID == 666)
+                    else if(type == "robotStatusFromFleet" && robotID != 666)
                     {
                         logger(AREA, DEBUG, "Sending " + type + " To Fleet Manager");
+
+                        fleetResponseTask = fleetManager.sendGetRequest("robots/" + robotMapping[robotID]);
+                    }
+                    else if(type == "missions" && robotID == 666)
+                    {
+                        logger(AREA, DEBUG, "Sending " + type + " Request To Fleet Manager");
+                        fleetResponseTask = fleetManager.sendGetRequest(type);
+                    }
+                    else if(robotID == 666)
+                    {
                         fleetResponseTask = fleetManager.sendGetRequest(type);
                     }
                     else
@@ -176,6 +198,10 @@ namespace Mirage
                 {
                     fleetResponseTask.Wait();
                 }
+                else if (robotID == 666)
+                {
+                    fleetResponseTask.Wait();
+                }
                 else
                 {
                     httpResponseTasks[robotID].Wait();
@@ -196,9 +222,39 @@ namespace Mirage
 
                 logger(AREA, DEBUG, "Status is : " + robots[robotID].s.mission_text);
             }
+            else if(type == "robotStatusFromFleet")
+            {
+                rest.Robots g;
+                g = new rest.Robots();
+                g = JsonConvert.DeserializeObject<rest.Robots>(fleetResponseTask.Result.Content.ReadAsStringAsync().Result);
+
+                //int a = 
+                //= new rest.Robots();
+                //g = JsonConvert.DeserializeObject<rest.Robots>(fleetResponseTask.Result.Content.ReadAsStringAsync().Result);
+                //_ = g.Root.fleet_state;
+
+                robots[robotID].s.robot_group_id = g.robot_group_id;
+
+                //robots[robotID].saveStatusInMemory(fleetResponseTask.Result);
+
+                logger(AREA, DEBUG, "Got Status From Fleet");
+            }
             else if (type == "mission_scheduler")
             {
+                logger(AREA, DEBUG, "Hellow from mission scheduler save");
+
                 fleetManager.Missions[0].saveToMemory(fleetResponseTask.Result);
+            }
+            else if (type == "mission_scheduler/" + mirFleet.fleetManager.schedule.id)
+            {
+                logger(AREA, DEBUG, "Getting Mission Scheduler response");
+
+                fleetManager.schedule.saveToMemory(fleetResponseTask.Result);
+            }
+            else if (type == "missions")
+            {
+                logger(AREA, DEBUG, "Hellow from missions save");
+                fleetManager.saveMissions(fleetResponseTask.Result);
             }
 
             logger(AREA, DEBUG, "==== Completed Get Request ====");
@@ -276,6 +332,14 @@ namespace Mirage
             for (int i = 0; i < sizeOfFleet; i++)
             {
                 robots[i].saveMissions(await httpResponseTasks[i]);
+            }
+        }
+
+        public async Task saveMissionsFleet()
+        {
+            for (int i = 0; i < sizeOfFleet; i++)
+            {
+                fleetManager.saveMissions(await fleetResponseTask);
             }
         }
 
@@ -426,6 +490,30 @@ namespace Mirage
             }
 
             Thread.Sleep(waitPeriod);
+
+            // Get Missions for the fleet
+            try
+            {
+                try
+                {
+                    issueGetRequest("missions", 666);
+                    mirFleet.saveMissionsFleet().Wait();
+                    //mirFleet.fleetManager.saveMissionsAsync().Wait();
+                }
+                catch (HttpRequestException exception)
+                {
+                    // TODO: Handle more exceptions
+                    // TODO: Remove the task which is causing the exception
+                    logger(AREA, ERROR, "HTTP Request Error. Couln't connect to the MiR robots.");
+                    logger(AREA, ERROR, "Check your network, dns settings, robot is up, etc. Error: ", exception);
+                }
+            }
+            catch (Exception exception)
+            {
+                logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
+            }
+
+
         }
     }
 }

@@ -599,8 +599,10 @@ class SiemensPLC
 
             try
             {
+                taskControlDB = 19;
+
                 // readBytes(Area, Data Block Number (in PLC), Start Byte, Length, Byte Container)
-                memoryres = dc.readBytes(daveDB, taskControlDB, fleetBlock.Offset, fleetBlockControlParameters*2, memoryBuffer);
+                memoryres = dc.readBytes(daveDB, taskControlDB, fleetBlock.Offset, fleetBlockControlParameters * 2, memoryBuffer);
 
                 //=========================================================|
                 //  Memoryres - return code from Libnodave:                |
@@ -612,7 +614,7 @@ class SiemensPLC
                 {
                     logger(AREA, DEBUG, BitConverter.ToString(memoryBuffer));
 
-                    for(int i = 0; i < fleetBlockControlParameters; i++)
+                    for (int i = 0; i < fleetBlockControlParameters; i++)
                     {
                         int size = 2;
                         int byte1 = i * size;
@@ -621,24 +623,25 @@ class SiemensPLC
                         byte[] tempBytesForConversion = new byte[2] { memoryBuffer[byte1], memoryBuffer[byte2] };
 
                         // Need to reverse the bytes to get actual values
-                        if (BitConverter.IsLittleEndian) 
-                            { Array.Reverse(tempBytesForConversion); }
+                        if (BitConverter.IsLittleEndian)
+                        { Array.Reverse(tempBytesForConversion); }
 
-                        fleetBlock.Param[i].setValue(BitConverter.ToInt16(tempBytesForConversion, 0)); 
+                        fleetBlock.Param[i].setValue(BitConverter.ToInt16(tempBytesForConversion, 0));
                     }
 
                     if (fleetBlock.Param[0].getValue() == TaskStatus.AwaitingPickUp)
-                    { 
+                    {
                         newMsg = true;
 
-                        for(int i = 0; i < fleetBlockControlParameters; i++)
+                        for (int i = 0; i < fleetBlockControlParameters; i++)
                         {
                             fleetBlock.Param[i].print();
                         }
 
-                        updateTaskStatus(fleetID, TaskStatus.TaskReceivedFromPLC);
+                        // TaskStatus.TaskReceivedFromPLC
+                        updateTaskStatus(fleetID, 10);
                     }
-                    else if(fleetBlock.Param[0].getValue() == 0)
+                    else if (fleetBlock.Param[0].getValue() == 0)
                     {
                         logger(AREA, DEBUG, "PLC Fleet Block Idle");
                         newMsg = false;
@@ -673,7 +676,7 @@ class SiemensPLC
 
             if (!newMsg)
             {
-                for (int i = 0; i < fleetBlockControlParameters+1; i++)
+                for (int i = 0; i < fleetBlockControlParameters + 1; i++)
                 {
                     fleetBlock.Param[i].simulateConsole();
                 }
@@ -683,7 +686,7 @@ class SiemensPLC
                 Console.WriteLine("Add Robot Commands Further On (y/n)");
                 yn = Console.ReadLine();
 
-                if(yn == "y" || yn == "Y")
+                if (yn == "y" || yn == "Y")
                 {
                     furtherMsg = true;
                 }
@@ -695,6 +698,15 @@ class SiemensPLC
                 newMsg = true;
             }
         }
+
+        logger(AREA, DEBUG, "==== Printing Fleet Task Control ====");
+
+        for (int i = 0; i < fleetBlockControlParameters; i++)
+        {
+            fleetBlock.Param[i].print();
+        }
+
+        Console.ReadLine();
 
         logger(AREA, DEBUG, "==== Completed Fleet Header ====");
     }
@@ -709,12 +721,19 @@ class SiemensPLC
             // If bigger than 222, break down into robots?
 
             int memoryres;
-            byte[] memoryBuffer = new byte[robotBlockSize * 5];
+            byte[] memoryBuffer = new byte[robotBlockControlParameters * noOfRobots * 2];
+
+            logger(AREA, DEBUG, "Initial Memory Buffer: ");
+            logger(AREA, DEBUG, BitConverter.ToString(memoryBuffer));
 
             try
             {
+                taskControlDB = 19;
+
+                logger(AREA, DEBUG, "DB: " + taskControlDB + "   Initial Offset: " + robots[0].Offset + "    Array Size: " + robotBlockControlParameters * noOfRobots);
+
                 // readBytes(Area, Data Block Number (in PLC), Start Byte, Length, Byte Container)
-                memoryres = dc.readBytes(daveDB, taskControlDB, robots[0].Offset, robotBlockSize*5, memoryBuffer);
+                memoryres = dc.readBytes(daveDB, taskControlDB, robots[0].Offset, robotBlockControlParameters * noOfRobots * 2, memoryBuffer);
 
                 //=========================================================|
                 //  Memoryres - return code from Libnodave:                |
@@ -724,6 +743,8 @@ class SiemensPLC
                 //=========================================================|
                 if (memoryres == 0)
                 {
+
+                    logger(AREA, DEBUG, "Memory Buffer After Libnodave Read: ");
                     logger(AREA, DEBUG, BitConverter.ToString(memoryBuffer));
 
                     //================================================================| 
@@ -733,13 +754,21 @@ class SiemensPLC
                     //================================================================|
                     for (int r = 0; r < noOfRobots; r++)
                     {
-                        int byteOffset = robots[r].Offset;
+                        logger(AREA, DEBUG, "Going Through Robot : " + r);
+
+                        //int byteOffset = robots[r].Offset;
+                        int byteOffset = 0;
 
                         for (int i = 0; i < robotBlockControlParameters; i++)
                         {
+                            logger(AREA, DEBUG, "Going Through Parameter : " + i);
+
                             int size = 2; // Can also be obtained from the parameters themselves
                             int byte1 = byteOffset + (i * size);
                             int byte2 = byteOffset + (i * size) + 1;
+
+                            logger(AREA, DEBUG, "Byte 1 : " + byte1);
+                            logger(AREA, DEBUG, "Byte 2 : " + byte2);
 
                             byte[] tempBytesForConversion = new byte[2] { memoryBuffer[byte1], memoryBuffer[byte2] };
 
@@ -747,8 +776,13 @@ class SiemensPLC
                             if (BitConverter.IsLittleEndian)
                             { Array.Reverse(tempBytesForConversion); }
 
-                            robots[r].Param[i].setValue(BitConverter.ToInt16(tempBytesForConversion, 0));
+                            robots[r].Param[i].setValue(BitConverter.ToInt16(tempBytesForConversion));
+                            robots[r].Param[i].print();
                         }
+
+                        logger(AREA, DEBUG, "Task No Is: " + robots[0].getTaskNumber());
+                        
+                        Console.ReadLine();
 
                         if (robots[r].Param[0].getValue() == TaskStatus.AwaitingPickUp)
                         {
@@ -827,6 +861,11 @@ class SiemensPLC
 
         if (live)
         {
+            logger(AREA, DEBUG, "Starting A Write Request");
+
+            dataStorageDB = 19;
+
+
             PDU p2 = (PDU)dc.prepareWriteRequest();
 
             //  Go through all the Write Parameters
@@ -835,17 +874,23 @@ class SiemensPLC
             //  Then add to the PDU as a write request
             for (int i = fleetBlockControlParameters; i < fleetBlock.Param.Count; i++)
             {
-                byte[] tempBytes = BitConverter.GetBytes(fleetBlock.Param[i].getValue());
+                fleetBlock.Param[i].print();
 
-                if (BitConverter.IsLittleEndian)
-                { Array.Reverse(tempBytes); }
+                byte[] tempBytes = BitConverter.GetBytes((short)fleetBlock.Param[i].getValue());
+
+                Array.Reverse(tempBytes);
+
+                //if (BitConverter.IsLittleEndian)
+                //{ Array.Reverse(tempBytes); }
 
                 p2.addVarToWriteRequest(daveDB, dataStorageDB, fleetBlock.Param[i].getOffset(), fleetBlock.Param[i].getSize(), tempBytes);
             }
 
             result = dc.execWriteRequest(p2, rs);
 
-            for (int i = 0; i < fleetBlock.Param.Count; i++)
+            logger(AREA, DEBUG, "Wrote A Request");
+
+            for (int i = 0; i < fleetBlock.Param.Count - fleetBlockControlParameters; i++)
             {
                 result = rs.getErrorOfResult(i);
                 logger(AREA, DEBUG, "Error Code From: " + fleetBlock.Param[i].getName() + " Code Is: " + result);
@@ -870,6 +915,9 @@ class SiemensPLC
 
         // Copying the Mirage Memory into FleetBlock buffer
         robots[robot].Param[robotBlockControlParameters].setValue(TaskStatus);
+
+        logger(AREA, DEBUG, "Updated Task Status To " + TaskStatus + ". Now Starting to copy memory over");
+
         robotMemoryToPLC(robotID);
 
         int result = 1;
@@ -885,6 +933,8 @@ class SiemensPLC
             //  Then add to the PDU as a write request
             for (int i = robotBlockControlParameters; i < robots[robot].Param.Count; i++)
             {
+                dataStorageDB = 19;
+
                 byte[] tempBytes;
 
                 if (robots[robot].Param[i].getSize() == 2)
@@ -896,8 +946,10 @@ class SiemensPLC
                     tempBytes = BitConverter.GetBytes(robots[robot].Param[i].getFloat());
                 }
 
-                if (BitConverter.IsLittleEndian)
-                { Array.Reverse(tempBytes); }
+                Array.Reverse(tempBytes);
+
+                //if (BitConverter.IsLittleEndian)
+                //{ Array.Reverse(tempBytes); }
 
                 p2.addVarToWriteRequest(daveDB, dataStorageDB, robots[robot].Param[i].getOffset(), robots[robot].Param[i].getSize(), tempBytes);
             }
@@ -916,26 +968,82 @@ class SiemensPLC
         }
     }
 
-
-
-/*
-    public static void readDataFromPLC()
+    /// <summary>
+    /// Writes the PLC fleetBlock Parameters into PLC DB. This is used after a Task was completed by Mirage.
+    /// </summary>
+    /// <param name="TaskStatus"></param>
+    public static void writeRobotBlock(int robot)
     {
-        PDU p;
-        resultSet rs;
-        DotNetSiemensPLCToolBoxLibrary.Communication.LibNoDave.libnodave.
-        
-        davePrepareReadRequest64(dc, p*);
+        logger(AREA, DEBUG, "==== Starting To Write Data For Robot " + robot + " ====");
+
+        robotMemoryToPLC(robotID);
+
+        int result = 1;
+        resultSet rs = new resultSet();
+
+        if (live)
+        {
+            PDU p2 = (PDU)dc.prepareWriteRequest();
+
+            //  Go through all the Write Parameters
+            //  First, convert all the values to Bytes
+            //  Then reverse cause fuck Siemens
+            //  Then add to the PDU as a write request
+            for (int i = robotBlockControlParameters; i < robots[robot].Param.Count; i++)
+            {
+                dataStorageDB = 19;
+
+                byte[] tempBytes;
+
+                if (robots[robot].Param[i].getSize() == 2)
+                {
+                    tempBytes = BitConverter.GetBytes(robots[robot].Param[i].getValue());
+                }
+                else
+                {
+                    tempBytes = BitConverter.GetBytes(robots[robot].Param[i].getFloat());
+                }
+
+                Array.Reverse(tempBytes);
+
+                //if (BitConverter.IsLittleEndian)
+                //{ Array.Reverse(tempBytes); }
+
+                p2.addVarToWriteRequest(daveDB, dataStorageDB, robots[robot].Param[i].getOffset(), robots[robot].Param[i].getSize(), tempBytes);
+            }
+
+            result = dc.execWriteRequest(p2, rs);
+
+            for (int i = 0; i < robots[robot].Param.Count; i++)
+            {
+                result = rs.getErrorOfResult(i);
+                logger(AREA, DEBUG, "Error Code From Robot: " + robot + " Param: " + robots[robot].Param[i].getName() + " Code Is: " + result);
+            }
+        }
+        else
+        {
+            logger(AREA, INFO, "==== Running In Sim Mode ====");
+        }
+    }
+
+    /*
+        public static void readDataFromPLC()
+        {
+            PDU p;
+            resultSet rs;
+            DotNetSiemensPLCToolBoxLibrary.Communication.LibNoDave.libnodave.
+
+            davePrepareReadRequest64(dc, p*);
 
 
 
-        davePrepareReadRequest64(dc, &p);
-        daveAddVarToReadRequest(&p, daveInputs, 0, 0, 1);
-        daveAddVarToReadRequest(&p, daveFlags, 0, 0, 4);
-        daveAddVarToReadRequest(&p, daveDB, 6, 20, 2);
-        daveAddVarToReadRequest(&p, daveFlags, 0, 12, 2);
-        res = dc.daveExecReadRequest(dc, &p, &rs);
-    }*/
+            davePrepareReadRequest64(dc, &p);
+            daveAddVarToReadRequest(&p, daveInputs, 0, 0, 1);
+            daveAddVarToReadRequest(&p, daveFlags, 0, 0, 4);
+            daveAddVarToReadRequest(&p, daveDB, 6, 20, 2);
+            daveAddVarToReadRequest(&p, daveFlags, 0, 12, 2);
+            res = dc.daveExecReadRequest(dc, &p, &rs);
+        }*/
 
 
     /// <summary>
@@ -1006,16 +1114,23 @@ class SiemensPLC
             if (robot == fleetID)
             {
                 fleetBlock.Param[Task_Status_ID].setValue(status);
-
+                fleetBlock.Param[Task_Status_ID].print();
             }
             else
             {
                 robots[robot].Param[Task_Status_ID].setValue(status);
+                robots[robot].Param[Task_Status_ID].print();
             }
 
-            tempBytes = BitConverter.GetBytes(status);
+            tempBytes = BitConverter.GetBytes((short)status);
 
-            if (BitConverter.IsLittleEndian) { Array.Reverse(tempBytes); }
+            logger(AREA, DEBUG, BitConverter.ToString(tempBytes));
+
+            Array.Reverse(tempBytes);
+
+            logger(AREA, DEBUG, BitConverter.ToString(tempBytes));
+
+            logger(AREA, DEBUG, "Bytes Turned into: " + BitConverter.ToInt16(tempBytes));
 
             try
             {
@@ -1023,7 +1138,8 @@ class SiemensPLC
 
                 if (robot==fleetID)
                 {
-                    result = dc.writeBytes(daveDB, taskControlDB, fleetBlock.Param[Task_Status_ID].getOffset(), fleetBlock.Param[Task_Status_ID].getSize(), tempBytes);
+                    result = dc.writeBytes(daveDB, 19, 8, 2, tempBytes);
+                    result = dc.writeBytes(daveDB, 19, fleetBlock.Param[Task_Status_ID].getOffset(), fleetBlock.Param[Task_Status_ID].getSize(), tempBytes);
                 }
                 else
                 {

@@ -55,6 +55,11 @@ namespace Mirage.plc
 
         public short getTaskNumber()
         {
+            return Param[1].getValue();
+        }
+
+        public short getTaskParameter()
+        {
             return Param[2].getValue();
         }
     }
