@@ -1,5 +1,7 @@
-﻿using Newtonsoft.Json;
+﻿using Mirage.rest;
+using Newtonsoft.Json;
 using System;
+using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading;
@@ -20,16 +22,16 @@ namespace Mirage
         public Robot fleetManager;
         private Task<HttpResponseMessage>[] httpResponseTasks;
         private Task<HttpResponseMessage> fleetResponseTask;
+        private RobotGroup[] group;
 
         public short returnParameter = 15;
-        public short[] groups = new short[8] { 1, 2, 3, 4, 5, 6, 7, 8 };
+        public short[] groups = new short[8] { (short)sizeOfFleet, 0, 0, 0, 0, 0, 0, 0 };
         public int[] robotMapping;
 
-
-    //=========================================================|
-    //  Used For Debugging                                     |     
-    //=========================================================|
-    private static readonly Type AREA = typeof(Fleet);
+        //=========================================================|
+        //  Used For Debugging                                     |     
+        //=========================================================|
+        private static readonly Type AREA = typeof(Fleet);
 
         /// <summary>
         /// Initializes the robot fleet, Fleet Manager excluded
@@ -40,9 +42,16 @@ namespace Mirage
             robots = new Robot[sizeOfFleet];
             robotMapping = new int[1] { 4 };
             httpResponseTasks = new Task<HttpResponseMessage>[sizeOfFleet];
+
             // Instantiates the group array
             groups = new short[8] { 0, 0, 0, 0, 0, 0, 0, 0 };
 
+            // Initialize the robot group
+            group = new RobotGroup[8];
+            for(int i = 0; i < 8; i++)
+            {
+                group[i] = new RobotGroup(); 
+            }
 
             instantiateRobots(sizeOfFleet);
         }
@@ -255,6 +264,24 @@ namespace Mirage
             {
                 logger(AREA, DEBUG, "Hellow from missions save");
                 fleetManager.saveMissions(fleetResponseTask.Result);
+            }
+            else if (type == "robots? whitelist = robot_group_id")
+            {
+                logger(AREA, DEBUG, "We're fetching robot groups in bulk");
+                group = JsonConvert.DeserializeObject<RobotGroup[]>(fleetResponseTask.Result.Content.ReadAsStringAsync().Result);
+
+                groups = new short[8] { 0, 0, 0, 0, 0, 0, 0, 0 };
+
+                for (int i = 0; i < group.Length; i++)
+                {
+                    for(int j = 0; j < groups.Length; j++)
+                    {
+                        if(group[i].robot_group_id == j)
+                        {
+                            groups[j]++;
+                        }
+                    }
+                }
             }
 
             logger(AREA, DEBUG, "==== Completed Get Request ====");

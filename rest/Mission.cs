@@ -246,5 +246,31 @@ namespace Mirage.rest
 
             return request;
         }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        public HttpRequestMessage postRequest(int robotID)
+        {
+            string payload = "{\r\n  \"mission_id\": \"" + guid + "\"\r\n}";
+
+            logger(AREA, DEBUG, payload);
+
+            //string payload = "{\r\n  \"mission_id\": \"a5e518af-820d-11e9-8328-0000000000" + stringyfyMission(missionNumber) + "\"\r\n}";
+
+            HttpRequestMessage request = new HttpRequestMessage
+            {
+                Content = new StringContent(payload, Encoding.UTF8, "application/json"),
+                Method = HttpMethod.Post,
+                RequestUri = new Uri("http://192.168.1.195/api/v2.0.0/mission_scheduler")
+                //RequestUri = new Uri("mission_scheduler")
+            };
+
+            logger(AREA, DEBUG, "Request Created");
+
+            return request;
+        }
+
     }
 }

@@ -5,6 +5,7 @@ using System.Net.Http;
 using MySql.Data.MySqlClient;
 using static Globals;
 using static Globals.DebugLevel;
+using Newtonsoft.Json;
 
 namespace Mirage.rest
 {
@@ -53,7 +54,13 @@ namespace Mirage.rest
             logger(AREA, INFO, "");
         }
 
-        public void saveToMemory(HttpResponseMessage response) { }
+        public void saveToMemory(HttpResponseMessage response) 
+        {
+            RobotGroup temp = JsonConvert.DeserializeObject<RobotGroup>(response.Content.ReadAsStringAsync().Result);
+
+            id = temp.id;
+            robot_group_id = temp.robot_group_id;
+        }
 
         /// <summary>
         /// Saves RobotGroup data to the database.

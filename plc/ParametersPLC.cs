@@ -62,6 +62,11 @@ namespace Mirage.plc
         {
             return Param[2].getValue();
         }
+
+        public short getTaskSubparameter()
+        {
+            return Param[3].getValue();
+        }
     }
 
     public class Parameters<T> where T : IParameters

@@ -6,6 +6,7 @@ using static Globals.DebugLevel;
 using static DotNetSiemensPLCToolBoxLibrary.Communication.LibNoDave.libnodave;
 using System.Collections.Generic;
 using Mirage.plc;
+using System.Collections;
 
 /// <summary>
 /// Contains all the methods and data related to a Siemens PLC.
@@ -67,6 +68,11 @@ class SiemensPLC
     public static int noOfRobots;
     public static int robotBlockSize;
     public static int robotBlockControlParameters = 4;
+
+    public static int alarmOffset = 424;
+    public static int alarmBlockSize = 22;
+   // public static BitArray[] alrm;
+    public static Alarms plcAlarms = new Alarms();
 
     //=========================================================|
     //  Message helper parameters                              |
@@ -1183,54 +1189,23 @@ class SiemensPLC
     {
         logger(AREA, DEBUG, "==== Checking PLC Response ====");
 
-        if(live)
+        if (live)
         {
-            byte[] tempByteBuffer = new byte[4];
-            int memoryres = 1;
+            readFleetHeader();
 
-            try
+            readRobots();
+
+            if (fleetBlock.getPLCTaskStatus() == TaskStatus.PlcOK)
             {
-                memoryres = dc.readBytes(daveDB, taskControlDB, 12, 4, tempByteBuffer);
+                updateTaskStatus(fleetID, TaskStatus.Idle);
+            }
 
-                // PLC read was successful
-                if (memoryres == 0)
+            for (int i = 0; i < sizeOfFleet; i++)
+            {
+                if (robots[i].getPLCTaskStatus() == TaskStatus.PlcOK)
                 {
-                    status = BitConverter.ToInt32(tempByteBuffer, 0);
-
-                    if (status == TaskStatus.PlcOK)
-                    {
-                        logger(AREA, DEBUG, "PLC Processed Data");
-                    }
-                    else if (status == TaskStatus.PlcError)
-                    {
-                        logger(AREA, ERROR, "PLC Failed To Process Data");
-                    }
-                    else
-                    {
-                        logger(AREA, ERROR, "Unknown Status");
-                    }
+                    updateTaskStatus(i, TaskStatus.Idle);
                 }
-                else
-                {
-                    logger(AREA, ERROR, "Response Check Failed");
-                    logger(AREA, ERROR, daveStrerror(memoryres));
-                    plcConnectionErrors++;
-                }
-            }
-            catch (NullReferenceException exception)
-            {
-                logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
-                plcConnectionErrors++;
-                establishConnection();
-            }
-            catch (Exception exception)
-            {
-                logger(AREA, ERROR, "Failed To Fetch Response Data: ", exception);
-                plcConnectionErrors++;
-            }
-            finally
-            {
-
             }
         }
         else
@@ -1243,6 +1218,116 @@ class SiemensPLC
         newMsg = false;
 
         logger(AREA, DEBUG, "==== Response Check Completed ====");
+    }
+
+    /// <summary>
+    /// Reads the alarm block
+    /// </summary>
+    public static void readAlarms()
+    {
+        logger(AREA, DEBUG, "==== Reading PLC Alarms ====");
+
+        int alarmOffset = 424;
+        int alarmBlockSize = 22;
+
+        if (live)
+        {
+            int memoryres;
+            byte[] memoryBuffer = new byte[alarmBlockSize];
+
+            try
+            {
+                taskControlDB = 19;
+
+                // readBytes(Area, Data Block Number (in PLC), Start Byte, Length, Byte Container)
+                memoryres = dc.readBytes(daveDB, taskControlDB, alarmOffset, alarmBlockSize, memoryBuffer);
+
+                //=========================================================|
+                //  Memoryres - return code from Libnodave:                |
+                //    0 - Obtained Data                                    |
+                //  < 0 - Error detected by Libnodave                      |
+                //  > 0 - Error from the PLC                               |
+                //=========================================================|
+                if (memoryres == 0)
+                {
+                    logger(AREA, DEBUG, BitConverter.ToString(memoryBuffer));
+
+                    int alarmPosition = 0;
+
+                    for(int i = 0; i < alarmBlockSize/2; i++)
+                    {
+                        int size = 2;
+                        int byte1 = i * size;
+                        int byte2 = (i * size) + 1;
+
+                        byte[] tempBytesForConversion = new byte[2] { memoryBuffer[byte1], memoryBuffer[byte2] };
+
+                        BitArray myBA = new BitArray(tempBytesForConversion);
+
+                        for (int a = 0; a < myBA.Count; a++)
+                        {
+                            plcAlarms.alarm_array[alarmPosition].triggered = myBA[a];
+                            //logger(AREA, DEBUG, "Word " + i + " Bit No: " + a + " is set to: " + myBA[a]);
+
+                            alarmPosition++;
+                        }
+                    }
+
+                    plcAlarms.printAllAlarms();
+                }
+                else
+                {
+                    logger(AREA, ERROR, "Failed to Poll");
+                    logger(AREA, ERROR, daveStrerror(memoryres));
+                    plcConnectionErrors++;
+                    newMsg = false;
+                }
+            }
+            catch (NullReferenceException exception)
+            {
+                logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
+                plcConnectionErrors++;
+                newMsg = false;
+
+                establishConnection();
+            }
+            catch (Exception exception)
+            {
+                logger(AREA, ERROR, "Polling Failed. Error : ", exception);
+                plcConnectionErrors++;
+                newMsg = false;
+            }
+        }
+        else
+        {
+            logger(AREA, INFO, "Simulating Messages From Console");
+
+            if (!newMsg)
+            {
+                for (int i = 0; i < fleetBlockControlParameters + 1; i++)
+                {
+                    fleetBlock.Param[i].simulateConsole();
+                }
+
+                string yn;
+
+                Console.WriteLine("Add Robot Commands Further On (y/n)");
+                yn = Console.ReadLine();
+
+                if (yn == "y" || yn == "Y")
+                {
+                    furtherMsg = true;
+                }
+                else if (yn == "n" || yn == "N")
+                {
+                    furtherMsg = false;
+                }
+
+                newMsg = true;
+            }
+        }
+
+        logger(AREA, DEBUG, "==== Completed Alarms Read ====");
     }
 
     /// <summary>

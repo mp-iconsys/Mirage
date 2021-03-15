@@ -35,6 +35,9 @@ class Program
 
             if (SiemensPLC.plcConnected)
             {
+                //====================================================|
+                //  Poll the PLC for any tasks                        |
+                //====================================================|
                 SiemensPLC.poll();
 
                 Console.ReadLine();
@@ -60,7 +63,7 @@ class Program
                                 taskStatus = getScheduleStatus();
                                 break;
                             case Tasks.SendMissionToScheduler:
-                                taskStatus = sendMissionToScheduler(SiemensPLC.fleetBlock.getTaskParameter());
+                                taskStatus = sendMissionToScheduler(SiemensPLC.fleetBlock.getTaskParameter(), SiemensPLC.fleetBlock.getTaskSubparameter());
                                 break;
                             case Tasks.CreateMission:
                                 taskStatus = createMission();
@@ -83,13 +86,13 @@ class Program
                         }
 
                         SiemensPLC.writeFleetBlock(taskStatus);
+
+                        logger(AREA, DEBUG, "Finished Checking Fleet");
                     }
                     else
                     {
                         logger(AREA, DEBUG, "Not A Fleet Data Task");
                     }
-
-                    logger(AREA, DEBUG, "Finished Checking Fleet");
 
                     Console.ReadLine();
 
@@ -113,7 +116,7 @@ class Program
                                     taskStatus = getScheduleStatus();
                                     break;
                                 case Tasks.SendMissionToScheduler:
-                                    taskStatus = sendMissionToScheduler(SiemensPLC.robots[j].getTaskParameter());
+                                    taskStatus = sendMissionToScheduler(SiemensPLC.robots[j].getTaskParameter(), mirFleet.robotMapping[j]);
                                     break;
                                 case Tasks.CreateMission:
                                     taskStatus = createMission();
@@ -143,6 +146,23 @@ class Program
 
                     logger(AREA, DEBUG, "==== Completed Processing Tasks ====");
                 }
+
+                //====================================================|
+                //  Read Alarms And Flag If Triggered                 |
+                //====================================================|
+                SiemensPLC.readAlarms();
+
+                getRobotGroups();
+
+                //====================================================|
+                //  Fetch High Frequency Data for the PLC             |
+                //====================================================|
+                for (int k = 0; k < Globals.sizeOfFleet; k++)
+                {
+                    getRobotStatus(k);
+
+                    getRobotStatusFromFleet(k);
+                }
             }
             else
             {
@@ -150,16 +170,6 @@ class Program
             }
 
             SiemensPLC.checkConnectivity();
-
-            //====================================================|
-            //  Fetch High Frequency Data for the PLC             |
-            //====================================================|
-            for(int k = 0; k < Globals.sizeOfFleet; k++)
-            {
-                getRobotStatus(k);
-
-                getRobotStatusFromFleet(k);
-            }
 
             // Poll MiR Fleet - async operation that happens every pollInterval
             if (timer.Elapsed.Seconds >= pollInterval)
@@ -216,28 +226,43 @@ class Program
     }
 
     /// <summary>
-    /// This actually involves sending a mission to scheduler
+    /// Sends a mission to Fleet Scheduler. If the robotID is 0, it sends a new mision and checks which robot got assigned
     /// </summary>
-    private static int sendMissionToScheduler(int mission_number)
+    private static int sendMissionToScheduler(int mission_number, int robotID)
     {
+        int restStatus;
+
         logger(AREA, INFO, "==== Send Mission To Scheduler ====");
+        logger(AREA, INFO, "Mission No: " + mission_number + " For robot: " + robotID);
 
-        int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Missions[mission_number].postRequest());
-
-        // Check the mission_scheduler we've just created to return with the robot ID
-        if (mirFleet.fleetManager.schedule.working_response)
+        if(robotID == 0)
         {
-            restStatus = mirFleet.issueGetRequest("mission_scheduler/" + mirFleet.fleetManager.schedule.id, 666);
+            logger(AREA, INFO, "==== Sending Brand New Mission To Any Robots ====");
 
-            if (restStatus == Globals.TaskStatus.CompletedNoErrors)
+            restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Missions[mission_number].postRequest());
+
+            // Check the mission_scheduler we've just created to return with the robot ID
+            if (mirFleet.fleetManager.schedule.working_response)
             {
-                mirFleet.returnParameter = (short)mirFleet.fleetManager.schedule.robot_id;
+                restStatus = mirFleet.issueGetRequest("mission_scheduler/" + mirFleet.fleetManager.schedule.id, 666);
+
+                if (restStatus == Globals.TaskStatus.CompletedNoErrors)
+                {
+                    mirFleet.returnParameter = (short)mirFleet.fleetManager.schedule.robot_id;
+                }
             }
+        }
+        else
+        {
+            logger(AREA, INFO, "==== Sending A Follow-Up Mission To Robot: " + robotID + " ====");
+
+            restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Missions[mission_number].postRequest(robotID));
         }
 
         SiemensPLC.updateTaskStatus(SiemensPLC.fleetID, restStatus);
 
         logger(AREA, DEBUG, "==== Mission Sent ====");
+        logger(AREA, DEBUG, "Status: " + restStatus);
 
         return restStatus;
     }
@@ -279,6 +304,25 @@ class Program
         logger(AREA, DEBUG, "==== Robot Group Changed ====");
 
         return restStatus;
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <returns></returns>
+    private static void getRobotGroups()
+    {
+        logger(AREA, INFO, "==== Scan Fleet Manager For Robot Groups ====");
+
+        // Need to add whether to turn alarm on/off and which alarm to affect from PLC
+        int restStatus = mirFleet.issueGetRequest("robots?whitelist=robot_group_id", SiemensPLC.fleetID);
+
+        fleetMemoryToPLC();
+        //int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Group.putRequest(robotID, robotGroupID));
+
+        //SiemensPLC.updateTaskStatus(restStatus);
+        logger(AREA, DEBUG, "Status: " + restStatus);
+        logger(AREA, DEBUG, "==== Fetched Robot Groups ====");
     }
 
     /// <summary>
