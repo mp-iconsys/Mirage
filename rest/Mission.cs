@@ -13,6 +13,10 @@ namespace Mirage.rest
     {
         public int missionNumber;
         public string guid = "a5e518af - 820d - 11e9 - 8328 - 0000000000"; // Add mission number to that
+        public string hidden;
+        public string group_id;
+        public string description;
+        public string created_by_id;
         public string name;
         public string url;
         public string uri_suffix = "missions";
@@ -234,12 +238,66 @@ namespace Mirage.rest
 
             //string payload = "{\r\n  \"mission_id\": \"a5e518af-820d-11e9-8328-0000000000" + stringyfyMission(missionNumber) + "\"\r\n}";
 
+            Uri uri = new Uri("http://" + fleetManagerIP + "/api/v2.0.0/mission_scheduler");
+
             HttpRequestMessage request = new HttpRequestMessage
             {
                 Content = new StringContent(payload, Encoding.UTF8, "application/json"),
                 Method = HttpMethod.Post,
-                RequestUri = new Uri("http://192.168.1.195/api/v2.0.0/mission_scheduler")
-            //RequestUri = new Uri("mission_scheduler")
+                RequestUri = uri
+                //RequestUri = new Uri("mission_scheduler")
+            };
+
+            logger(AREA, DEBUG, "Request Created");
+
+            return request;
+        }
+
+        public HttpRequestMessage postRequest(string guid, string name, string description, string hidden, string group_id, string created_by)
+        {
+            string payload;
+            payload = "{\"guid\": \"" + guid + "\", ";
+            payload += "\"name\": \"" + name + "\", ";
+            payload += "\"description\": \"" + description + "\", ";
+            payload += "\"hidden:\": " + hidden + ", ";
+            payload += "\"group_id\": \"" + group_id + "\", ";
+            payload += "\"created_by\": \"" + created_by + "\"}";
+
+            logger(AREA, DEBUG, payload);
+
+            Uri uri = new Uri("http://" + fleetManagerIP + "/api/v2.0.0/missions");
+
+            HttpRequestMessage request = new HttpRequestMessage
+            {
+                Content = new StringContent(payload, Encoding.UTF8, "application/json"),
+                Method = HttpMethod.Post,
+                RequestUri = uri
+            };
+
+            logger(AREA, DEBUG, "Request Created");
+
+            return request;
+        }
+
+        public HttpRequestMessage postRequest(bool newMissionCreation)
+        {
+            string payload;
+            payload = "{\"guid\": \"" + guid + "\", ";
+            payload += "\"name\": \"" + name + "\", ";
+            payload += "\"description\": \"" + description + "\", ";
+            payload += "\"hidden:\": " + hidden + ", ";
+            payload += "\"group_id\": \"" + group_id + "\", ";
+            payload += "\"created_by\": \"" + created_by_id + "\"}";
+
+            logger(AREA, DEBUG, payload);
+
+            Uri uri = new Uri("http://" + fleetManagerIP + "/api/v2.0.0/missions");
+
+            HttpRequestMessage request = new HttpRequestMessage
+            {
+                Content = new StringContent(payload, Encoding.UTF8, "application/json"),
+                Method = HttpMethod.Post,
+                RequestUri = uri
             };
 
             logger(AREA, DEBUG, "Request Created");

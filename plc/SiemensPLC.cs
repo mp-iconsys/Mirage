@@ -77,6 +77,7 @@ class SiemensPLC
     //=========================================================|
     //  Message helper parameters                              |
     //=========================================================|
+    public static bool[] newMsgs = new bool[10];
     public static bool newMsg;
     public static bool plcConnected;
     public static bool live;
@@ -93,6 +94,11 @@ class SiemensPLC
     public static void initialize()
     {
         logger(AREA, DEBUG, "==== Starting Initialization ====");
+
+        for(int i = 0; i < sizeOfFleet+1; i++)
+        {
+            newMsgs[i] = false;
+        }
 
         int rowcount = 0;
 
@@ -632,10 +638,34 @@ class SiemensPLC
                         if (BitConverter.IsLittleEndian)
                         { Array.Reverse(tempBytesForConversion); }
 
+                        if(i == 0)
+                        {
+                            if(BitConverter.ToInt16(tempBytesForConversion, 0) == 10 && fleetBlock.Param[0].getValue() == 0)
+                            {
+                                newMsgs[0] = true;
+
+                                for (int j = 0; j < fleetBlockControlParameters; j++)
+                                {
+                                    fleetBlock.Param[j].print();
+                                }
+
+                                updateTaskStatus(fleetID, 10);
+                                //newMsg = true;
+                            }
+                            else
+                            {
+                                //newMsg = false;
+                                logger(AREA, DEBUG, "PLC Fleet Block Idle");
+                                newMsgs[0] = false;
+                            }
+                        }
+
                         fleetBlock.Param[i].setValue(BitConverter.ToInt16(tempBytesForConversion, 0));
                     }
 
-                    if (fleetBlock.Param[0].getValue() == TaskStatus.AwaitingPickUp)
+                    // Not sure this is right
+                    // Might have to only trigger new message on rising edge 
+/*                    if (fleetBlock.Param[0].getValue() == TaskStatus.AwaitingPickUp)
                     {
                         newMsg = true;
 
@@ -651,7 +681,7 @@ class SiemensPLC
                     {
                         logger(AREA, DEBUG, "PLC Fleet Block Idle");
                         newMsg = false;
-                    }
+                    }*/
                 }
                 else
                 {
@@ -781,6 +811,23 @@ class SiemensPLC
                             // Need to reverse the bytes to get actual values
                             if (BitConverter.IsLittleEndian)
                             { Array.Reverse(tempBytesForConversion); }
+
+                            // Trigger a new message on rising edge
+                            if (i == 0)
+                            {
+
+                                if (BitConverter.ToInt16(tempBytesForConversion, 0) == 10 && fleetBlock.Param[0].getValue() == 0)
+                                {
+                                    //newMsg = true;
+                                    newMsgs[r+1] = true;
+
+                                    updateTaskStatus(r, 10);
+                                }
+                                else
+                                {
+                                    newMsg = false;
+                                }
+                            }
 
                             robots[r].Param[i].setValue(BitConverter.ToInt16(tempBytesForConversion));
                             robots[r].Param[i].print();

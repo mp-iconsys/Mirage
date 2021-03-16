@@ -22,7 +22,7 @@ namespace Mirage
         public Robot fleetManager;
         private Task<HttpResponseMessage>[] httpResponseTasks;
         private Task<HttpResponseMessage> fleetResponseTask;
-        private RobotGroup[] group;
+        public RobotGroup[] group;
 
         public short returnParameter = 15;
         public short[] groups = new short[8] { (short)sizeOfFleet, 0, 0, 0, 0, 0, 0, 0 };

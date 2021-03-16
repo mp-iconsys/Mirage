@@ -80,6 +80,7 @@ public class Robot
             FireAlarm = new FireAlarms();
             Group = new RobotGroup();
             schedule = new Scheduler();
+            Missions = new List<Mission>();
         }
 
         /// <summary>
@@ -205,7 +206,7 @@ public class Robot
         /// <returns></returns>
         public int sendRESTdata(HttpRequestMessage request)
         {
-            //formConnection();
+            formConnection();
 
             int statusCode = 0;
 

@@ -16,6 +16,12 @@ class Program
     {
         readAllSettings();
 
+        initializeFleet();
+
+        Console.ReadLine();
+
+        //Console.ReadLine();
+
         mirFleet.getInitialFleetData();
 
         logger(AREA, DEBUG, "==== Starting Main Loop ====");
@@ -49,7 +55,7 @@ class Program
                     //====================================================|
                     //  Fleet Manager Tasks                               |
                     //====================================================|
-                    if (SiemensPLC.fleetBlock.getTaskStatus() == Globals.TaskStatus.TaskReceivedFromPLC)
+                    if (SiemensPLC.newMsgs[0])
                     {
                         SiemensPLC.updateTaskStatus(SiemensPLC.fleetID, Globals.TaskStatus.StartedProcessing);
 
@@ -101,7 +107,7 @@ class Program
                     //====================================================|
                     for (int j = 0; j < Globals.sizeOfFleet; j ++)
                     {
-                        if (SiemensPLC.robots[j].getTaskStatus() == Globals.TaskStatus.TaskReceivedFromPLC)
+                        if (SiemensPLC.newMsgs[j])
                         {
                             SiemensPLC.updateTaskStatus(j, Globals.TaskStatus.StartedProcessing);
 
@@ -153,6 +159,8 @@ class Program
                 SiemensPLC.readAlarms();
 
                 getRobotGroups();
+
+                //checkMissionAssignment();
 
                 //====================================================|
                 //  Fetch High Frequency Data for the PLC             |
@@ -239,6 +247,7 @@ class Program
         {
             logger(AREA, INFO, "==== Sending Brand New Mission To Any Robots ====");
 
+            //if()
             restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Missions[mission_number].postRequest());
 
             // Check the mission_scheduler we've just created to return with the robot ID

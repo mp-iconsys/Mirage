@@ -116,7 +116,7 @@ namespace Mirage.rest
             {
                 Content = new StringContent("", Encoding.UTF8, "application/json"),
                 Method = HttpMethod.Delete,
-                RequestUri = new Uri("fire_alarms")
+                RequestUri = new Uri("robot_groups")
             };
 
             return request;
@@ -132,7 +132,34 @@ namespace Mirage.rest
             {
                 Content = new StringContent("", Encoding.UTF8, "application/json"),
                 Method = HttpMethod.Delete,
-                RequestUri = new Uri("fire_alarms")
+                RequestUri = new Uri("robot_groups")
+            };
+
+            return request;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        public HttpRequestMessage postRequest(string name, string description ,string allow_all, string created_by)
+        {
+            string payload;
+            payload = "{\"name\": \"" + name + "\", ";
+            payload += "\"description\": \"" + description + "\", ";
+            payload += "\"allow_all_mission_groups:\": " + allow_all + ", ";
+            payload += "\"created_by_id\": \"" + created_by + "\"}";
+
+            Console.WriteLine(payload);
+
+            string url = "http://" + fleetManagerIP + "/api/v2.0.0/robot_groups/";
+            Uri uri = new Uri(url);
+
+            HttpRequestMessage request = new HttpRequestMessage
+            {
+                Content = new StringContent(payload, Encoding.UTF8, "application/json"),
+                Method = HttpMethod.Post,
+                RequestUri = uri
             };
 
             return request;

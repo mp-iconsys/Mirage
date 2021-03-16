@@ -14,6 +14,7 @@ using Mirage;
 using System.Collections.Generic;
 using static Globals.DebugLevel;
 using Mirage.Reporting;
+using System.Text;
 
 public static class Globals
 {
@@ -483,6 +484,150 @@ public static class Globals
 
         logger(AREA, DEBUG, "==== SMS Alert Sent ====");
     }
+
+    /// <summary>
+    /// Sends various parameters on start-up so that fleet is correct
+    /// </summary>
+    public static void initializeFleet()
+    {
+        logger(AREA, DEBUG, "Initializing Fleet");
+
+        //=========================================================|
+        // Post All the Robot Groups                               |
+        //=========================================================|
+        try
+        {
+            string sql = "SELECT * FROM robot_groups;";
+            using var cmd = new MySqlCommand(sql, db);
+            using MySqlDataReader rdr = cmd.ExecuteReader();
+
+            while (rdr.Read())
+            {
+                Mirage.rest.RobotGroup temp = new Mirage.rest.RobotGroup();
+
+                string name = rdr.GetString(1);
+                string desc = rdr.GetString(2);
+                string allow_all = rdr.GetString(3);
+                string created_by = rdr.GetString(4);
+
+                logger(AREA, DEBUG, "Row: " + rdr.GetInt32(0) + " - Name: " + name + " - Description: " + desc + "Allow All Mission: " + allow_all + "Created By: " + created_by);
+
+                //mirFleet.group[i] = new Mirage.rest.RobotGroup();
+                HttpRequestMessage tempReq = temp.postRequest(name, desc, allow_all, created_by);
+
+                mirFleet.fleetManager.sendRESTdata(tempReq);
+            }
+        }
+        catch (Exception e)
+        {
+            logger(AREA, DEBUG, "Failed a query: ", e);
+        }
+
+        //=========================================================|
+        // Post the Mission Groups                                 |
+        //=========================================================|
+        try
+        {
+            string sql = "SELECT * FROM mission_groups;";
+            using var cmd = new MySqlCommand(sql, db);
+            using MySqlDataReader rdr = cmd.ExecuteReader();
+
+            while (rdr.Read())
+            {
+                string guid = rdr.GetString(1);
+                string name = rdr.GetString(2);
+                int priority = rdr.GetInt32(3);
+                string feature = rdr.GetString(4);
+                string icon = rdr.GetString(5);
+                string created_by = rdr.GetString(6);
+
+                logger(AREA, DEBUG, "Row: " + rdr.GetInt32(0) + " - GUID: " + guid + " - Name: " + name + "Priority: " + priority + "Feature: " + feature + " icon: " + icon + " Created by: " + created_by);
+
+                var plainTextBytes = System.Text.Encoding.UTF8.GetBytes(icon);
+
+                string payload;
+                payload = "{\"guid\": \"" + guid + "\", ";
+                payload += "\"name\": \"" + name + "\", ";
+                payload += "\"priority\": " + priority + ", ";
+                payload += "\"feature\": \"" + feature + "\", ";
+                payload += "\"icon\": \"" + System.Convert.ToBase64String(plainTextBytes) + "\", ";
+                payload += "\"created_by_id\": \"" + created_by + "\"}";
+
+                logger(AREA, DEBUG, payload);
+
+                string url = "http://" + fleetManagerIP + "/api/v2.0.0/mission_groups/";
+                Uri uri = new Uri(url);
+
+                HttpRequestMessage request = new HttpRequestMessage
+                {
+                    Content = new StringContent(payload, Encoding.UTF8, "application/json"),
+                    Method = HttpMethod.Post,
+                    RequestUri = uri
+                };
+
+                logger(AREA, DEBUG, request.Content.ToString());
+
+                mirFleet.fleetManager.sendRESTdata(request);
+            }
+        }
+        catch (Exception e)
+        {
+            logger(AREA, DEBUG, "Failed a query: ", e);
+        }
+
+        //=========================================================|
+        // Post the Missions                                       |
+        //=========================================================|
+        try
+        {
+            string sql = "SELECT * FROM missions;";
+            using var cmd = new MySqlCommand(sql, db);
+            using MySqlDataReader rdr = cmd.ExecuteReader();
+
+            int i = 0;
+
+            while (rdr.Read())
+            {
+                string guid = rdr.GetString(2);
+                string name = rdr.GetString(3);
+                string description = rdr.GetString(4);
+                string hidden = rdr.GetString(5);
+                string group_id = rdr.GetString(6);
+                string created_by = rdr.GetString(7);
+                string url_string = rdr.GetString(8);
+
+                Mirage.rest.Mission temp = new Mirage.rest.Mission();
+
+                temp.created_by_id = created_by;
+                temp.url = url_string;
+                temp.group_id = group_id;
+                temp.hidden = hidden;
+                temp.description = description;
+                temp.name = name;
+                temp.guid = guid;
+
+/*                mirFleet.fleetManager.Missions[i].created_by_id = created_by;
+                mirFleet.fleetManager.Missions[i].url = url_string;
+                mirFleet.fleetManager.Missions[i].group_id = group_id;
+                mirFleet.fleetManager.Missions[i].hidden = hidden;
+                mirFleet.fleetManager.Missions[i].description = description;
+                mirFleet.fleetManager.Missions[i].name = name;
+                mirFleet.fleetManager.Missions[i].guid = guid;*/
+
+                mirFleet.fleetManager.Missions.Add(temp);
+
+                logger(AREA, DEBUG, "Row: " + rdr.GetInt32(0) + " - GUID: " + guid + " - Name: " + name + "Desc: " + description + "Hidden: " + hidden + " group_id: " + group_id + " created_by: " + created_by + " URL: " + url_string);
+
+                mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Missions[i].postRequest(true));
+            }
+        }
+        catch (Exception e)
+        {
+            logger(AREA, DEBUG, "Failed a query: ", e);
+        }
+    }
+
+
 
     /// <summary>
     /// Copies the data from Mirage internal memory to PLC buffer
