@@ -347,7 +347,7 @@ class SiemensPLC
         for (int i = 0; i < noOfRobots; i++)
         {
             for(int j = 0; j < robots[0].Param.Count; j++ )
-            { 
+            {
                 robots[i].Param[j].print();
             }
         }
@@ -642,6 +642,7 @@ class SiemensPLC
                         {
                             if(BitConverter.ToInt16(tempBytesForConversion, 0) == 10 && fleetBlock.Param[0].getValue() == 0)
                             {
+                                logger(AREA, DEBUG, "Got A Mission From Fleet");
                                 newMsgs[0] = true;
 
                                 for (int j = 0; j < fleetBlockControlParameters; j++)
@@ -650,11 +651,11 @@ class SiemensPLC
                                 }
 
                                 updateTaskStatus(fleetID, 10);
-                                //newMsg = true;
+                                newMsg = true;
                             }
                             else
                             {
-                                //newMsg = false;
+                                newMsg = false;
                                 logger(AREA, DEBUG, "PLC Fleet Block Idle");
                                 newMsgs[0] = false;
                             }
@@ -742,7 +743,7 @@ class SiemensPLC
             fleetBlock.Param[i].print();
         }
 
-        Console.ReadLine();
+        //Console.ReadLine();
 
         logger(AREA, DEBUG, "==== Completed Fleet Header ====");
     }
@@ -803,9 +804,6 @@ class SiemensPLC
                             int byte1 = byteOffset + (i * size);
                             int byte2 = byteOffset + (i * size) + 1;
 
-                            logger(AREA, DEBUG, "Byte 1 : " + byte1);
-                            logger(AREA, DEBUG, "Byte 2 : " + byte2);
-
                             byte[] tempBytesForConversion = new byte[2] { memoryBuffer[byte1], memoryBuffer[byte2] };
 
                             // Need to reverse the bytes to get actual values
@@ -818,14 +816,15 @@ class SiemensPLC
 
                                 if (BitConverter.ToInt16(tempBytesForConversion, 0) == 10 && fleetBlock.Param[0].getValue() == 0)
                                 {
-                                    //newMsg = true;
+                                    logger(AREA, DEBUG, "We've Got A New Message For Robot : " + r);
+                                    newMsg = true;
                                     newMsgs[r+1] = true;
 
                                     updateTaskStatus(r, 10);
                                 }
                                 else
                                 {
-                                    newMsg = false;
+                                    //newMsg = false;
                                 }
                             }
 
@@ -835,9 +834,9 @@ class SiemensPLC
 
                         logger(AREA, DEBUG, "Task No Is: " + robots[0].getTaskNumber());
                         
-                        Console.ReadLine();
+                        //Console.ReadLine();
 
-                        if (robots[r].Param[0].getValue() == TaskStatus.AwaitingPickUp)
+/*                        if (robots[r].Param[0].getValue() == TaskStatus.AwaitingPickUp)
                         {
                             newMsg = true;
 
@@ -849,7 +848,7 @@ class SiemensPLC
                             }
 
                             updateTaskStatus(r, TaskStatus.TaskReceivedFromPLC);
-                        }
+                        }*/
                     }
                 }
                 else
@@ -971,7 +970,7 @@ class SiemensPLC
 
         logger(AREA, DEBUG, "Updated Task Status To " + TaskStatus + ". Now Starting to copy memory over");
 
-        robotMemoryToPLC(robotID);
+        robotMemoryToPLC(robot);
 
         int result = 1;
         resultSet rs = new resultSet();
@@ -1029,7 +1028,7 @@ class SiemensPLC
     {
         logger(AREA, DEBUG, "==== Starting To Write Data For Robot " + robot + " ====");
 
-        robotMemoryToPLC(robotID);
+        robotMemoryToPLC(robot);
 
         int result = 1;
         resultSet rs = new resultSet();
@@ -1044,6 +1043,8 @@ class SiemensPLC
             //  Then add to the PDU as a write request
             for (int i = robotBlockControlParameters; i < robots[robot].Param.Count; i++)
             {
+                //logger(AREA, DEBUG, "Robot: " + i + " Param: " + robots[robot].Param[i].getName() + " Offset: " + robots[robot].Param[i].getOffset());
+
                 dataStorageDB = 19;
 
                 byte[] tempBytes;

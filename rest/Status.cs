@@ -40,8 +40,6 @@ namespace Mirage.rest
 
 
         public List<string> allowed_methods { get; set; }
-
-
         public Position position { get; set; }
         public List<ErrorsItem> errors { get; set; } // Try without a list
         public User_prompt user_prompt { get; set; }

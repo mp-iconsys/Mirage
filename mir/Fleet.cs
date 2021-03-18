@@ -24,7 +24,7 @@ namespace Mirage
         private Task<HttpResponseMessage> fleetResponseTask;
         public RobotGroup[] group;
 
-        public short returnParameter = 15;
+        public short returnParameter = 0;
         public short[] groups = new short[8] { (short)sizeOfFleet, 0, 0, 0, 0, 0, 0, 0 };
         public int[] robotMapping;
 
@@ -65,7 +65,7 @@ namespace Mirage
         public Fleet(int sizeOfFleet, string fleetManagerIP, AuthenticationHeaderValue fleetManagerAuthToken)
         {
             robots = new Robot[sizeOfFleet];
-            robotMapping = new int[1] { 4 };
+            robotMapping = new int[2] { 1, 2 };
             httpResponseTasks = new Task<HttpResponseMessage>[sizeOfFleet];
 
             // Instantiates the group array
@@ -211,6 +211,10 @@ namespace Mirage
                 {
                     fleetResponseTask.Wait();
                 }
+                else if(type == "mission_scheduler/666")
+                {
+                    fleetResponseTask.Wait();
+                }
                 else
                 {
                     httpResponseTasks[robotID].Wait();
@@ -248,12 +252,12 @@ namespace Mirage
 
                 logger(AREA, DEBUG, "Got Status From Fleet");
             }
-            else if (type == "mission_scheduler")
+/*            else if (type == "mission_scheduler")
             {
                 logger(AREA, DEBUG, "Hellow from mission scheduler save");
 
                 fleetManager.Missions[0].saveToMemory(fleetResponseTask.Result);
-            }
+            }*/
             else if (type == "mission_scheduler/" + mirFleet.fleetManager.schedule.id)
             {
                 logger(AREA, DEBUG, "Getting Mission Scheduler response");
@@ -265,14 +269,37 @@ namespace Mirage
                 logger(AREA, DEBUG, "Hellow from missions save");
                 fleetManager.saveMissions(fleetResponseTask.Result);
             }
-            else if (type == "robots? whitelist = robot_group_id")
+            else if (type == "robots?whitelist=robot_group_id")
             {
                 logger(AREA, DEBUG, "We're fetching robot groups in bulk");
                 group = JsonConvert.DeserializeObject<RobotGroup[]>(fleetResponseTask.Result.Content.ReadAsStringAsync().Result);
 
                 groups = new short[8] { 0, 0, 0, 0, 0, 0, 0, 0 };
 
-                for (int i = 0; i < group.Length; i++)
+                //GROUPS:
+                //  0 - Spare
+                //  1 - Available
+                //  2 - Busy
+                //  3 - Charging
+
+                // Go through robots
+                for(int i = 0; i < sizeOfFleet; i++)
+                {
+                    if(group[i].robot_group_id == 3)
+                    {
+                        groups[1]++;
+                    }
+                    else if(group[i].robot_group_id == 4)
+                    {
+                        groups[2]++;
+                    }
+                    else if (group[i].robot_group_id == 5)
+                    {
+                        groups[3]++;
+                    }
+                }
+
+/*                for (int i = 0; i < group.Length; i++)
                 {
                     for(int j = 0; j < groups.Length; j++)
                     {
@@ -281,13 +308,93 @@ namespace Mirage
                             groups[j]++;
                         }
                     }
-                }
+                }*/
             }
 
             logger(AREA, DEBUG, "==== Completed Get Request ====");
 
             return functionStatus;
         }
+
+        public int checkMissionSchedule(string type, int robotID, int robot)
+        {
+            // TODO: joing with fleet
+
+            logger(AREA, DEBUG, "==== Issuing Get Request ====");
+
+            int functionStatus = Globals.TaskStatus.CompletedNoErrors;
+
+            try
+            {
+                try
+                {
+                    if (type == "mission_scheduler" || robotID == 666)
+                    {
+                        logger(AREA, DEBUG, "Sending " + type + " Request To Fleet Manager");
+                        fleetResponseTask = fleetManager.sendGetRequest(type);
+                    }
+                }
+                catch (HttpRequestException exception)
+                {
+                    // TODO: Handle more exceptions
+                    // Remove the task which is causing the exception
+                    logger(AREA, ERROR, "HTTP Request Error. Couln't connect to the MiR robots.");
+                    logger(AREA, ERROR, "Check your network, dns settings, robot is up, etc. Error: ", exception);
+
+                    functionStatus = Globals.TaskStatus.CouldntProcessRequest;
+                }
+            }
+            catch (System.Net.WebException exception)
+            {
+                logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
+
+                functionStatus = Globals.TaskStatus.CouldntProcessRequest;
+            }
+
+            try
+            {
+                if (type == "mission_scheduler" || robotID == 666)
+                {
+                    fleetResponseTask.Wait();
+                }
+                else if (robotID == 666)
+                {
+                    fleetResponseTask.Wait();
+                }
+                else
+                {
+                    httpResponseTasks[robotID].Wait();
+
+                    logger(AREA, DEBUG, "Waiting For HTTP Response Task");
+                }
+            }
+            catch (Exception exception)
+            {
+                functionStatus = Globals.TaskStatus.CouldntProcessRequest;
+
+                logger(AREA, ERROR, "Connection Error: ", exception);
+            }
+
+            if (type == "status")
+            {
+                robots[robotID].saveStatusInMemory(httpResponseTasks[robotID].Result);
+
+                logger(AREA, DEBUG, "Status is : " + robots[robotID].s.mission_text);
+            }
+            else  
+            {
+                        
+                logger(AREA, DEBUG, "Getting Mission Scheduler response");
+
+                mirFleet.robots[robot].schedule.saveToMemory(fleetResponseTask.Result);
+                //fleetManager.schedule.saveToMemory(fleetResponseTask.Result);  
+            }
+
+            logger(AREA, DEBUG, "==== Completed Get Request ====");
+
+            return functionStatus;
+        }
+
 
         /// <summary>
         /// 

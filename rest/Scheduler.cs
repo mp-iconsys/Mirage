@@ -11,10 +11,14 @@ namespace Mirage.rest
 {
     public class Scheduler : IRest
     {
-        public string url, state;
-        public string mission, mission_id, description;
-        public int id = 0; 
-        public int robot_id;
+        public string url { get; set; }
+        public string state { get; set; }
+        public int state_id { get; set; }
+        public string mission { get; set; }
+        public string mission_id { get; set; }
+        public string description { get; set; }
+        public int id { get; set; }
+        public int robot_id { get; set; }
 
         public bool working_response;
 
@@ -23,7 +27,11 @@ namespace Mirage.rest
         //=========================================================|
         private static readonly Type AREA = typeof(Scheduler);
 
-        public Scheduler() { }
+        public Scheduler() 
+        {
+            id = 0;
+            state_id = 0;
+        }
 
         /// <summary>
         /// Prints map data from memory to the log file and console.

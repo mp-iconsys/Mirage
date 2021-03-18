@@ -11,23 +11,26 @@ namespace Mirage.rest
 {
     public class Mission : IRest
     {
-        public int missionNumber;
-        public string guid = "a5e518af - 820d - 11e9 - 8328 - 0000000000"; // Add mission number to that
-        public string hidden;
-        public string group_id;
-        public string description;
-        public string created_by_id;
-        public string name;
-        public string url;
-        public string uri_suffix = "missions";
-        public string missionNumberString;
+        public int missionNumber { get; set; }
+        public string guid { get; set; }// Add mission number to that
+        public string hidden { get; set; }
+        public string group_id { get; set; }
+        public string description { get; set; }
+        public string created_by_id { get; set; }
+        public string name { get; set; }
+        public string url { get; set; }
+        public string url_string { get; set; }
+        public string uri_suffix { get; set; }
+        public string missionNumberString { get; set; }
 
-        //=========================================================|
-        //  Used For Logging & Debugging                           |     
-        //=========================================================|
-        private static readonly Type AREA = typeof(Mission);
+    //=========================================================|
+    //  Used For Logging & Debugging                           |     
+    //=========================================================|
+    private static readonly Type AREA = typeof(Mission);
 
         public Mission() { }
+
+        //public setMission(int missionNo, string guid)
 
         /// <summary>
         /// 
@@ -255,15 +258,19 @@ namespace Mirage.rest
 
         public HttpRequestMessage postRequest(string guid, string name, string description, string hidden, string group_id, string created_by)
         {
+            // TODO: change the session ID to be dynamic
             string payload;
             payload = "{\"guid\": \"" + guid + "\", ";
             payload += "\"name\": \"" + name + "\", ";
             payload += "\"description\": \"" + description + "\", ";
             payload += "\"hidden:\": " + hidden + ", ";
             payload += "\"group_id\": \"" + group_id + "\", ";
+            payload += "\"session_id\": \"7198db1f - 0474 - 11ea - 84a7 - 0001298f8a0a\", ";
             payload += "\"created_by\": \"" + created_by + "\"}";
 
             logger(AREA, DEBUG, payload);
+
+            //Console.ReadLine();
 
             Uri uri = new Uri("http://" + fleetManagerIP + "/api/v2.0.0/missions");
 
@@ -281,12 +288,14 @@ namespace Mirage.rest
 
         public HttpRequestMessage postRequest(bool newMissionCreation)
         {
+            // TODO: change the session ID to be dynamic
             string payload;
             payload = "{\"guid\": \"" + guid + "\", ";
             payload += "\"name\": \"" + name + "\", ";
             payload += "\"description\": \"" + description + "\", ";
             payload += "\"hidden:\": " + hidden + ", ";
             payload += "\"group_id\": \"" + group_id + "\", ";
+            payload += "\"session_id\": \"7198db1f-0474-11ea-84a7-0001298f8a0a\", ";
             payload += "\"created_by\": \"" + created_by_id + "\"}";
 
             logger(AREA, DEBUG, payload);
@@ -311,9 +320,12 @@ namespace Mirage.rest
         /// <returns></returns>
         public HttpRequestMessage postRequest(int robotID)
         {
-            string payload = "{\r\n  \"mission_id\": \"" + guid + "\"\r\n}";
-
+            string payload;
+            payload = "{\"mission_id\": \"" + guid + "\", ";
+            payload += "\"robot_id\": " + robotID + "} ";
             logger(AREA, DEBUG, payload);
+
+            Uri uri = new Uri("http://" + fleetManagerIP + "/api/v2.0.0/mission_scheduler");
 
             //string payload = "{\r\n  \"mission_id\": \"a5e518af-820d-11e9-8328-0000000000" + stringyfyMission(missionNumber) + "\"\r\n}";
 
@@ -321,7 +333,7 @@ namespace Mirage.rest
             {
                 Content = new StringContent(payload, Encoding.UTF8, "application/json"),
                 Method = HttpMethod.Post,
-                RequestUri = new Uri("http://192.168.1.195/api/v2.0.0/mission_scheduler")
+                RequestUri = uri
                 //RequestUri = new Uri("mission_scheduler")
             };
 

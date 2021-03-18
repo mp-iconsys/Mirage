@@ -15,6 +15,7 @@ using System.Collections.Generic;
 using static Globals.DebugLevel;
 using Mirage.Reporting;
 using System.Text;
+using System.Threading;
 
 public static class Globals
 {
@@ -64,12 +65,13 @@ public static class Globals
     public static class Tasks
     {
         public const int GetScheduleStatus = 100;
-        public const int SendMissionToScheduler = 101;
-        public const int CreateMission = 102;
+        public const int CreateMission = 101;
+        public const int SendMissionToScheduler = 102;
         public const int ClearScheduler = 103;
         public const int GetBattery = 200;
         public const int GetDistance = 201;
         public const int GetRobotStatus = 202;
+        public const int SendRobotMission = 208;
     }
 
     /// <summary>
@@ -495,7 +497,7 @@ public static class Globals
         //=========================================================|
         // Post All the Robot Groups                               |
         //=========================================================|
-        try
+/*        try
         {
             string sql = "SELECT * FROM robot_groups;";
             using var cmd = new MySqlCommand(sql, db);
@@ -516,17 +518,22 @@ public static class Globals
                 HttpRequestMessage tempReq = temp.postRequest(name, desc, allow_all, created_by);
 
                 mirFleet.fleetManager.sendRESTdata(tempReq);
+                Thread.Sleep(50);
             }
         }
         catch (Exception e)
         {
             logger(AREA, DEBUG, "Failed a query: ", e);
-        }
+        }*/
+
+        logger(AREA, DEBUG, "==== FINISHED INITIALIZING ROBOT GROUPS ====");
+        logger(AREA, DEBUG, "Press a key to proceed");
+        //Console.ReadLine();
 
         //=========================================================|
         // Post the Mission Groups                                 |
         //=========================================================|
-        try
+/*        try
         {
             string sql = "SELECT * FROM mission_groups;";
             using var cmd = new MySqlCommand(sql, db);
@@ -550,8 +557,8 @@ public static class Globals
                 payload += "\"name\": \"" + name + "\", ";
                 payload += "\"priority\": " + priority + ", ";
                 payload += "\"feature\": \"" + feature + "\", ";
-                payload += "\"icon\": \"" + System.Convert.ToBase64String(plainTextBytes) + "\", ";
-                payload += "\"created_by_id\": \"" + created_by + "\"}";
+                payload += "\"icon\": \"" + System.Convert.ToBase64String(plainTextBytes) + "\"} ";
+                //payload += "\"created_by_id\": \"" + created_by + "\"}";
 
                 logger(AREA, DEBUG, payload);
 
@@ -568,12 +575,18 @@ public static class Globals
                 logger(AREA, DEBUG, request.Content.ToString());
 
                 mirFleet.fleetManager.sendRESTdata(request);
+
+                Thread.Sleep(50);
             }
         }
         catch (Exception e)
         {
             logger(AREA, DEBUG, "Failed a query: ", e);
         }
+*/
+        logger(AREA, DEBUG, "==== FINISHED INITIALIZING MISSION GROUPS ====");
+        logger(AREA, DEBUG, "Press a key to proceed");
+        //Console.ReadLine();
 
         //=========================================================|
         // Post the Missions                                       |
@@ -588,6 +601,8 @@ public static class Globals
 
             while (rdr.Read())
             {
+
+                //mirFleet.fleetManager.Missions[i] = new Mirage.rest.Mission();
                 string guid = rdr.GetString(2);
                 string name = rdr.GetString(3);
                 string description = rdr.GetString(4);
@@ -596,35 +611,59 @@ public static class Globals
                 string created_by = rdr.GetString(7);
                 string url_string = rdr.GetString(8);
 
-                Mirage.rest.Mission temp = new Mirage.rest.Mission();
-
-                temp.created_by_id = created_by;
-                temp.url = url_string;
-                temp.group_id = group_id;
-                temp.hidden = hidden;
-                temp.description = description;
-                temp.name = name;
-                temp.guid = guid;
-
-/*                mirFleet.fleetManager.Missions[i].created_by_id = created_by;
-                mirFleet.fleetManager.Missions[i].url = url_string;
-                mirFleet.fleetManager.Missions[i].group_id = group_id;
-                mirFleet.fleetManager.Missions[i].hidden = hidden;
-                mirFleet.fleetManager.Missions[i].description = description;
+                mirFleet.fleetManager.Missions[i].missionNumber = i;
+                mirFleet.fleetManager.Missions[i].guid = guid;
                 mirFleet.fleetManager.Missions[i].name = name;
-                mirFleet.fleetManager.Missions[i].guid = guid;*/
+                mirFleet.fleetManager.Missions[i].description = description;
+                mirFleet.fleetManager.Missions[i].hidden = hidden;
+                mirFleet.fleetManager.Missions[i].group_id = group_id;
+                mirFleet.fleetManager.Missions[i].created_by_id = created_by;
+                mirFleet.fleetManager.Missions[i].url_string = url_string;
 
-                mirFleet.fleetManager.Missions.Add(temp);
+/*                if (i == 2)
+                {
+                    mirFleet.fleetManager.Missions[i].print();
+                }*/
+                //Console.ReadLine();
 
-                logger(AREA, DEBUG, "Row: " + rdr.GetInt32(0) + " - GUID: " + guid + " - Name: " + name + "Desc: " + description + "Hidden: " + hidden + " group_id: " + group_id + " created_by: " + created_by + " URL: " + url_string);
+                /*                Mirage.rest.Mission temp = new Mirage.rest.Mission();
 
-                mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Missions[i].postRequest(true));
+                                temp.created_by_id = created_by;
+                                temp.url = url_string;
+                                temp.group_id = group_id;
+                                temp.hidden = hidden;
+                                temp.description = description;
+                                temp.name = name;
+                                temp.guid = guid;*/
+
+                /*                mirFleet.fleetManager.Missions[i].created_by_id = created_by;
+                                mirFleet.fleetManager.Missions[i].url = url_string;
+                                mirFleet.fleetManager.Missions[i].group_id = group_id;
+                                mirFleet.fleetManager.Missions[i].hidden = hidden;
+                                mirFleet.fleetManager.Missions[i].description = description;
+                                mirFleet.fleetManager.Missions[i].name = name;
+                                mirFleet.fleetManager.Missions[i].guid = guid;*/
+
+                //mirFleet.fleetManager.Missions.Add(temp);
+
+                //logger(AREA, DEBUG, "Row: " + rdr.GetInt32(0) + " - GUID: " + guid + " - Name: " + name + "Desc: " + description + "Hidden: " + hidden + " group_id: " + group_id + " created_by: " + created_by + " URL: " + url_string);
+
+                //mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Missions[i].postRequest(true));
+
+                Thread.Sleep(50);
+                i++;
             }
         }
         catch (Exception e)
         {
             logger(AREA, DEBUG, "Failed a query: ", e);
         }
+
+        //mirFleet.fleetManager.Missions[2].print();
+
+        logger(AREA, DEBUG, "==== FINISHED INITIALIZING MISSIONS ====");
+        logger(AREA, DEBUG, "Press a key to proceed");
+        //Console.ReadLine();
     }
 
 
@@ -634,7 +673,7 @@ public static class Globals
     /// </summary>
     public static void fleetMemoryToPLC()
     {
-        Console.ReadLine();
+        //Console.ReadLine();
 
         // Copy the internal Fleet Data to PLC fleetBlock
         SiemensPLC.fleetBlock.Param[SiemensPLC.fleetBlockControlParameters+1].setValue(mirFleet.returnParameter);
@@ -651,7 +690,7 @@ public static class Globals
             j++;
         }
 
-        Console.ReadLine();
+        //Console.ReadLine();
 
         logger(AREA, DEBUG, "Finished Copying Mirage Internal Data to PLC Buffer");
     }
@@ -665,9 +704,15 @@ public static class Globals
 
         logger(AREA, DEBUG, "Mode is: " + mirFleet.robots[robotID].s.mode_id);
 
+        logger(AREA, DEBUG, "Mission Status is: " + mirFleet.robots[robotID].schedule.state_id);
         SiemensPLC.robots[robotID].Param[5].print();
-        SiemensPLC.robots[robotID].Param[5].setValue(mirFleet.robots[robotID].s.mode_id);
+        SiemensPLC.robots[robotID].Param[5].setValue(mirFleet.robots[robotID].schedule.state_id);
         SiemensPLC.robots[robotID].Param[5].print();
+
+        /*
+                SiemensPLC.robots[robotID].Param[5].print();
+                SiemensPLC.robots[robotID].Param[5].setValue(mirFleet.robots[robotID].s.mode_id);
+                SiemensPLC.robots[robotID].Param[5].print();*/
 
         logger(AREA, DEBUG, "Robot Group is: " + mirFleet.robots[robotID].s.robot_group_id);
 
@@ -693,7 +738,7 @@ public static class Globals
         SiemensPLC.robots[robotID].Param[10].setValueDouble(mirFleet.robots[robotID].s.position.orientation);
         SiemensPLC.robots[robotID].Param[10].print();
 
-        Console.ReadLine();
+        //Console.ReadLine();
 
         SiemensPLC.robots[robotID].Param[11].print();
         SiemensPLC.robots[robotID].Param[11].setValueDouble(mirFleet.robots[robotID].s.moved);

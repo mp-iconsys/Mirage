@@ -80,7 +80,13 @@ public class Robot
             FireAlarm = new FireAlarms();
             Group = new RobotGroup();
             schedule = new Scheduler();
-            Missions = new List<Mission>();
+
+            Missions = new List<Mission>(new Mission[60]);
+
+            for (int i = 0; i < 60; i++)
+            {
+                Missions[i] = new Mirage.rest.Mission();
+            }
         }
 
         /// <summary>

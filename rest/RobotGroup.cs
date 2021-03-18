@@ -23,6 +23,7 @@ namespace Mirage.rest
         public string created_by_id { get; set; }
         public int id { get; set; }
         public string robot_model { get; set; }
+        public int robot_group_mapping { get; set; }
 
         //=========================================================|
         //  Used For Logging & Debugging                           |     
@@ -147,8 +148,8 @@ namespace Mirage.rest
             string payload;
             payload = "{\"name\": \"" + name + "\", ";
             payload += "\"description\": \"" + description + "\", ";
-            payload += "\"allow_all_mission_groups:\": " + allow_all + ", ";
-            payload += "\"created_by_id\": \"" + created_by + "\"}";
+            payload += "\"allow_all_mission_groups:\": " + allow_all + "}";
+            //payload += "\"created_by_id\": \"" + created_by + "\"}";
 
             Console.WriteLine(payload);
 
@@ -182,7 +183,8 @@ namespace Mirage.rest
             payload += "\"active\": "   + active.ToString().ToLowerInvariant() + ", ";
             payload += "\"robot_group_id\": " + robot_group_id + "}";
 
-            string  url = "http://192.168.1.195/api/v2.0.0/robots/";
+
+            string  url = "http://"+fleetManagerIP+"/api/v2.0.0/robots/";
                     url += 1;
 
             Uri uri = new Uri(url);
@@ -210,7 +212,7 @@ namespace Mirage.rest
             payload += "\"active\": " + active.ToString().ToLowerInvariant() + ", ";
             payload += "\"robot_group_id\": " + robot_group_id + "}";
 
-            string url = "http://127.0.0.1:15151/api/v2.0.0/robots/" + robot;
+            string url = "http://"+fleetManagerIP+"/api/v2.0.0/robots/" + robot;
             Uri uri = new Uri(url);
 
 
