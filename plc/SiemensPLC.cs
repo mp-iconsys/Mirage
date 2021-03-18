@@ -794,7 +794,8 @@ class SiemensPLC
                         logger(AREA, DEBUG, "Going Through Robot : " + r);
 
                         //int byteOffset = robots[r].Offset;
-                        int byteOffset = 0;
+                        // Robot Control Parameters, each is 2 bytes
+                        int byteOffset = r* robotBlockControlParameters* 2;
 
                         for (int i = 0; i < robotBlockControlParameters; i++)
                         {
@@ -813,18 +814,15 @@ class SiemensPLC
                             // Trigger a new message on rising edge
                             if (i == 0)
                             {
-
-                                if (BitConverter.ToInt16(tempBytesForConversion, 0) == 10 && fleetBlock.Param[0].getValue() == 0)
+                                
+                                if (BitConverter.ToInt16(tempBytesForConversion, 0) == 10 && robots[r].Param[0].getValue() == 0)
                                 {
-                                    logger(AREA, DEBUG, "We've Got A New Message For Robot : " + r);
+                                    logger(AREA, DEBUG, "NEW MESSAGE FOR ROBOT : " + r);
+
                                     newMsg = true;
                                     newMsgs[r+1] = true;
 
-                                    updateTaskStatus(r, 10);
-                                }
-                                else
-                                {
-                                    //newMsg = false;
+                                    updateTaskStatus(r, TaskStatus.StartedProcessing);
                                 }
                             }
 
@@ -893,6 +891,8 @@ class SiemensPLC
             }
         }
 
+        //Console.ReadLine();
+
         logger(AREA, DEBUG, "==== Completed Robot Task Control ====");
     }
 
@@ -916,7 +916,6 @@ class SiemensPLC
             logger(AREA, DEBUG, "Starting A Write Request");
 
             dataStorageDB = 19;
-
 
             PDU p2 = (PDU)dc.prepareWriteRequest();
 
@@ -1250,9 +1249,14 @@ class SiemensPLC
 
             for (int i = 0; i < sizeOfFleet; i++)
             {
+
                 if (robots[i].getPLCTaskStatus() == TaskStatus.PlcOK)
                 {
+                    mirFleet.robots[i].schedule.state_id = TaskStatus.Idle;
                     updateTaskStatus(i, TaskStatus.Idle);
+
+                    robotMemoryToPLC(i);
+                    writeRobotBlock(i); // TODO - fix so it only writes on falling edge and we don't write an entire block
                 }
             }
         }

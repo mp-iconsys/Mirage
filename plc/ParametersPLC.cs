@@ -110,7 +110,7 @@ namespace Mirage.plc
 
         public void print()
         {
-            logger(AREA, INFO, Name + ", Size: " + Size + " Offset: " + Offset + " Value: " + Value);
+            logger(AREA, DEBUG, Name + ", Size: " + Size + " Offset: " + Offset + " Value: " + Value);
         }
 
         public int getSize()
@@ -192,7 +192,7 @@ namespace Mirage.plc
 
         public void print()
         {
-            logger(AREA, INFO, Name + ", Size: " + Size + " Offset: " + Offset + " Value: " + Value);
+            logger(AREA, DEBUG, Name + ", Size: " + Size + " Offset: " + Offset + " Value: " + Value);
         }
 
         public int getSize()

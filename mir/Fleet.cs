@@ -40,7 +40,7 @@ namespace Mirage
         public Fleet(int sizeOfFleet)
         {
             robots = new Robot[sizeOfFleet];
-            robotMapping = new int[1] { 4 };
+            robotMapping = new int[2] { 2, 3 };
             httpResponseTasks = new Task<HttpResponseMessage>[sizeOfFleet];
 
             // Instantiates the group array
@@ -288,14 +288,17 @@ namespace Mirage
                     if(group[i].robot_group_id == 3)
                     {
                         groups[1]++;
+                        group[i].robot_group_id = group[i].robot_group_id - 2;
                     }
                     else if(group[i].robot_group_id == 4)
                     {
                         groups[2]++;
+                        group[i].robot_group_id = group[i].robot_group_id - 2;
                     }
                     else if (group[i].robot_group_id == 5)
                     {
                         groups[3]++;
+                        group[i].robot_group_id = group[i].robot_group_id - 2;
                     }
                 }
 
@@ -320,7 +323,7 @@ namespace Mirage
         {
             // TODO: joing with fleet
 
-            logger(AREA, DEBUG, "==== Issuing Get Request ====");
+            logger(AREA, DEBUG, "==== Checking Mission Scheduler ====");
 
             int functionStatus = Globals.TaskStatus.CompletedNoErrors;
 
@@ -390,7 +393,7 @@ namespace Mirage
                 //fleetManager.schedule.saveToMemory(fleetResponseTask.Result);  
             }
 
-            logger(AREA, DEBUG, "==== Completed Get Request ====");
+            logger(AREA, INFO, "==== Mission Scheduler Updated ====");
 
             return functionStatus;
         }

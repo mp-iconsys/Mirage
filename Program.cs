@@ -42,7 +42,7 @@ class Program
             //  M A I N      L O O P                              |
             //====================================================|
             while (keepRunning)
-        {
+            {
             logger(AREA, DEBUG, "==== Loop " + ++i + " Starting ====");
             logger(AREA, DEBUG, "Current Stopwatch Time: " + timer.Elapsed.TotalSeconds);
 
@@ -98,7 +98,16 @@ class Program
                                 break;
                         }
 
-                        SiemensPLC.writeFleetBlock(taskStatus);
+                        if(taskStatus == Globals.TaskStatus.StartedProcessing)
+                        {
+                            SiemensPLC.writeFleetBlock(taskStatus);
+                        }
+                        else
+                        {
+                            SiemensPLC.writeFleetBlock(Globals.TaskStatus.StartedProcessing);
+
+                            SiemensPLC.writeFleetBlock(taskStatus);
+                        }
 
                         logger(AREA, DEBUG, "Finished Checking Fleet");
                     }
@@ -117,6 +126,9 @@ class Program
                         if (SiemensPLC.newMsgs[j+1])
                         {
                             SiemensPLC.updateTaskStatus(j, Globals.TaskStatus.StartedProcessing);
+
+                            //Settomg Mission Status to Idle
+                            mirFleet.robots[j].schedule.state_id = Globals.TaskStatus.Idle;
 
                             logger(AREA, DEBUG, "Issuing Task For Robot: " + j);
                             logger(AREA, DEBUG, "Task Number: " + SiemensPLC.robots[j].getTaskNumber());
@@ -155,6 +167,10 @@ class Program
                             }
 
                             SiemensPLC.writeRobotBlock(j, taskStatus);
+
+                            SiemensPLC.newMsgs[j + 1] = false;
+
+                            //Console.ReadLine();
                         }
                     }
 
@@ -172,6 +188,8 @@ class Program
 
                 checkMissionAssignment();
 
+                //Console.ReadLine();
+
                 //====================================================|
                 //  Fetch High Frequency Data for the PLC             |
                 //====================================================|
@@ -181,8 +199,6 @@ class Program
 
                     getRobotStatusFromFleet(k);
                 }
-
-
             }
             else
             {
@@ -208,7 +224,12 @@ class Program
 
             //Console.ReadLine();
 
-            Thread.Sleep(500); // Remove in live deployment
+            for(int g = 0; g < sizeOfFleet+1; g++)
+            {
+                logger(AREA, DEBUG, "MESSAGE STATUS: " + SiemensPLC.newMsgs[g]);
+            }
+
+            Thread.Sleep(1000); // Remove in live deployment
         }
 
         gracefulTermination();
@@ -231,23 +252,6 @@ class Program
     }
 
     /// <summary>
-    /// 
-    /// </summary>
-    private static int getRobotGroup()
-    {
-        logger(AREA, INFO, "==== Get Robot Group Data ====");
-
-        int restStatus = mirFleet.issueGetRequest("robots/" + 0, 666);
-        mirFleet.fleetManager.Group.print();
-
-        //SiemensPLC.writeData("mission_schedule", restStatus, mirFleet.robots[SiemensPLC.robotID].s.mission_text);
-
-        logger(AREA, DEBUG, "==== Obtained Scheduler Status ====");
-
-        return restStatus;
-    }
-
-    /// <summary>
     /// Sends a mission to Fleet Scheduler. If the robotID is 0, it sends a new mision and checks which robot got assigned
     /// </summary>
     private static int sendMissionToScheduler(int mission_number, int robotID)
@@ -255,6 +259,7 @@ class Program
         int restStatus;
 
         logger(AREA, INFO, "==== Send Mission To Scheduler ====");
+        logger(AREA, INFO, "Mapped Robot ID: " + robotID);
         logger(AREA, INFO, "Mission No: " + mission_number + " For robot: " + robotID);
 
         mirFleet.fleetManager.Missions[mission_number].print();
@@ -276,16 +281,15 @@ class Program
                 logger(AREA, DEBUG, "Mission Scheduler Robot ID is: " + mirFleet.fleetManager.schedule.robot_id);
                 logger(AREA, DEBUG, "Mission Schedule ID is: " + mirFleet.fleetManager.schedule.id);
 
-
                 restStatus = mirFleet.issueGetRequest("mission_scheduler/" + mirFleet.fleetManager.schedule.id, 666);
 
                 logger(AREA, DEBUG, "Mission Scheduler Robot ID After polling is: " + mirFleet.fleetManager.schedule.robot_id);
 
                 if (restStatus == Globals.TaskStatus.CompletedNoErrors && mirFleet.fleetManager.schedule.robot_id != 0)
                 {
-                    currentMissionRobot = mirFleet.fleetManager.schedule.robot_id - 1; // This is as the robots are offset by one in fleet - change to be better
-
-                    mirFleet.returnParameter = (short)mirFleet.fleetManager.schedule.robot_id;
+                    //currentMissionRobot = mirFleet.fleetManager.schedule.robot_id - 1; // This is as the robots are offset by one in fleet - change to be better
+                    currentMissionRobot = mirFleet.fleetManager.schedule.robot_id - 3; // TODO: This is as the robots are offset by one in fleet - change to be better
+                    mirFleet.returnParameter = (short)(mirFleet.fleetManager.schedule.robot_id - 2);
 
                     for (int i = 0; i < sizeOfFleet; i++)
                     {
@@ -297,20 +301,26 @@ class Program
 
                     mirFleet.fleetManager.schedule.working_response = false;
                 }
-
+                else
+                {
+                    restStatus = Globals.TaskStatus.StartedProcessing;
+                    mirFleet.fleetManager.schedule.working_response = true;
+                }
 
                 //Console.ReadLine();
             }
 
-            SiemensPLC.updateTaskStatus(SiemensPLC.fleetID, restStatus);
+            //SiemensPLC.updateTaskStatus(SiemensPLC.fleetID, restStatus);
         }
         else
         {
             logger(AREA, INFO, "==== Sending A Follow-Up Mission To Robot: " + robotID + " ====");
 
-            restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Missions[mission_number].postRequest(robotID));
+            restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Missions[mission_number].postRequest(robotID+2));
 
-            SiemensPLC.updateTaskStatus(robotID-1, restStatus);
+            mirFleet.robots[robotID - 1].schedule.id++;
+
+            SiemensPLC.updateTaskStatus(robotID-1, Globals.TaskStatus.StartedProcessing);
         }
 
         logger(AREA, DEBUG, "==== Mission Sent ====");
@@ -451,9 +461,47 @@ class Program
 
     private static void checkMissionAssignment()
     {
+        logger(AREA, INFO, "==== Checking Mission Assignment ====");
+
         if(mirFleet.fleetManager.schedule.working_response)
         {
             // Still waiting for the Fleet Mission to be assigned
+            // Check the mission_scheduler we've just created to return with the robot ID
+                int currentMissionRobot = 0;
+                int restStatus = 0;
+
+                logger(AREA, DEBUG, "Current Scheduler Robot ID is: " + mirFleet.fleetManager.schedule.robot_id);
+                logger(AREA, DEBUG, "Current Mission Schedule ID is: " + mirFleet.fleetManager.schedule.id);
+
+                restStatus = mirFleet.issueGetRequest("mission_scheduler/" + mirFleet.fleetManager.schedule.id, 666);
+
+                logger(AREA, DEBUG, "Mission Scheduler Robot ID After polling is: " + mirFleet.fleetManager.schedule.robot_id);
+
+                if (restStatus == Globals.TaskStatus.CompletedNoErrors && mirFleet.fleetManager.schedule.robot_id != 0)
+                {
+                    currentMissionRobot = mirFleet.fleetManager.schedule.robot_id - 3; // TODO: This is as the robots are offset by one in fleet - change to be better
+                    mirFleet.returnParameter = (short)(mirFleet.fleetManager.schedule.robot_id-2);
+
+                    for (int i = 0; i < sizeOfFleet; i++)
+                    {
+                        if (currentMissionRobot == i)
+                        {
+                            mirFleet.robots[i].schedule.id = mirFleet.fleetManager.schedule.id;
+                        }
+                    }
+
+                restStatus = Globals.TaskStatus.CompletedNoErrors;
+
+                mirFleet.fleetManager.schedule.working_response = false;
+                }
+                else
+                {
+                    restStatus = Globals.TaskStatus.StartedProcessing;
+                    mirFleet.fleetManager.schedule.working_response = true;
+                }
+
+            SiemensPLC.writeFleetBlock(restStatus);
+
         }
         else
         {
@@ -474,6 +522,14 @@ class Program
                     logger(AREA, DEBUG, "Mission Status For Robot: " + r + " is: " + mirFleet.robots[r].schedule.state);
 
                     if(mirFleet.robots[r].schedule.state == "Pending")
+                    {
+                        mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.StartedProcessing;
+                    }
+                    else if(mirFleet.robots[r].schedule.state == "Executing")
+                    {
+                        mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.StartedProcessing;
+                    }
+                    else if (mirFleet.robots[r].schedule.state == "Outbound")
                     {
                         mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.StartedProcessing;
                     }
