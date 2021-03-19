@@ -24,6 +24,9 @@ namespace Mirage
         private Task<HttpResponseMessage> fleetResponseTask;
         public RobotGroup[] group;
 
+        public ChargingGroup busy;
+        public ChargingGroup available;
+
         public short returnParameter = 0;
         public short[] groups = new short[8] { (short)sizeOfFleet, 0, 0, 0, 0, 0, 0, 0 };
         public int[] robotMapping;
@@ -40,7 +43,7 @@ namespace Mirage
         public Fleet(int sizeOfFleet)
         {
             robots = new Robot[sizeOfFleet];
-            robotMapping = new int[2] { 2, 3 };
+            robotMapping = new int[2] { 4, 2 };
             httpResponseTasks = new Task<HttpResponseMessage>[sizeOfFleet];
 
             // Instantiates the group array
@@ -52,6 +55,9 @@ namespace Mirage
             {
                 group[i] = new RobotGroup(); 
             }
+
+            available = new ChargingGroup(2, "FullCharge", "/v2.0.0/charging_groups/2");
+            busy = new ChargingGroup(3, "EmptyCharge", "/v2.0.0/charging_groups/3");
 
             instantiateRobots(sizeOfFleet);
         }
@@ -65,12 +71,15 @@ namespace Mirage
         public Fleet(int sizeOfFleet, string fleetManagerIP, AuthenticationHeaderValue fleetManagerAuthToken)
         {
             robots = new Robot[sizeOfFleet];
-            robotMapping = new int[2] { 1, 2 };
+            robotMapping = new int[2] { 4, 2 };
             httpResponseTasks = new Task<HttpResponseMessage>[sizeOfFleet];
 
             // Instantiates the group array
             groups = new short[8] { 0, 0, 0, 0, 0, 0, 0, 0 };
             logger(AREA, DEBUG, "Assigned Basics");
+
+            available = new ChargingGroup(2, "FullCharge", "/v2.0.0/charging_groups/2");
+            busy = new ChargingGroup(3, "EmptyCharge", "/v2.0.0/charging_groups/3");
 
             instantiateRobots(sizeOfFleet, fleetManagerIP, fleetManagerAuthToken);
         }

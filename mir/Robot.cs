@@ -222,11 +222,15 @@ public class Robot
 
                 logger(AREA, DEBUG, "Status Code: " + result.StatusCode);
 
-                Console.WriteLine("Base Address: " + comms.BaseAddress);
+                //Console.WriteLine("Base Address: " + comms.BaseAddress);
 
                 if (result.IsSuccessStatusCode)
                 {
+                    logger(AREA, INFO, "Status Code: ");
+
                     statusCode = (int)result.StatusCode;
+
+                    logger(AREA, INFO, "Status Code: ");
 
                     schedule = JsonConvert.DeserializeObject<Scheduler>(result.Content.ReadAsStringAsync().Result);
                     schedule.working_response = true;
@@ -235,6 +239,11 @@ public class Robot
                     {
                         logger(AREA, DEBUG, "Bad Request - Failed to process");
                         statusCode = Globals.TaskStatus.CouldntProcessRequest;
+                    }
+                    else if (statusCode == 409)
+                    {
+                        logger(AREA, INFO, "Robot Already Moved out of the group");
+                        statusCode = Globals.TaskStatus.CompletedNoErrors;
                     }
                     else if ((statusCode > 199 && statusCode < 400) || result.StatusCode == System.Net.HttpStatusCode.OK)
                     {
@@ -251,6 +260,11 @@ public class Robot
                         logger(AREA, DEBUG, "Unknown Error");
                         statusCode = Globals.TaskStatus.FatalError;
                     }
+                }
+                else if((int)result.StatusCode == 409)
+                {
+                    logger(AREA, INFO, "Robot Already Moved out of the group");
+                    statusCode = Globals.TaskStatus.CompletedNoErrors;
                 }
                 else
                 {

@@ -72,6 +72,7 @@ public static class Globals
         public const int GetDistance = 201;
         public const int GetRobotStatus = 202;
         public const int SendRobotMission = 208;
+        public const int ReleaseRobot = 353;
     }
 
     /// <summary>
@@ -120,7 +121,7 @@ public static class Globals
             Console.WriteLine(exception);
         }
 
-        logger(AREA, INFO, "Starting Mirage v0.01");
+        logger(AREA, INFO, "Starting Mirage v0.18");
         logger(AREA, DEBUG, "==== Obtaining Settings ====");
 
         try
@@ -620,6 +621,11 @@ public static class Globals
                 mirFleet.fleetManager.Missions[i].created_by_id = created_by;
                 mirFleet.fleetManager.Missions[i].url_string = url_string;
 
+                //if(i == 52)
+                //{
+                //    mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Missions[i].postRequest(true));
+                //}
+
 /*                if (i == 2)
                 {
                     mirFleet.fleetManager.Missions[i].print();
@@ -690,8 +696,6 @@ public static class Globals
             j++;
         }
 
-        //Console.ReadLine();
-
         logger(AREA, DEBUG, "Finished Copying Mirage Internal Data to PLC Buffer");
     }
 
@@ -700,7 +704,7 @@ public static class Globals
     /// </summary>
     public static void robotMemoryToPLC(int robotID)
     {
-        logger(AREA, DEBUG, "Copying Mirage Internal Memory For Robot " + robotID + " to PLC Buffer");
+        logger(AREA, DEBUG, "Copying Mirage Data Structure To Internal Siemens PLC Parameters For Robot " + robotID);
 
         logger(AREA, DEBUG, "Mode is: " + mirFleet.robots[robotID].s.mode_id);
 
@@ -708,11 +712,6 @@ public static class Globals
         SiemensPLC.robots[robotID].Param[5].print();
         SiemensPLC.robots[robotID].Param[5].setValue(mirFleet.robots[robotID].schedule.state_id);
         SiemensPLC.robots[robotID].Param[5].print();
-
-        /*
-                SiemensPLC.robots[robotID].Param[5].print();
-                SiemensPLC.robots[robotID].Param[5].setValue(mirFleet.robots[robotID].s.mode_id);
-                SiemensPLC.robots[robotID].Param[5].print();*/
 
         logger(AREA, DEBUG, "Robot Group is: " + mirFleet.robots[robotID].s.robot_group_id);
 
@@ -737,8 +736,6 @@ public static class Globals
         SiemensPLC.robots[robotID].Param[10].print();
         SiemensPLC.robots[robotID].Param[10].setValueDouble(mirFleet.robots[robotID].s.position.orientation);
         SiemensPLC.robots[robotID].Param[10].print();
-
-        //Console.ReadLine();
 
         SiemensPLC.robots[robotID].Param[11].print();
         SiemensPLC.robots[robotID].Param[11].setValueDouble(mirFleet.robots[robotID].s.moved);

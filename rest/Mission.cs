@@ -66,14 +66,14 @@ namespace Mirage.rest
         /// </summary>
         public void print()
         {
-            logger(AREA, INFO, "");
-            logger(AREA, INFO, "Mission No: " + missionNumber);
-            logger(AREA, INFO, "GUID: " + guid);
-            logger(AREA, INFO, "Name: " + name);
-            logger(AREA, INFO, "Url: " + url);
-            logger(AREA, INFO, "URI Suffix: " + uri_suffix);
-            logger(AREA, INFO, "missionNumberString: " + missionNumberString);
-            logger(AREA, INFO, "");
+            logger(AREA, DEBUG, "");
+            logger(AREA, DEBUG, "Mission No: " + missionNumber);
+            logger(AREA, DEBUG, "GUID: " + guid);
+            logger(AREA, DEBUG, "Name: " + name);
+            logger(AREA, DEBUG, "Url: " + url);
+            logger(AREA, DEBUG, "URI Suffix: " + uri_suffix);
+            logger(AREA, DEBUG, "missionNumberString: " + missionNumberString);
+            logger(AREA, DEBUG, "");
         }
 
         /// <summary>
@@ -269,8 +269,6 @@ namespace Mirage.rest
             payload += "\"created_by\": \"" + created_by + "\"}";
 
             logger(AREA, DEBUG, payload);
-
-            //Console.ReadLine();
 
             Uri uri = new Uri("http://" + fleetManagerIP + "/api/v2.0.0/missions");
 

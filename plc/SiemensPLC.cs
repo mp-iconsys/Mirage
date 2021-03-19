@@ -814,10 +814,12 @@ class SiemensPLC
                             // Trigger a new message on rising edge
                             if (i == 0)
                             {
-                                
-                                if (BitConverter.ToInt16(tempBytesForConversion, 0) == 10 && robots[r].Param[0].getValue() == 0)
+                                logger(AREA, INFO, "NEW PLC Task Status: " + BitConverter.ToInt16(tempBytesForConversion, 0) + " OLD PLC Task Status: " + robots[r].getTaskStatus());
+                                //robots[0].getPLCTaskStatus()
+                                //robots[r].Param[0].getValue() == 0
+                                if (BitConverter.ToInt16(tempBytesForConversion, 0) == 10 && robots[r].getTaskStatus() == 0)
                                 {
-                                    logger(AREA, DEBUG, "NEW MESSAGE FOR ROBOT : " + r);
+                                    logger(AREA, INFO, "NEW MESSAGE FOR ROBOT : " + r);
 
                                     newMsg = true;
                                     newMsgs[r+1] = true;
@@ -1234,7 +1236,7 @@ class SiemensPLC
     /// </summary>
     public static void checkResponse()
     {
-        logger(AREA, DEBUG, "==== Checking PLC Response ====");
+        logger(AREA, INFO, "==== Checking PLC Response ====");
 
         if (live)
         {
@@ -1242,6 +1244,7 @@ class SiemensPLC
 
             readRobots();
 
+            // If the PLC Task Status is Idle, set our Task Status to Idle 
             if (fleetBlock.getPLCTaskStatus() == TaskStatus.PlcOK)
             {
                 updateTaskStatus(fleetID, TaskStatus.Idle);
@@ -1249,9 +1252,11 @@ class SiemensPLC
 
             for (int i = 0; i < sizeOfFleet; i++)
             {
-
                 if (robots[i].getPLCTaskStatus() == TaskStatus.PlcOK)
                 {
+                    logger(AREA, INFO, "Resetting Task And Mission Status To Idle For Robot : " + i);
+
+                    robots[i].Param[0].setValue(TaskStatus.Idle);
                     mirFleet.robots[i].schedule.state_id = TaskStatus.Idle;
                     updateTaskStatus(i, TaskStatus.Idle);
 
