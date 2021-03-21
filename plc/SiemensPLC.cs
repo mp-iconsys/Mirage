@@ -1099,6 +1099,27 @@ class SiemensPLC
             daveAddVarToReadRequest(&p, daveFlags, 0, 12, 2);
             res = dc.daveExecReadRequest(dc, &p, &rs);
         }*/
+    
+
+    /// <summary>
+    /// Helper method that prints the message and task status
+    /// </summary>
+    public static void printNewMessageStatus()
+    {
+        logger(AREA, INFO, "Fleet Task Status: " + robots[0].getTaskStatus() + " And PLC Task Status: " + robots[0].getPLCTaskStatus());
+
+        for (int g = 0; g < sizeOfFleet; g++)
+        {
+            if(g == 0) 
+            { 
+                logger(AREA, INFO, "Fleet Message Status: " + newMsgs[g].ToString());  
+            }
+            else
+            {
+                logger(AREA, INFO, "Robot " + g + " Message Status: " + newMsgs[g].ToString());
+            }
+        }
+    }
 
 
     /// <summary>

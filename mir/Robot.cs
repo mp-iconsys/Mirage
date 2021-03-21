@@ -14,8 +14,10 @@ using static Globals.DebugLevel;
 // TODO: Clean-up so we're a bit more tidy
 public class Robot
 {
-    private int id = 0;
-    private string ipAddress; // TODO: change to actual IPAddress class from .net library
+    public int id {get; set; } //Used to be: public int id = 0; 
+    public int fleetRobotID { get; set; }
+    public int plcRobotID { get; set; }
+    public string ipAddress { get; set; } // TODO: change to actual IPAddress class from .net library
     private AuthenticationHeaderValue authValue;
 
     //=========================================================|
@@ -48,6 +50,8 @@ public class Robot
             s = new Status();
             schedule = new Scheduler();
 
+            fleetRobotID = 0;
+            plcRobotID = 0;
         }
 
         /// <summary>
@@ -57,6 +61,7 @@ public class Robot
         public Robot(int id)
         {
             this.id = id;
+            plcRobotID = id + 1; // The PLC Uses Robot 0 as a spare while it's used for us so we need to offset by 1 
 
             fetchConnectionDetails();
 
@@ -85,7 +90,7 @@ public class Robot
 
             for (int i = 0; i < 60; i++)
             {
-                Missions[i] = new Mirage.rest.Mission();
+                Missions[i] = new Mission();
             }
         }
 
@@ -222,8 +227,6 @@ public class Robot
 
                 logger(AREA, DEBUG, "Status Code: " + result.StatusCode);
 
-                //Console.WriteLine("Base Address: " + comms.BaseAddress);
-
                 if (result.IsSuccessStatusCode)
                 {
                     logger(AREA, INFO, "Status Code: ");
@@ -232,8 +235,8 @@ public class Robot
 
                     logger(AREA, INFO, "Status Code: ");
 
-                    schedule = JsonConvert.DeserializeObject<Scheduler>(result.Content.ReadAsStringAsync().Result);
-                    schedule.working_response = true;
+                    //schedule = JsonConvert.DeserializeObject<Scheduler>(result.Content.ReadAsStringAsync().Result);
+                    //schedule.working_response = true;
 
                     if (result.StatusCode.ToString() == "BadRequest")
                     {
@@ -271,7 +274,7 @@ public class Robot
                     logger(AREA, DEBUG, "Bad Request - Failed to process");
                     statusCode = Globals.TaskStatus.CouldntProcessRequest;
 
-                    schedule.working_response = false;
+                    //schedule.working_response = false;
                 }
             }
             catch (Exception exception)
@@ -281,12 +284,90 @@ public class Robot
 
             return statusCode;
         }
-        
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="response"></param>
-        public void saveSoftwareLogs(HttpResponseMessage response)
+
+    /// <summary>
+    /// Sends a mission schedule, either to a robot (through fleet) or to the fleet.
+    /// Returns the API status code and saves the schedule id for each robot. 
+    /// </summary>
+    /// <param name="request"></param>
+    /// <returns></returns>
+    public int sendScheduleRequest(HttpRequestMessage request)
+    {
+        formConnection();
+
+        int statusCode = 0;
+
+        try
+        {
+            HttpResponseMessage result = comms.SendAsync(request).Result;
+
+            logger(AREA, DEBUG, "Status Code: " + result.StatusCode);
+
+            if (result.IsSuccessStatusCode)
+            {
+                logger(AREA, INFO, "Status Code: ");
+
+                statusCode = (int)result.StatusCode;
+
+                logger(AREA, INFO, "Status Code: ");
+
+                schedule = JsonConvert.DeserializeObject<Scheduler>(result.Content.ReadAsStringAsync().Result);
+                schedule.working_response = true;
+
+                if (result.StatusCode.ToString() == "BadRequest")
+                {
+                    logger(AREA, DEBUG, "Bad Request - Failed to process");
+                    statusCode = Globals.TaskStatus.CouldntProcessRequest;
+                }
+                else if (statusCode == 409)
+                {
+                    logger(AREA, INFO, "Robot Already Moved out of the group");
+                    statusCode = Globals.TaskStatus.CompletedNoErrors;
+                }
+                else if ((statusCode > 199 && statusCode < 400) || result.StatusCode == System.Net.HttpStatusCode.OK)
+                {
+                    logger(AREA, DEBUG, "Data Sent Successfully");
+                    statusCode = Globals.TaskStatus.CompletedNoErrors;
+                }
+                else if (statusCode > 399)
+                {
+                    logger(AREA, DEBUG, "Data send did not succeed");
+                    statusCode = Globals.TaskStatus.CouldntProcessRequest;
+                }
+                else
+                {
+                    logger(AREA, DEBUG, "Unknown Error");
+                    statusCode = Globals.TaskStatus.FatalError;
+                }
+            }
+            else if ((int)result.StatusCode == 409)
+            {
+                logger(AREA, INFO, "Robot Already Moved out of the group");
+                statusCode = Globals.TaskStatus.CompletedNoErrors;
+            }
+            else
+            {
+                logger(AREA, DEBUG, "Bad Request - Failed to process");
+                statusCode = Globals.TaskStatus.CouldntProcessRequest;
+
+                schedule.working_response = false;
+            }
+        }
+        catch (Exception exception)
+        {
+            logger(AREA, ERROR, "Failed to decode send REST request: ", exception);
+        }
+
+        return statusCode;
+    }
+
+
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="response"></param>
+    public void saveSoftwareLogs(HttpResponseMessage response)
         {
             logger(AREA, DEBUG, "==== Saving Software Logs ====");
 

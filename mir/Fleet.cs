@@ -32,6 +32,11 @@ namespace Mirage
         public int[] robotMapping;
 
         //=========================================================|
+        //  Helper parameters                                      |
+        //=========================================================|
+        int waitPeriod = 100; // Used when getting initial fleet data so we don't DDOS our own robots
+
+        //=========================================================|
         //  Used For Debugging                                     |     
         //=========================================================|
         private static readonly Type AREA = typeof(Fleet);
@@ -47,7 +52,7 @@ namespace Mirage
             httpResponseTasks = new Task<HttpResponseMessage>[sizeOfFleet];
 
             // Instantiates the group array
-            groups = new short[8] { 0, 0, 0, 0, 0, 0, 0, 0 };
+            groups = new short[8] { 0, (short)sizeOfFleet, 0, 0, 0, 0, 0, 0 };
 
             // Initialize the robot group
             group = new RobotGroup[8];
@@ -75,7 +80,7 @@ namespace Mirage
             httpResponseTasks = new Task<HttpResponseMessage>[sizeOfFleet];
 
             // Instantiates the group array
-            groups = new short[8] { 0, 0, 0, 0, 0, 0, 0, 0 };
+            groups = new short[8] { 0, (short)sizeOfFleet, 0, 0, 0, 0, 0, 0 };
             logger(AREA, DEBUG, "Assigned Basics");
 
             available = new ChargingGroup(2, "FullCharge", "/v2.0.0/charging_groups/2");
@@ -111,7 +116,6 @@ namespace Mirage
 
             for (int i = 0; i < sizeOfFleet; i++)
             {
-                // Instantiate the robots - Don't touch the tasks yet
                 robots[i] = new Robot(i);
             }
 
@@ -246,16 +250,17 @@ namespace Mirage
             }
             else if(type == "robotStatusFromFleet")
             {
-                rest.Robots g;
-                g = new rest.Robots();
-                g = JsonConvert.DeserializeObject<rest.Robots>(fleetResponseTask.Result.Content.ReadAsStringAsync().Result);
+                Robots g;
+                g = new Robots();
+                g = JsonConvert.DeserializeObject<Robots>(fleetResponseTask.Result.Content.ReadAsStringAsync().Result);
 
                 //int a = 
                 //= new rest.Robots();
                 //g = JsonConvert.DeserializeObject<rest.Robots>(fleetResponseTask.Result.Content.ReadAsStringAsync().Result);
                 //_ = g.Root.fleet_state;
 
-                robots[robotID].s.robot_group_id = g.robot_group_id;
+                // Robot Group is offset by 2 from the fleet robot group
+                robots[robotID].s.robot_group_id = g.robot_group_id - 2;
 
                 //robots[robotID].saveStatusInMemory(fleetResponseTask.Result);
 
@@ -289,7 +294,7 @@ namespace Mirage
                 //  0 - Spare
                 //  1 - Available
                 //  2 - Busy
-                //  3 - Charging
+                //  3 - Charging -> No Longer Used
 
                 // Go through robots
                 for(int i = 0; i < sizeOfFleet; i++)
@@ -407,6 +412,83 @@ namespace Mirage
             return functionStatus;
         }
 
+        /// <summary>
+        /// Get Robot Ids from the Fleet. These are different from our internal IDs as well as the ones used in the PLC
+        /// </summary>
+        public void getFleetRobotIDs()
+        {
+            //=========================================================|
+            // Get Fleet Robot IDs                                     |
+            //=========================================================|
+            try
+            {
+                logger(AREA, INFO, "Getting Fleet Robot IDs");
+
+                fleetResponseTask = fleetManager.sendGetRequest("robots?whitelist=ip,id");
+
+                fleetResponseTask.Wait();
+
+                group = JsonConvert.DeserializeObject<RobotGroup[]>(fleetResponseTask.Result.Content.ReadAsStringAsync().Result);
+
+                // Go through each Mirage robot
+                for(int i = 0; i < sizeOfFleet; i++)
+                {
+                    logger(AREA, DEBUG, "Going Through Robot: " + i);
+                    logger(AREA, DEBUG, "Robot IP is: " + robots[i].ipAddress);
+
+                    bool foundMatch = false;
+
+                    // Go through each return parameter
+                    for (int j = 0; j < group.Length; j++)
+                    {
+                        logger(AREA, DEBUG, "Checking Fleet Robot: " + group[j].id + " With IP: " + group[j].ip);
+
+                        // For each robot and return parameter, compare their IP address
+                        // If they match, assign a Mirage robot the corresponding fleet robot ID
+                        if (robots[i].ipAddress == group[j].ip)
+                        {
+                            foundMatch = true;
+
+                            robots[i].fleetRobotID = group[j].id;
+                            logger(AREA, INFO, "Mirage Robot: " + robots[i].id + " Corresponds To Fleet Robot: " + group[j].id);
+
+                            break;
+                        }
+                    }
+
+                    if(!foundMatch)
+                    {
+                        logger(AREA, ERROR, "Robot " + robots[i].id + " Hasn't Found A Match In Fleet");
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                logger(AREA, ERROR, "Error getting robot IDs from Fleet: ", e);
+            }
+        }
+
+        /// <summary>
+        /// Gets an internal (mirage) robot id from a given fleet robot ID
+        /// </summary>
+        /// <param name="fleetID"></param>
+        /// <returns></returns>
+        public int getInternalRobotID(int fleetID)
+        {
+            // Error Code
+            int internalID = 999;
+
+            for(int i = 0; i < sizeOfFleet; i++)
+            {
+                if(mirFleet.robots[i].fleetRobotID == fleetID)
+                {
+                    internalID = mirFleet.robots[i].id;
+                    break;
+                }
+            }
+
+            return internalID;
+        }
 
         /// <summary>
         /// 
@@ -525,8 +607,6 @@ namespace Mirage
         /// </summary>
         public void getInitialFleetData()
         {
-            int waitPeriod = 200; // So we don't DDOS our own robots
-
             try
             {
                 try
@@ -615,51 +695,60 @@ namespace Mirage
 
             Thread.Sleep(waitPeriod);
 
-            try
-            {
+            // TODO: might need to be removed since we're creating them from scratch for the most part
+            if(false)
+            { 
                 try
                 {
-                    mirFleet.issueGetRequests("missions");
-                    mirFleet.saveMissionsAsync().Wait();
+                    try
+                    {
+                        mirFleet.issueGetRequests("missions");
+                        mirFleet.saveMissionsAsync().Wait();
+                    }
+                    catch (HttpRequestException exception)
+                    {
+                        // TODO: Handle more exceptions
+                        // TODO: Remove the task which is causing the exception
+                        logger(AREA, ERROR, "HTTP Request Error. Couln't connect to the MiR robots.");
+                        logger(AREA, ERROR, "Check your network, dns settings, robot is up, etc. Error: ", exception);
+                    }
                 }
-                catch (HttpRequestException exception)
+                catch (Exception exception)
                 {
-                    // TODO: Handle more exceptions
-                    // TODO: Remove the task which is causing the exception
-                    logger(AREA, ERROR, "HTTP Request Error. Couln't connect to the MiR robots.");
-                    logger(AREA, ERROR, "Check your network, dns settings, robot is up, etc. Error: ", exception);
+                    logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
                 }
-            }
-            catch (Exception exception)
-            {
-                logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
-            }
 
-            Thread.Sleep(waitPeriod);
+                Thread.Sleep(waitPeriod);
 
-            // Get Missions for the fleet
-            try
-            {
+                // Get Missions for the fleet
                 try
                 {
-                    issueGetRequest("missions", 666);
-                    mirFleet.saveMissionsFleet().Wait();
-                    //mirFleet.fleetManager.saveMissionsAsync().Wait();
+                    try
+                    {
+                        issueGetRequest("missions", 666);
+                        mirFleet.saveMissionsFleet().Wait();
+                        //mirFleet.fleetManager.saveMissionsAsync().Wait();
+                    }
+                    catch (HttpRequestException exception)
+                    {
+                        // TODO: Handle more exceptions
+                        // TODO: Remove the task which is causing the exception
+                        logger(AREA, ERROR, "HTTP Request Error. Couln't connect to the MiR robots.");
+                        logger(AREA, ERROR, "Check your network, dns settings, robot is up, etc. Error: ", exception);
+                    }
                 }
-                catch (HttpRequestException exception)
+                catch (Exception exception)
                 {
-                    // TODO: Handle more exceptions
-                    // TODO: Remove the task which is causing the exception
-                    logger(AREA, ERROR, "HTTP Request Error. Couln't connect to the MiR robots.");
-                    logger(AREA, ERROR, "Check your network, dns settings, robot is up, etc. Error: ", exception);
+                    logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
                 }
+            
             }
-            catch (Exception exception)
+
+            // Get Initial Robot Statuses
+            for(int robotID = 0; robotID < sizeOfFleet; robotID++)
             {
-                logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
+                issueGetRequest("status", robotID);
             }
-
-
         }
     }
 }

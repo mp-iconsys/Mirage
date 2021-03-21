@@ -208,9 +208,11 @@ namespace Mirage.rest
         public HttpRequestMessage putRequest(int robot, int robot_group_id)
         {
             string payload;
-            payload = "{\"alarm_on\": " + description + ", ";
-            payload += "\"active\": " + active.ToString().ToLowerInvariant() + ", ";
-            payload += "\"robot_group_id\": " + robot_group_id + "}";
+            payload = "{\"robot_group_id\": " + robot_group_id + "}";
+
+            //payload = "{\"alarm_on\": " + description + ", ";
+            //payload += "\"active\": " + active.ToString().ToLowerInvariant() + ", ";
+            //payload += "\"robot_group_id\": " + robot_group_id + "}";
 
             string url = "http://"+fleetManagerIP+"/api/v2.0.0/robots/" + robot;
             Uri uri = new Uri(url);
