@@ -643,7 +643,7 @@ class SiemensPLC
                             if(BitConverter.ToInt16(tempBytesForConversion, 0) == 10 && fleetBlock.Param[0].getValue() == 0)
                             {
                                 logger(AREA, DEBUG, "Got A Mission From Fleet");
-                                newMsgs[0] = true;
+
 
                                 for (int j = 0; j < fleetBlockControlParameters; j++)
                                 {
@@ -651,12 +651,13 @@ class SiemensPLC
                                 }
 
                                 updateTaskStatus(fleetID, 10);
+                                newMsgs[0] = true;
                                 newMsg = true;
                             }
                             else
                             {
-                                newMsg = false;
                                 logger(AREA, DEBUG, "PLC Fleet Block Idle");
+                                newMsg = false;
                                 newMsgs[0] = false;
                             }
                         }
@@ -689,7 +690,7 @@ class SiemensPLC
                     logger(AREA, ERROR, "Failed to Poll");
                     logger(AREA, ERROR, daveStrerror(memoryres));
                     plcConnectionErrors++;
-                    newMsg = false;
+                    //newMsg = false;
                 }
             }
             catch (NullReferenceException exception)
@@ -832,7 +833,7 @@ class SiemensPLC
                             robots[r].Param[i].print();
                         }
 
-                        logger(AREA, DEBUG, "Task No Is: " + robots[0].getTaskNumber());
+                        logger(AREA, DEBUG, "Task No Is: " + robots[r].getTaskNumber());
                         
                         //Console.ReadLine();
 
@@ -856,7 +857,7 @@ class SiemensPLC
                     logger(AREA, ERROR, "Failed to Poll");
                     logger(AREA, ERROR, daveStrerror(memoryres));
                     plcConnectionErrors++;
-                    newMsg = false;
+                    //newMsg = false;
                 }
 
             }
@@ -864,7 +865,7 @@ class SiemensPLC
             {
                 logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
                 plcConnectionErrors++;
-                newMsg = false;
+                //newMsg = false;
 
                 establishConnection();
             }
@@ -872,7 +873,7 @@ class SiemensPLC
             {
                 logger(AREA, ERROR, "Polling Failed. Error : ", exception);
                 plcConnectionErrors++;
-                newMsg = false;
+                //newMsg = false;
             }
         }
         else
@@ -943,12 +944,12 @@ class SiemensPLC
 
             logger(AREA, DEBUG, "Wrote A Request");
 
-            for (int i = 0; i < fleetBlock.Param.Count - fleetBlockControlParameters; i++)
+/*            for (int i = 0; i < fleetBlock.Param.Count - fleetBlockControlParameters; i++)
             {
                 result = rs.getErrorOfResult(i);
                 logger(AREA, DEBUG, "Error Code From: " + fleetBlock.Param[i].getName() + " Code Is: " + result);
             }
-
+*/
             // If no error
             //
         }
@@ -1069,11 +1070,11 @@ class SiemensPLC
 
             result = dc.execWriteRequest(p2, rs);
 
-            for (int i = 0; i < robots[robot].Param.Count; i++)
+/*            for (int i = 0; i < robots[robot].Param.Count; i++)
             {
                 result = rs.getErrorOfResult(i);
                 logger(AREA, DEBUG, "Error Code From Robot: " + robot + " Param: " + robots[robot].Param[i].getName() + " Code Is: " + result);
-            }
+            }*/
         }
         else
         {
@@ -1106,18 +1107,14 @@ class SiemensPLC
     /// </summary>
     public static void printNewMessageStatus()
     {
-        logger(AREA, INFO, "Fleet Task Status: " + robots[0].getTaskStatus() + " And PLC Task Status: " + robots[0].getPLCTaskStatus());
+        logger(AREA, INFO, "Fleet Mirage Task Status: " + robots[0].getTaskStatus());
+        logger(AREA, INFO, "Fleet PLC Task Status: " + robots[0].getPLCTaskStatus());
 
-        for (int g = 0; g < sizeOfFleet; g++)
+        for (int g = 1; g < sizeOfFleet+1; g++)
         {
-            if(g == 0) 
-            { 
-                logger(AREA, INFO, "Fleet Message Status: " + newMsgs[g].ToString());  
-            }
-            else
-            {
-                logger(AREA, INFO, "Robot " + g + " Message Status: " + newMsgs[g].ToString());
-            }
+            logger(AREA, INFO, "Robot " + g + " Mirage Task Status: " + robots[g-1].getTaskStatus());
+            logger(AREA, INFO, "Robot " + g + " PLC Task Status: " + robots[g-1].getPLCTaskStatus());
+            logger(AREA, INFO, "Robot " + g + " Message Status: " + newMsgs[g-1].ToString());
         }
     }
 
@@ -1293,7 +1290,8 @@ class SiemensPLC
         }
 
         // Set message to false as we've processed the message
-        newMsg = false;
+        // Only do this from within the switch statement
+        //newMsg = false;
 
         logger(AREA, DEBUG, "==== Response Check Completed ====");
     }
@@ -1352,20 +1350,19 @@ class SiemensPLC
                     }
 
                     plcAlarms.printAllAlarms();
+                    plcAlarms.checkAlarms();
                 }
                 else
                 {
                     logger(AREA, ERROR, "Failed to Poll");
                     logger(AREA, ERROR, daveStrerror(memoryres));
                     plcConnectionErrors++;
-                    newMsg = false;
                 }
             }
             catch (NullReferenceException exception)
             {
                 logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
                 plcConnectionErrors++;
-                newMsg = false;
 
                 establishConnection();
             }
@@ -1373,35 +1370,6 @@ class SiemensPLC
             {
                 logger(AREA, ERROR, "Polling Failed. Error : ", exception);
                 plcConnectionErrors++;
-                newMsg = false;
-            }
-        }
-        else
-        {
-            logger(AREA, INFO, "Simulating Messages From Console");
-
-            if (!newMsg)
-            {
-                for (int i = 0; i < fleetBlockControlParameters + 1; i++)
-                {
-                    fleetBlock.Param[i].simulateConsole();
-                }
-
-                string yn;
-
-                Console.WriteLine("Add Robot Commands Further On (y/n)");
-                yn = Console.ReadLine();
-
-                if (yn == "y" || yn == "Y")
-                {
-                    furtherMsg = true;
-                }
-                else if (yn == "n" || yn == "N")
-                {
-                    furtherMsg = false;
-                }
-
-                newMsg = true;
             }
         }
 

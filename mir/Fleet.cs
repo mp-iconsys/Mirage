@@ -627,6 +627,7 @@ namespace Mirage
                 logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
             }
 
+            logger(AREA, INFO, "Obtained SOftware Logs");
             Thread.Sleep(waitPeriod);
 
             try
@@ -649,6 +650,7 @@ namespace Mirage
                 logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
             }
 
+            logger(AREA, INFO, "Obtained Maps");
             Thread.Sleep(waitPeriod);
 
             try
@@ -671,6 +673,7 @@ namespace Mirage
                 logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
             }
 
+            logger(AREA, INFO, "Obtained Settings");
             Thread.Sleep(waitPeriod);
 
             try
@@ -693,6 +696,7 @@ namespace Mirage
                 logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
             }
 
+            logger(AREA, INFO, "Obtained Advanced Settings");
             Thread.Sleep(waitPeriod);
 
             // TODO: might need to be removed since we're creating them from scratch for the most part

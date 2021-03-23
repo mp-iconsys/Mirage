@@ -21,6 +21,13 @@ public class Robot
     private AuthenticationHeaderValue authValue;
 
     //=========================================================|
+    //  KPI, OEM & Statistics                                  |
+    //=========================================================|
+/*    public long job { get; set; }
+    public List<int> MissionsForDB { get; set; }
+*/
+
+    //=========================================================|
     //  Data which makes up the robot                          |     
     //=========================================================|
     private List<Register> Registers { get; set; }
@@ -32,6 +39,7 @@ public class Robot
     public Scheduler schedule { get; set; }
     public FireAlarms FireAlarm { get; set; }
     public RobotGroup Group { get; set; }
+    public Job currentJob { get; set; }
 
 
     //=========================================================|
@@ -52,6 +60,8 @@ public class Robot
 
             fleetRobotID = 0;
             plcRobotID = 0;
+
+            currentJob = new Job();
         }
 
         /// <summary>
@@ -68,6 +78,7 @@ public class Robot
             Registers = new List<Register>(new Register[200]);
             s = new Status();
             schedule = new Scheduler();
+            currentJob = new Job();
         }
 
         /// <summary>
@@ -87,6 +98,7 @@ public class Robot
             schedule = new Scheduler();
 
             Missions = new List<Mission>(new Mission[60]);
+            currentJob = new Job();
 
             for (int i = 0; i < 60; i++)
             {

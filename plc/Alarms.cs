@@ -1,5 +1,7 @@
-﻿using System;
+﻿using MySql.Data.MySqlClient;
+using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Text;
 using static Globals;
 using static Globals.DebugLevel;
@@ -224,14 +226,40 @@ namespace Mirage.plc
             }
         }
 
+        public void checkAlarms()
+        {
+            for (int i = 0; i < alarmBlockSize * 8; i++)
+            {
+                if(alarm_array[i].triggered && !alarm_array[i].old_triggered)
+                {
+                    // Rising Edge on the alarm
+                    logger(AREA, INFO, alarm_array[i].area + " -- " + alarm_array[i].name + " Rising Edge");
+                    alarm_array[i].old_triggered = true;
+                    alarm_array[i].saveRisingEdgeToDB();
+                }
+                else if(!alarm_array[i].triggered && alarm_array[i].old_triggered)
+                {
+                    // Falling Edge on the alarm
+                    logger(AREA, INFO, alarm_array[i].area + " -- " + alarm_array[i].name + " Falling Edge");
+                    alarm_array[i].old_triggered = false;
+                    alarm_array[i].saveFallingEdgeToDB();
+                    alarm_array[i].id = 0;
+                }
+            }
+        }
+
         public class Alarm
         {
+            public int id { get; set; }
+            public bool old_triggered { get; set; }
             public bool triggered { get; set; }
             public string name { get; set; }
             public string area { get; set; }
 
             public Alarm()
             {
+                id = 0;
+                old_triggered = false;
                 triggered = false;
                 name = "";
                 area = "";
@@ -239,8 +267,59 @@ namespace Mirage.plc
 
             public void print()
             {
-                Console.WriteLine(area + " -- " + name + " : " + triggered);
+                if (triggered)
+                {
+                    logger(AREA, INFO, area + " -- " + name + " Old Trigger: " + old_triggered + " Current Trigger: " + triggered);
+                }
             }
+
+            public void saveRisingEdgeToDB()
+            {
+                //MySqlCommand cmd = new MySqlCommand("rising_edge_alarm");
+
+                try
+                {
+                    MySqlCommand cmd = new MySqlCommand();
+                    cmd.Connection = db;
+                    cmd.CommandText = "rising_edge_alarm";
+                    cmd.CommandType = CommandType.StoredProcedure;
+
+                    cmd.Parameters.AddWithValue("@ALARM_AREA", area);
+                    cmd.Parameters["@ALARM_AREA"].Direction = ParameterDirection.Input;
+
+                    cmd.Parameters.AddWithValue("@ALARM_TEXT", name);
+                    cmd.Parameters["@ALARM_TEXT"].Direction = ParameterDirection.Input;
+
+                    cmd.Parameters.Add("@LID", MySqlDbType.Int32);
+                    cmd.Parameters["@LID"].Direction = ParameterDirection.Output;
+
+                    cmd.ExecuteNonQuery();
+                    id = (int)cmd.Parameters["@LID"].Value;
+                    cmd.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    logger(AREA, ERROR, "MySQL Query Error: ", exception);
+                }
+            }
+
+            public void saveFallingEdgeToDB()
+            {
+                MySqlCommand cmd = new MySqlCommand("falling_edge_alarm");
+
+                try
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.Add(new MySqlParameter("LID", id));
+                    issueQuery(cmd);
+                }
+                catch (Exception exception)
+                {
+                    cmd.Dispose();
+                    logger(AREA, ERROR, "MySQL Query Error: ", exception);
+                }
+            }
+
         }
     }
 }

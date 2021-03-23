@@ -321,6 +321,24 @@ namespace Mirage.rest
             string payload;
             payload = "{\"mission_id\": \"" + guid + "\", ";
             payload += "\"robot_id\": " + robotID + "} ";
+
+            if(robotID == fleetID)
+            {
+                // Send available mission
+                /* 
+                string payload = "{\r\n  \"mission_id\": \"" + guid + "\"\r\n}";
+
+                           if(fleet == fleetID)
+                            {
+                                payload = "{\r\n  \"mission_id\": \"" + guid + "\"\r
+                                payload += \n}";
+                            }*/
+            }
+
+
+            logger(AREA, DEBUG, payload);
+
+
             logger(AREA, DEBUG, payload);
 
             Uri uri = new Uri("http://" + fleetManagerIP + "/api/v2.0.0/mission_scheduler");

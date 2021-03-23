@@ -16,6 +16,7 @@ namespace Mirage.rest
         public int state_id { get; set; }
         public string mission { get; set; }
         public string mission_id { get; set; }
+        public int mission_number { get; set; }
         public string description { get; set; }
         public int id { get; set; }
         public int robot_id { get; set; }
