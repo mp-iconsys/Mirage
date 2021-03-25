@@ -1,5 +1,7 @@
-﻿using System;
+﻿using MySql.Data.MySqlClient;
+using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Text;
 using static Globals;
 using static Globals.DebugLevel;
@@ -13,6 +15,7 @@ namespace Mirage.rest
         //=========================================================|
         private static readonly Type AREA = typeof(Job);
 
+        public bool isJobInProgress { get; set; }
         public long job { get; set; }
         public int currentMission { get; set; }
         public int totalNoOfMissions { get; set; }
@@ -22,56 +25,231 @@ namespace Mirage.rest
 
         public Job()
         {
+            isJobInProgress = true;
             job = 0;
             currentMission = 0;
-            missions = new List<JobMission>();
+            missions = new List<JobMission>();  
         }
 
         public void startJob()
         {
-            job++;
-            start = DateTime.Now;
-            missions = new List<JobMission>();
+            try
+            {
+                isJobInProgress = true;
+                job++;
+                currentMission = 0;
+                start = DateTime.Now;
+                missions = new List<JobMission>();
+            }
+            catch (Exception e)
+            {
+                logger(AREA, ERROR, "Failed To Initialize A Job");
+                logger(AREA, ERROR, "Exception", e);
+            }
         }
 
         public void startJob(int missionID, string missionName)
         {
-            startJob();
-            missions.Add(new JobMission(missionID, missionName));
-            logger(AREA, INFO, "Starting Job " + job);
+            try
+            { 
+                startJob();
+                missions.Add(new JobMission(missionID, missionName));
+                //missions[currentMission] = new JobMission(missionID, missionName);
+
+                logger(AREA, INFO, "Starting A New Job " + job);
+                logger(AREA, INFO, "Robot's " + currentMission + " Mission");
+                missions[currentMission].print();
+            }
+            catch (Exception e)
+            {
+                logger(AREA, ERROR, "Failed To Initialize A Job");
+                logger(AREA, ERROR, "Exception", e);
+            }
         }
 
         public void addMission(int missionID, string missionName)
         {
-            missions[currentMission].end_time = DateTime.Now;
-            missions[currentMission].print();
+            try
+            { 
+                if(isJobInProgress)
+                { 
+                    logger(AREA, INFO, "Adding A New Mission To The Stack. It Will Be Robot's " + currentMission + " Mission");
 
-            currentMission++;
+                    missions.Add(new JobMission(missionID, missionName));
 
-            missions.Add(new JobMission(missionID, missionName));
+                    logger(AREA, INFO, "Mission Added");
+
+                    currentMission++;
+
+                    //missions[currentMission] = new JobMission(missionID, missionName);
+
+                    logger(AREA, INFO, "New Mission: " + currentMission);
+
+                    missions[currentMission].print();
+                }
+                else
+                {
+                    logger(AREA, INFO, "There's No Jobs In Progress. We're Starting In The Middle Of A Sequence.");
+
+                    startJob(missionID, missionName);
+                }
+            }
+            catch (Exception e)
+            {
+                logger(AREA, ERROR, "Failed To Add A Mission. Will Try Again After Creating A Job.");
+                logger(AREA, ERROR, "Exception :", e);
+                startJob(missionID, missionName);
+            }
         }
 
-        public void finishJob()
+        public void finishMission()
         {
-            end = DateTime.Now;
-            missions[currentMission].end_time = DateTime.Now;
-            totalNoOfMissions = currentMission;
+            try
+            { 
+                missions[currentMission].end_time = DateTime.Now;
 
-            // Save Job Data to DB
+                logger(AREA, INFO, "Finished Robot's " + currentMission + " Mission");
+                missions[currentMission].print();
+            }
+            catch (Exception e)
+            {
+                logger(AREA, ERROR, "Failed To Finish A Mission.");
+                logger(AREA, ERROR, "Exception: ", e);
+            }
+        }
 
-            // Save all the missions to DB
+        public void finishJob(int robotID)
+        {
+            try
+            {
+                if(isJobInProgress)
+                {
+                    totalNoOfMissions = currentMission;
+
+                    logger(AREA, INFO, "Finishing Job " + job + ". It Had " + totalNoOfMissions + " Missions In Total");
+
+                    isJobInProgress = false;
+                    end = DateTime.Now; 
+                    missions[currentMission].end_time = DateTime.Now;
+                    
+
+                    // Save Job Data to DB
+                    saveJob(robotID);
+
+                    // Save all the missions to DB
+                    saveMissions(robotID);
+                }
+            }
+            catch (Exception e)
+            {
+                logger(AREA, ERROR, "Failed To Finalize Job Details");
+                logger(AREA, ERROR, "Exception: ", e);
+            }
 
             // Release the missions and clear the Job data
-            missions = new List<JobMission>();
-            start = DateTime.Now;
-            currentMission = 0;
+            try
+            {
+                job++;
+                missions = new List<JobMission>();
+                start = DateTime.Now;
+                currentMission = 0;
+            }
+            catch (Exception e)
+            {
+                logger(AREA, ERROR, "Failed To Clear Job");
+                logger(AREA, ERROR, "Exception: ", e);
+            }
         }
 
-        public void saveJob()
+        /// <summary>
+        /// 
+        /// </summary>
+        public void saveJob(int robotID)
         {
+            logger(AREA, INFO, "Saving The Job In The DB");
 
+            try
+            {
+                MySqlCommand cmd = new MySqlCommand();
+                cmd.Connection = db;
+                cmd.CommandText = "store_job";
+                cmd.CommandType = CommandType.StoredProcedure;
+
+                cmd.Parameters.AddWithValue("@JOB_ID", job);
+                cmd.Parameters["@JOB_ID"].Direction = ParameterDirection.Input;
+
+                cmd.Parameters.AddWithValue("@ROBOT_ID", robotID);
+                cmd.Parameters["@ROBOT_ID"].Direction = ParameterDirection.Input;
+
+                cmd.Parameters.AddWithValue("@NO_OF_MISSIONS", totalNoOfMissions);
+                cmd.Parameters["@NO_OF_MISSIONS"].Direction = ParameterDirection.Input;
+
+                cmd.Parameters.AddWithValue("@START_TIME", start.ToString("yyyy-MM-dd HH:mm:ss"));
+                cmd.Parameters["@START_TIME"].Direction = ParameterDirection.Input;
+
+                cmd.Parameters.AddWithValue("@END_TIME", end.ToString("yyyy-MM-dd HH:mm:ss"));
+                cmd.Parameters["@END_TIME"].Direction = ParameterDirection.Input;
+
+                cmd.ExecuteNonQuery();
+                cmd.Dispose();
+            }
+            catch (Exception exception)
+            {
+                logger(AREA, ERROR, "MySQL Query Error: ", exception);
+            }
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        public void saveMissions(int robotID)
+        {
+            logger(AREA, INFO, "Saving Missions In The DB");
+            logger(AREA, INFO, "Total No Of Missions: " + totalNoOfMissions);
+
+            for (int i = 0; i < (totalNoOfMissions+1); i++)
+            {
+                logger(AREA, INFO, "Going Through Robot's Mission: " + i);
+                missions[i].print();
+
+                try 
+                { 
+                    MySqlCommand cmd = new MySqlCommand();
+                    cmd.Connection = db;
+                    cmd.CommandText = "store_job_mission";
+                    cmd.CommandType = CommandType.StoredProcedure;
+
+                    cmd.Parameters.AddWithValue("@JOB_ID", job);
+                    cmd.Parameters["@JOB_ID"].Direction = ParameterDirection.Input;
+
+                    cmd.Parameters.AddWithValue("@ROBOT_ID", robotID);
+                    cmd.Parameters["@ROBOT_ID"].Direction = ParameterDirection.Input;
+
+                    cmd.Parameters.AddWithValue("@MISSION_ID", missions[i].mission);
+                    cmd.Parameters["@MISSION_ID"].Direction = ParameterDirection.Input;
+
+                    cmd.Parameters.AddWithValue("@MISSION_NAME", missions[i].mission_name);
+                    cmd.Parameters["@MISSION_NAME"].Direction = ParameterDirection.Input;
+
+                    cmd.Parameters.AddWithValue("@START_TIME", missions[i].start_time.ToString("yyyy-MM-dd HH:mm:ss"));
+                    cmd.Parameters["@START_TIME"].Direction = ParameterDirection.Input;
+
+                    cmd.Parameters.AddWithValue("@END_TIME", missions[i].end_time.ToString("yyyy-MM-dd HH:mm:ss"));
+                    cmd.Parameters["@END_TIME"].Direction = ParameterDirection.Input;
+
+                    cmd.ExecuteNonQuery();
+                    cmd.Dispose();
+                }
+                catch (Exception e)
+                {
+                    logger(AREA, ERROR, "MySQL Query Error: ", e);
+                }
+            }
+        }
+
+        /// <summary>
+        /// A class that contains relevant data for 
+        /// </summary>
         public class JobMission
         {
             public int mission { get; set; }
@@ -97,6 +275,11 @@ namespace Mirage.rest
             public void print()
             {
                 logger(AREA, INFO, "Mission: " + mission + " " + mission_name + " Started: " + start_time + " Finished: " + end_time);
+            }
+
+            public void saveMissionInDB()
+            {
+
             }
         }
     }

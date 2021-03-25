@@ -437,6 +437,94 @@ public static class Globals
     }
 
     /// <summary>
+    /// Checks if plc wants to reset has been changed on the database and re-implements the app parameters.
+    /// </summary>
+    public static void checkPLCReset()
+    {
+        try
+        {
+            bool plcResetRequired = false;
+
+            string sql = "SELECT reset_required FROM plc_reset;";
+            using var cmd = new MySqlCommand(sql, db);
+            using MySqlDataReader rdr = cmd.ExecuteReader();
+
+            while (rdr.Read())
+            {
+                if (rdr.GetInt16(0) == 1)
+                {
+                    plcResetRequired = true;
+                }
+            }
+
+            if (plcResetRequired)
+            {
+                logger(AREA, INFO, "Issuing A Sequence Reset From The PLC");
+                logger(AREA, INFO, "Getting More Data");
+
+                try
+                {
+                    cmd.Dispose();
+                    rdr.Close();
+                }
+                catch
+                {
+                    logger(AREA, ERROR, "Failed To Dispose MySQL Resource");
+                }
+
+                readPLCSequenceBreak();
+
+                logger(AREA, DEBUG, "==== Reset Updates ====");
+
+                using var cmd1 = new MySqlCommand("UPDATE app_update SET PROCESS = 0;", db);
+                issueQuery(cmd1);
+            }
+        }
+        catch (Exception e)
+        {
+            logger(AREA, ERROR, "Failed Runtime Parameter Update Check");
+        }
+    }
+
+    public static void readPLCSequenceBreak()
+    {
+        try
+        {
+            string sql = "SELECT * FROM plc_sequence_reset WHERE RESET = 1;";
+            using var cmd = new MySqlCommand(sql, db);
+            using MySqlDataReader rdr = cmd.ExecuteReader();
+            int id = 999;
+
+            while (rdr.Read())
+            {
+                id = rdr.GetInt32(0);
+                SiemensPLC.updateResetBits(id);
+            }
+
+            cmd.Dispose();
+            rdr.Close();
+
+            if (id < 999)
+            { 
+                using var cmd1 = new MySqlCommand("UPDATE plc_sequence_reset SET RESET = 0 WHERE ID = " + id + ";", db);
+                issueQuery(cmd1);
+
+                cmd1.Dispose();
+                rdr.Close();
+
+                using var cmd2 = new MySqlCommand("UPDATE plc_reset SET RESET_REQUIRED = 0", db);
+                issueQuery(cmd2);
+            }
+        }
+        catch (Exception e)
+        {
+            logger(AREA, ERROR, "Failed Resetting Sequence Bits");
+            logger(AREA, ERROR, "Exception: ", e);
+        }
+    }
+
+
+    /// <summary>
     /// Sends an SMS alert and terminates the program. Only used in extreme cases.
     /// </summary>
     /// <param name="terminationReason">Reason for termination and the content of an SMS alert.</param>
@@ -693,44 +781,52 @@ public static class Globals
     {
         logger(AREA, DEBUG, "Copying Mirage Data Structure To Internal Siemens PLC Parameters For Robot " + robotID);
 
-        logger(AREA, DEBUG, "Mode is: " + mirFleet.robots[robotID].s.mode_id);
+        try
+        { 
+            logger(AREA, DEBUG, "Mode is: " + mirFleet.robots[robotID].s.mode_id);
 
-        logger(AREA, DEBUG, "Mission Status is: " + mirFleet.robots[robotID].schedule.state_id);
-        SiemensPLC.robots[robotID].Param[5].print();
-        SiemensPLC.robots[robotID].Param[5].setValue(mirFleet.robots[robotID].schedule.state_id);
-        SiemensPLC.robots[robotID].Param[5].print();
+            logger(AREA, DEBUG, "Mission Status is: " + mirFleet.robots[robotID].schedule.state_id);
+            SiemensPLC.robots[robotID].Param[5].print();
+            SiemensPLC.robots[robotID].Param[5].setValue(mirFleet.robots[robotID].schedule.state_id);
+            SiemensPLC.robots[robotID].Param[5].print();
 
-        logger(AREA, DEBUG, "Robot Group is: " + mirFleet.robots[robotID].s.robot_group_id);
+            logger(AREA, DEBUG, "Robot Group is: " + mirFleet.robots[robotID].s.robot_group_id);
 
-        SiemensPLC.robots[robotID].Param[6].print();
-        SiemensPLC.robots[robotID].Param[6].setValue(mirFleet.robots[robotID].s.robot_group_id);
-        SiemensPLC.robots[robotID].Param[6].print();
+            SiemensPLC.robots[robotID].Param[6].print();
+            SiemensPLC.robots[robotID].Param[6].setValue(mirFleet.robots[robotID].s.robot_group_id);
+            SiemensPLC.robots[robotID].Param[6].print();
 
-        logger(AREA, DEBUG, "Robot Status is: " + mirFleet.robots[robotID].s.state_id);
-        SiemensPLC.robots[robotID].Param[7].print();
-        SiemensPLC.robots[robotID].Param[7].setValue(mirFleet.robots[robotID].s.state_id);
-        SiemensPLC.robots[robotID].Param[7].print();
+            logger(AREA, DEBUG, "Robot Status is: " + mirFleet.robots[robotID].s.state_id);
+            SiemensPLC.robots[robotID].Param[7].print();
+            SiemensPLC.robots[robotID].Param[7].setValue(mirFleet.robots[robotID].s.state_id);
+            SiemensPLC.robots[robotID].Param[7].print();
 
-        logger(AREA, DEBUG, "Robot Position X is: " + mirFleet.robots[robotID].s.position.x);
-        SiemensPLC.robots[robotID].Param[8].print();
-        SiemensPLC.robots[robotID].Param[8].setValueDouble(mirFleet.robots[robotID].s.position.x);
-        SiemensPLC.robots[robotID].Param[8].print();
+            logger(AREA, DEBUG, "Robot Position X is: " + mirFleet.robots[robotID].s.position.x);
+            SiemensPLC.robots[robotID].Param[8].print();
+            SiemensPLC.robots[robotID].Param[8].setValueDouble(mirFleet.robots[robotID].s.position.x);
+            SiemensPLC.robots[robotID].Param[8].print();
 
-        SiemensPLC.robots[robotID].Param[9].print();
-        SiemensPLC.robots[robotID].Param[9].setValueDouble(mirFleet.robots[robotID].s.position.y);
-        SiemensPLC.robots[robotID].Param[9].print();
+            SiemensPLC.robots[robotID].Param[9].print();
+            SiemensPLC.robots[robotID].Param[9].setValueDouble(mirFleet.robots[robotID].s.position.y);
+            SiemensPLC.robots[robotID].Param[9].print();
 
-        SiemensPLC.robots[robotID].Param[10].print();
-        SiemensPLC.robots[robotID].Param[10].setValueDouble(mirFleet.robots[robotID].s.position.orientation);
-        SiemensPLC.robots[robotID].Param[10].print();
+            SiemensPLC.robots[robotID].Param[10].print();
+            SiemensPLC.robots[robotID].Param[10].setValueDouble(mirFleet.robots[robotID].s.position.orientation);
+            SiemensPLC.robots[robotID].Param[10].print();
 
-        SiemensPLC.robots[robotID].Param[11].print();
-        SiemensPLC.robots[robotID].Param[11].setValueDouble(mirFleet.robots[robotID].s.moved);
-        SiemensPLC.robots[robotID].Param[11].print();
+            SiemensPLC.robots[robotID].Param[11].print();
+            SiemensPLC.robots[robotID].Param[11].setValueDouble(mirFleet.robots[robotID].s.moved);
+            SiemensPLC.robots[robotID].Param[11].print();
 
-        SiemensPLC.robots[robotID].Param[12].print();
-        SiemensPLC.robots[robotID].Param[12].setValueDouble(mirFleet.robots[robotID].s.battery_percentage);
-        SiemensPLC.robots[robotID].Param[12].print();
+            SiemensPLC.robots[robotID].Param[12].print();
+            SiemensPLC.robots[robotID].Param[12].setValueDouble(mirFleet.robots[robotID].s.battery_percentage);
+            SiemensPLC.robots[robotID].Param[12].print();
+        }
+        catch (Exception e)
+        {
+            logger(AREA, ERROR, "Failed To Copy Internal Memory To PLC Buffer: ");
+            logger(AREA, ERROR, "Exception: ", e);
+        }
 
         logger(AREA, DEBUG, "Completed Copying Mirage Internal Memory For Robot " + robotID + " to PLC Buffer");
     }

@@ -29,7 +29,7 @@ namespace Mirage
 
         public short returnParameter = 0;
         public short[] groups = new short[8] { (short)sizeOfFleet, 0, 0, 0, 0, 0, 0, 0 };
-        public int[] robotMapping;
+        //public int[] robotMapping;
 
         //=========================================================|
         //  Helper parameters                                      |
@@ -48,7 +48,7 @@ namespace Mirage
         public Fleet(int sizeOfFleet)
         {
             robots = new Robot[sizeOfFleet];
-            robotMapping = new int[2] { 4, 2 };
+           // robotMapping = new int[2] { 4, 2 };
             httpResponseTasks = new Task<HttpResponseMessage>[sizeOfFleet];
 
             // Instantiates the group array
@@ -76,7 +76,7 @@ namespace Mirage
         public Fleet(int sizeOfFleet, string fleetManagerIP, AuthenticationHeaderValue fleetManagerAuthToken)
         {
             robots = new Robot[sizeOfFleet];
-            robotMapping = new int[2] { 4, 2 };
+            //robotMapping = new int[2] { 4, 2 };
             httpResponseTasks = new Task<HttpResponseMessage>[sizeOfFleet];
 
             // Instantiates the group array
@@ -180,7 +180,7 @@ namespace Mirage
                     {
                         logger(AREA, DEBUG, "Sending " + type + " To Fleet Manager");
 
-                        fleetResponseTask = fleetManager.sendGetRequest("robots/" + robotMapping[robotID]);
+                        fleetResponseTask = fleetManager.sendGetRequest("robots/" + mirFleet.robots[robotID].fleetRobotID);
                     }
                     else if(type == "missions" && robotID == 666)
                     {
@@ -630,7 +630,7 @@ namespace Mirage
             logger(AREA, INFO, "Obtained SOftware Logs");
             Thread.Sleep(waitPeriod);
 
-            try
+/*            try
             {
                 try
                 {
@@ -649,7 +649,7 @@ namespace Mirage
             {
                 logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
             }
-
+*/
             logger(AREA, INFO, "Obtained Maps");
             Thread.Sleep(waitPeriod);
 
