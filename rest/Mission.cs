@@ -30,8 +30,6 @@ namespace Mirage.rest
 
         public Mission() { }
 
-        //public setMission(int missionNo, string guid)
-
         /// <summary>
         /// 
         /// </summary>

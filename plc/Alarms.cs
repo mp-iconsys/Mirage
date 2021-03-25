@@ -269,7 +269,7 @@ namespace Mirage.plc
             {
                 if (triggered)
                 {
-                    logger(AREA, INFO, area + " -- " + name + " Old Trigger: " + old_triggered + " Current Trigger: " + triggered);
+                    logger(AREA, INFO, area + " -- " + name + " Alarm Is Active");
                 }
             }
 

@@ -266,12 +266,6 @@ namespace Mirage
 
                 logger(AREA, DEBUG, "Got Status From Fleet");
             }
-/*            else if (type == "mission_scheduler")
-            {
-                logger(AREA, DEBUG, "Hellow from mission scheduler save");
-
-                fleetManager.Missions[0].saveToMemory(fleetResponseTask.Result);
-            }*/
             else if (type == "mission_scheduler/" + mirFleet.fleetManager.schedule.id)
             {
                 logger(AREA, DEBUG, "Getting Mission Scheduler response");
@@ -582,11 +576,16 @@ namespace Mirage
             {
                 try
                 {
-                    mirFleet.issueGetRequests("status");
-                    await mirFleet.saveFleetStatusAsync();
+                    //mirFleet.issueGetRequests("status");
+                    //await mirFleet.saveFleetStatusAsync();
 
-                    //mirFleet.issueGetRequests("registers");
-                    //await mirFleet.saveFleetRegistersAsync();
+                    for(int robot = 0; robot < sizeOfFleet; robot++)
+                    {
+                        mirFleet.robots[robot].s.saveToDB(robot);
+                    }
+
+                    mirFleet.issueGetRequests("registers");
+                    await mirFleet.saveFleetRegistersAsync();
                 }
                 catch (HttpRequestException exception)
                 {

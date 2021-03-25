@@ -10,6 +10,7 @@ using MySql.Data.MySqlClient;
 using Mirage.rest;
 using static Globals;
 using static Globals.DebugLevel;
+using System.Data;
 
 // TODO: Clean-up so we're a bit more tidy
 public class Robot
@@ -23,9 +24,10 @@ public class Robot
     //=========================================================|
     //  KPI, OEM & Statistics                                  |
     //=========================================================|
-/*    public long job { get; set; }
-    public List<int> MissionsForDB { get; set; }
-*/
+    /*    public long job { get; set; }
+        public List<int> MissionsForDB { get; set; }
+    */
+    public int maxRegister = 13;
 
     //=========================================================|
     //  Data which makes up the robot                          |     
@@ -577,12 +579,6 @@ public class Robot
             try
             {
                 Registers = JsonConvert.DeserializeObject<List<Register>>(response.Content.ReadAsStringAsync().Result);
-
-                for (int i = 0; i < Registers.Count; i++)
-                {
-                    //Registers[i].print();
-                    Registers[i].saveToDB(id);
-                }
             }
             catch (Exception exception)
             {
@@ -590,6 +586,47 @@ public class Robot
                 logger(AREA, ERROR, response.Content.ReadAsStringAsync().Result);
             }
 
-            logger(AREA, DEBUG, "==== Finished Saving Registers ====");
+        // Now save registers to DB (from memory)
+        logger(AREA, INFO, "Saving The Registers In The DB");
+
+        try
+        {
+            MySqlCommand cmd = new MySqlCommand();
+            cmd.Connection = db;
+            cmd.CommandText = "store_12_registers";
+            cmd.CommandType = CommandType.StoredProcedure;
+
+            cmd.Parameters.AddWithValue("@ROBOT_ID", id);
+            cmd.Parameters["@ROBOT_ID"].Direction = ParameterDirection.Input;
+            
+            string param = "";
+
+            for (int regNo = 0; regNo < maxRegister; regNo++)
+            {
+                param = "@REG" + (regNo + 1);
+                cmd.Parameters.AddWithValue(param, Registers[regNo].value);
+                cmd.Parameters[param].Direction = ParameterDirection.Input;
+            }
+/*
+
+
+            cmd.Parameters.AddWithValue("@REG2", totalNoOfMissions);
+            cmd.Parameters["@REG2"].Direction = ParameterDirection.Input;
+
+            cmd.Parameters.AddWithValue("@REG3", start.ToString("yyyy-MM-dd HH:mm:ss"));
+            cmd.Parameters["@REG3"].Direction = ParameterDirection.Input;
+
+            cmd.Parameters.AddWithValue("@REG4", end.ToString("yyyy-MM-dd HH:mm:ss"));
+            cmd.Parameters["@REG4"].Direction = ParameterDirection.Input;*/
+
+            cmd.ExecuteNonQuery();
+            cmd.Dispose();
+        }
+        catch (Exception exception)
+        {
+            logger(AREA, ERROR, "MySQL Query Error: ", exception);
+        }
+
+        logger(AREA, DEBUG, "==== Finished Saving Registers ====");
         }
     }

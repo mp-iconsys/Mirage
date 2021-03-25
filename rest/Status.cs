@@ -85,7 +85,6 @@ namespace Mirage.rest
         { 
             Status temp = JsonConvert.DeserializeObject<Status>(response.Content.ReadAsStringAsync().Result);
 
-            //robot_group_id = temp.robot_group_id;
             mode_id = temp.mode_id;
             state_id = temp.state_id;
             uptime = temp.uptime;

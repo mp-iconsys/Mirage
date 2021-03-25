@@ -31,6 +31,14 @@ namespace Mirage.rest
             missions = new List<JobMission>();  
         }
 
+        public Job(int jobNo)
+        {
+            isJobInProgress = true;
+            job = jobNo;
+            currentMission = 0;
+            missions = new List<JobMission>();
+        }
+
         public void startJob()
         {
             try
@@ -118,7 +126,7 @@ namespace Mirage.rest
             }
         }
 
-        public void finishJob(int robotID)
+        public void finishJob(int robotID, bool isAborted)
         {
             try
             {
@@ -134,7 +142,7 @@ namespace Mirage.rest
                     
 
                     // Save Job Data to DB
-                    saveJob(robotID);
+                    saveJob(robotID, isAborted);
 
                     // Save all the missions to DB
                     saveMissions(robotID);
@@ -164,7 +172,7 @@ namespace Mirage.rest
         /// <summary>
         /// 
         /// </summary>
-        public void saveJob(int robotID)
+        public void saveJob(int robotID, bool isAborted)
         {
             logger(AREA, INFO, "Saving The Job In The DB");
 
@@ -183,6 +191,17 @@ namespace Mirage.rest
 
                 cmd.Parameters.AddWithValue("@NO_OF_MISSIONS", totalNoOfMissions);
                 cmd.Parameters["@NO_OF_MISSIONS"].Direction = ParameterDirection.Input;
+
+                if(isAborted)
+                {
+                    cmd.Parameters.AddWithValue("@ABORTED", 1);
+                    cmd.Parameters["@ABORTED"].Direction = ParameterDirection.Input;
+                }
+                else
+                {
+                    cmd.Parameters.AddWithValue("@ABORTED", 0);
+                    cmd.Parameters["@ABORTED"].Direction = ParameterDirection.Input;
+                }
 
                 cmd.Parameters.AddWithValue("@START_TIME", start.ToString("yyyy-MM-dd HH:mm:ss"));
                 cmd.Parameters["@START_TIME"].Direction = ParameterDirection.Input;

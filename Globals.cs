@@ -50,8 +50,8 @@ public static class Globals
     //  For Sending SMS Alerts                                 |     
     //=========================================================|
     private static List<string> phone_numbers;
-    private static string accountSid; //= "ACc9a9248dd2a1f6d6e673148e73cfc2f9";
-    private static string authToken; //= "b57abe0211b4fde95bf7ae159eb75e2d";
+    private static string accountSid;
+    private static string authToken;
     private static string phone_twilio;
 
     /// <summary>
@@ -62,7 +62,9 @@ public static class Globals
         INFO = 1,
         DEBUG = 2,
         WARNING = 3,
-        ERROR = 4
+        ERROR = 4,
+        FATAL = 5,
+        ALL = 6
     }
 
     /// <summary>
@@ -95,17 +97,8 @@ public static class Globals
         public const int FatalError = 40;
         public const int CouldntProcessRequest = 40;
 
-        public const int PlcOK = 0;
+        public const int PlcIdle = 0;
         public const int PlcError = 0;
-
-        /*        public const int Awaiting = 0;
-                public const int StartedProcessing = 1;
-                public const int CompletedNoErrors = 20;
-                public const int CompletedPartially = 21;
-                public const int PlcOK = 30;
-                public const int PlcError = 31;
-                public const int CouldntProcessRequest = 40;
-                public const int FatalError = 41;*/
     }
 
     /// <summary>
@@ -162,6 +155,7 @@ public static class Globals
         //=========================================================|
         if (fleetManagerIP != null && fleetManagerAuthToken != null)
         {
+            //sendSMS("Starting AMR-Connect");
             logger(AREA, INFO, "Fleet Data Assigned");
             mirFleet = new Fleet(sizeOfFleet, fleetManagerIP, fleetManagerAuthToken);
         }
@@ -559,7 +553,7 @@ public static class Globals
     /// <param name="message"></param>
     public static void sendSMS(string message)
     {
-        logger(AREA, DEBUG, "==== Sending SMS Alert ====");
+        logger(AREA, DEBUG, "Sending SMS Alert");
 
         try
         {
@@ -754,8 +748,6 @@ public static class Globals
     /// </summary>
     public static void fleetMemoryToPLC()
     {
-        //Console.ReadLine();
-
         // Copy the internal Fleet Data to PLC fleetBlock
         SiemensPLC.fleetBlock.Param[SiemensPLC.fleetBlockControlParameters+1].setValue(mirFleet.returnParameter);
 
@@ -869,6 +861,10 @@ public static class Globals
                 log.Warn(message);
                 break;
             case DebugLevel.ERROR:
+                log.Error(message);
+                // Send an SMS message
+                break;
+            case DebugLevel.FATAL:
                 log.Error(message);
                 // Send an SMS message
                 break;

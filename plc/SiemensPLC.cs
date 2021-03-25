@@ -75,6 +75,13 @@ class SiemensPLC
     public static Alarms plcAlarms = new Alarms();
 
     //=========================================================|
+    // Watchdog Parameters                                     |
+    //=========================================================|
+    public static int watchdogFromPLC, watchdogToPLC;
+    public static int watchdogFromPLCOffset = 486;
+    public static int watchdogToPLCOffset = 484;
+
+    //=========================================================|
     //  Reset Data                                             |
     //=========================================================|
     public static int resetOffset = 478;
@@ -619,16 +626,7 @@ class SiemensPLC
             {
                 taskControlDB = 19;
 
-                // readBytes(Area, Data Block Number (in PLC), Start Byte, Length, Byte Container)
-/*                try
-                {*/
                     memoryres = dc.readBytes(daveDB, taskControlDB, fleetBlock.Offset, fleetBlockControlParameters * 2, memoryBuffer);
-/*                }
-                catch (Exception e)
-                {
-                    logger(AREA, ERROR, "Failed To Read Fleet Header");
-                    logger(AREA, ERROR, "Exception: ", e);
-                }*/
 
                 //=========================================================|
                 //  Memoryres - return code from Libnodave:                |
@@ -656,6 +654,7 @@ class SiemensPLC
                         {
                             //Used to be: fleetBlock.Param[0].getValue() == 0
                             //Now is: fleetBlock.getTaskStatus()
+                            // BitConverter.ToInt16(tempBytesForConversion, 0) == 10 && fleetBlock.getTaskStatus() == 0
                             if (BitConverter.ToInt16(tempBytesForConversion, 0) == 10 && fleetBlock.getTaskStatus() == 0)
                             {
                                 logger(AREA, INFO, "Got A Mission For Fleet");
@@ -667,12 +666,14 @@ class SiemensPLC
 
                                 updateTaskStatus(fleetID, 10);
                                 newMsgs[0] = true;
+
+                                logger(AREA, INFO, "New Message Is: " + newMsgs[0].ToString());
                                 newMsg = true;
                             }
                             else
                             {
                                 logger(AREA, DEBUG, "PLC Fleet Block Idle");
-                                newMsgs[0] = false;
+                                //newMsgs[0] = false;
                             }
                         }
 
@@ -730,15 +731,6 @@ class SiemensPLC
                 newMsg = true;
             }
         }
-
-        logger(AREA, DEBUG, "==== Printing Fleet Task Control ====");
-
-/*        for (int i = 0; i < fleetBlockControlParameters; i++)
-        {
-            fleetBlock.Param[i].print();
-        }*/
-
-        //Console.ReadLine();
 
         logger(AREA, DEBUG, "==== Completed Fleet Header ====");
     }
@@ -1101,12 +1093,15 @@ class SiemensPLC
     {
         logger(AREA, INFO, "Fleet Mirage Task Status: " + fleetBlock.getTaskStatus());
         logger(AREA, INFO, "Fleet PLC Task Status: " + fleetBlock.getPLCTaskStatus());
+        logger(AREA, INFO, "Fleet Message Status: " + newMsgs[0].ToString());
 
         for (int g = 1; g < sizeOfFleet+1; g++)
         {
             logger(AREA, INFO, "Robot " + g + " Mirage Task Status: " + robots[g-1].getTaskStatus());
+            logger(AREA, INFO, "Robot " + g + " Mission Status (Memory): " + mirFleet.robots[g-1].schedule.state_id);
+            logger(AREA, INFO, "Robot " + g + " Mission Status (PLC Buffer): " + robots[g - 1].Param[5].getValue());
             logger(AREA, INFO, "Robot " + g + " PLC Task Status: " + robots[g-1].getPLCTaskStatus());
-            logger(AREA, INFO, "Robot " + g + " Message Status: " + newMsgs[g-1].ToString());
+            logger(AREA, INFO, "Robot " + g + " Message Status: " + newMsgs[g].ToString());
         }
     }
 
@@ -1242,61 +1237,43 @@ class SiemensPLC
     }
 
     /// <summary>
-    /// 
+    /// Sets a single bit in the PLC to the high value (1). This is done to reset
+    /// a sequence or reset the tote count that's on top of the robot
     /// </summary>
-    /// <param name="robot"></param>
-    /// <param name="status"></param>
+    /// <param name="resetID">The ID of the parameter in the PLC block</param>
     public static void updateResetBits(int resetID)
     {
-        logger(AREA, INFO, "Reseting Sequence ID: " + resetID);
-
+        //=========================================================|
+        // The bit we want to reset is:                            |
+        // (No of bytes) * (Size of a byte) + Bit position         |
+        //=========================================================|
         int startBit = resetOffset * 8 + resetID;
 
+        logger(AREA, INFO, "Reseting Sequence ID: " + resetID);
         logger(AREA, INFO, "Start Bit Is:  " + startBit);
 
         if (live)
         {
-            byte[] tempBytes;
-            // tempBytes[0] = 255; // write 1
-            //byte[] buffer = 255; // write 1
+            byte[] tempBytes = new byte[] { 255 };
 
-
-            //byte t = Convert.ToByte(true);
-            //tempBytes = { 1 };
-            tempBytes = new byte[] { 255 };
-            logger(AREA, INFO, BitConverter.ToString(tempBytes));
-
+            // TODO: check if needed - probablt not since 255 is 11111111
             Array.Reverse(tempBytes);
-
-            logger(AREA, INFO, BitConverter.ToString(tempBytes));
 
             try
             {
                 int result;
 
-                result = dc.writeBits(daveDB, 19, startBit, 1, new Byte[] { 255 });
-
-                logger(AREA, INFO, daveStrerror(result));
-
-                /*                if (robot == fleetID)
-                                {
-                                    result = dc.writeBytes(daveDB, 19, 8, 2, tempBytes);
-                                    result = dc.writeBytes(daveDB, 19, fleetBlock.Param[Task_Status_ID].getOffset(), fleetBlock.Param[Task_Status_ID].getSize(), tempBytes);
-                                }
-                                else
-                                {
-                                    result = dc.writeBytes(daveDB, taskControlDB, robots[robot].Param[Task_Status_ID].getOffset(), robots[robot].Param[Task_Status_ID].getSize(), tempBytes);
-                                }*/
+                result = dc.writeBits(daveDB, 19, startBit, 1, tempBytes);
 
                 if (result != 0)
                 {
-                    logger(AREA, ERROR, "Task Status Update Was Unsuccessful");
+                    logger(AREA, ERROR, "Sequence Reset Was Unsuccessful");
                     logger(AREA, ERROR, daveStrerror(result));
                     plcConnectionErrors++;
                 }
                 else
                 {
-                    logger(AREA, DEBUG, "Task Status Updated To " + status);
+                    logger(AREA, DEBUG, "Sequence Was Reset Successfully");
                 }
             }
             catch (NullReferenceException exception)
@@ -1310,8 +1287,6 @@ class SiemensPLC
                 plcConnectionErrors++;
             }
         }
-
-        logger(AREA, DEBUG, "==== Sequence Bit Set In PLC ====");
     }
 
     /// <summary>
@@ -1319,7 +1294,7 @@ class SiemensPLC
     /// </summary>
     public static void checkResponse()
     {
-        logger(AREA, INFO, "==== Checking PLC Response ====");
+        logger(AREA, DEBUG, "Checking PLC Response");
 
         if (live)
         {
@@ -1327,49 +1302,74 @@ class SiemensPLC
 
             readRobots();
 
-            // If the PLC Task Status is Idle, set our Task Status to Idle 
-            if (fleetBlock.getPLCTaskStatus() == TaskStatus.PlcOK)
+            // Used to be: if (fleetBlock.getPLCTaskStatus() == TaskStatus.PlcIdle)
+            // Changed to: if (fleetBlock.getPLCTaskStatus() == TaskStatus.PlcIdle && fleetBlock.getTaskStatus() != TaskStatus.PlcIdle)
+            // This should only write to the PLC on the falling edge
+            // Can't be too smart as we need to make sure we overwrite the mission status to 0 when it completes the mission
+            if (fleetBlock.getPLCTaskStatus() == TaskStatus.PlcIdle && fleetBlock.getTaskStatus() != TaskStatus.Idle)
             {
-                updateTaskStatus(fleetID, TaskStatus.Idle);
+                logger(AREA, INFO, "Resetting Task Status And Fleet Return Parameter To 0 (Idle) From " + fleetBlock.getTaskStatus());
+
                 mirFleet.returnParameter = 0;
+                updateTaskStatus(fleetID, TaskStatus.Idle);   
             }
 
-            for (int i = 0; i < sizeOfFleet; i++)
+            for (int robotID = 0; robotID < sizeOfFleet; robotID++)
             {
-                if (robots[i].getPLCTaskStatus() == TaskStatus.PlcOK)
+                // Used to be: if (robots[robotID].getPLCTaskStatus() == TaskStatus.PlcIdle)
+                // Changed to: if (robots[robotID].getPLCTaskStatus() == TaskStatus.PlcIdle && robots[robotID].getTaskStatus() != TaskStatus.PlcIdle)
+                // This should only write to the PLC on the falling edge
+                // Can't be too smart as we need to make sure we overwrite the mission status to 0 when it completes the mission
+                if (robots[robotID].getPLCTaskStatus() == TaskStatus.PlcIdle && (robots[robotID].getTaskStatus() != TaskStatus.PlcIdle))
                 {
-                    logger(AREA, INFO, "Resetting Task And Mission Status To Idle For Robot : " + i);
+                    logger(AREA, INFO, "Resetting Task And Mission Status To 0 (Idle) For Robot : " + robotID);
 
-                    robots[i].Param[0].setValue(TaskStatus.Idle);
-                    mirFleet.robots[i].schedule.state_id = TaskStatus.Idle;
-                    updateTaskStatus(i, TaskStatus.Idle);
+                    // This should already be 0 from the read we did at the top
+                    // robots[robotID].Param[0].setValue(TaskStatus.Idle);
+                    mirFleet.robots[robotID].schedule.state_id = TaskStatus.Idle;
+                    robots[robotID].setTaskStatus(TaskStatus.Idle);
+                    //mirFleet.robots[robotID].schedule.state_id = TaskStatus.Idle;
 
-                    robotMemoryToPLC(i);
-                    writeRobotBlock(i); // TODO - fix so it only writes on falling edge and we don't write an entire block
+                    //updateTaskStatus(robotID, TaskStatus.Idle);
+
+                    // TODO: not needed since we write to PLC at the end anyway?
+                    robotMemoryToPLC(robotID);
+                    writeRobotBlock(robotID);
+                }
+                else if(robots[robotID].getPLCTaskStatus() == TaskStatus.PlcIdle && mirFleet.robots[robotID].schedule.state_id == TaskStatus.CompletedNoErrors)
+                {
+                    mirFleet.robots[robotID].schedule.state_id = TaskStatus.Idle;
+                    robots[robotID].setTaskStatus(TaskStatus.Idle);
+                    //mirFleet.robots[robotID].schedule.state_id = TaskStatus.Idle;
+
+                    //updateTaskStatus(robotID, TaskStatus.Idle);
+
+                    // TODO: not needed since we write to PLC at the end anyway?
+                    robotMemoryToPLC(robotID);
+                    writeRobotBlock(robotID);
                 }
             }
         }
         else
         {
-            status = TaskStatus.PlcOK;
+            status = TaskStatus.PlcIdle;
         }
 
-        // Set message to false as we've processed the message
-        // Only do this from within the switch statement
-        //newMsg = false;
-
-        logger(AREA, DEBUG, "==== Response Check Completed ====");
+        logger(AREA, DEBUG, "Response Check Completed");
     }
 
     /// <summary>
-    /// Reads the alarm block
+    /// Reads the PLC Alarms block and checks if any are triggered. 
+    /// If they are, it saves the rising and falling edge and records in the DB.
     /// </summary>
     public static void readAlarms()
     {
-        logger(AREA, DEBUG, "==== Reading PLC Alarms ====");
+        logger(AREA, DEBUG, "Reading PLC Alarms");
 
-        int alarmOffset = 424;
-        int alarmBlockSize = 22;
+        // TODO: remove, they're defined at the top
+        // TODO: define in the database
+        //int alarmOffset = 424;
+        //int alarmBlockSize = 22;
 
         if (live)
         {
@@ -1408,8 +1408,6 @@ class SiemensPLC
                         for (int a = 0; a < myBA.Count; a++)
                         {
                             plcAlarms.alarm_array[alarmPosition].triggered = myBA[a];
-                            //logger(AREA, DEBUG, "Word " + i + " Bit No: " + a + " is set to: " + myBA[a]);
-
                             alarmPosition++;
                         }
                     }
@@ -1419,26 +1417,27 @@ class SiemensPLC
                 }
                 else
                 {
-                    logger(AREA, ERROR, "Failed to Poll");
+                    logger(AREA, ERROR, "Failed to Poll PLC For Alarms");
                     logger(AREA, ERROR, daveStrerror(memoryres));
                     plcConnectionErrors++;
                 }
             }
             catch (NullReferenceException exception)
             {
-                logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
+                logger(AREA, WARNING, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
+                logger(AREA, WARNING, "Trying To Establish Connection Again");
                 plcConnectionErrors++;
 
                 establishConnection();
             }
             catch (Exception exception)
             {
-                logger(AREA, ERROR, "Polling Failed. Error : ", exception);
+                logger(AREA, ERROR, "PLC Polling Failed. Error : ", exception);
                 plcConnectionErrors++;
             }
         }
 
-        logger(AREA, DEBUG, "==== Completed Alarms Read ====");
+        logger(AREA, DEBUG, "Completed Reading PLC Alarms");
     }
 
     /// <summary>
@@ -1447,7 +1446,7 @@ class SiemensPLC
     /// </summary>
     public static void checkConnectivity()
     {
-        logger(AREA, DEBUG, "==== Checking Connectivity ====");
+        logger(AREA, DEBUG, "Checking PLC Connectivity");
 
         if (!plcConnected)
         {
@@ -1481,10 +1480,111 @@ class SiemensPLC
         }
         else
         {
-            logger(AREA, DEBUG, "Idling");
+            logger(AREA, DEBUG, "Connected To The PLC");
         }
 
-        logger(AREA, DEBUG, "==== Connectivity Checked ====");
+        updateWatchdog();
+
+        logger(AREA, DEBUG, "PLC Connectivity Checked");
+    }
+
+    /// <summary>
+    /// Scans the PLC watchdog, iterates the number by 1 and writes back.
+    /// </summary>
+    private static void updateWatchdog()
+    {
+        logger(AREA, DEBUG, "Updating PLC Watchdog");
+
+        int memoryres = 1;
+        int watchdogSize = 2;
+        int watchdogMaxValue = 32767;
+        byte[] memoryBuffer = new byte[watchdogSize];
+
+        //==========================================================|
+        // First, get the PLC Watchdog integer                      |
+        //==========================================================|
+        try
+        {
+            memoryres = dc.readBytes(daveDB, taskControlDB, watchdogFromPLCOffset, watchdogSize, memoryBuffer);
+
+            if (memoryres == 0)
+            {
+                logger(AREA, DEBUG, BitConverter.ToString(memoryBuffer));
+
+                if (BitConverter.IsLittleEndian)
+                {
+                    Array.Reverse(memoryBuffer);
+                }
+
+                watchdogFromPLC = BitConverter.ToInt16(memoryBuffer);
+
+                if(watchdogFromPLC <= watchdogMaxValue)
+                {
+                    watchdogToPLC = watchdogFromPLC;
+                }
+                else
+                {
+                    logger(AREA, WARNING, "PLC Watchdig Exceeded Maximum Value For Signed Int16. Resetting To 0");
+                    watchdogToPLC = 0;
+                }
+                
+                logger(AREA, INFO, "PLC Watchdog Is: " + watchdogFromPLC);
+            }
+            else
+            {
+                logger(AREA, ERROR, "Failed to Poll");
+                logger(AREA, ERROR, daveStrerror(memoryres));
+                plcConnectionErrors++;
+            }
+        }
+        catch (NullReferenceException exception)
+        {
+            logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
+            plcConnectionErrors++;
+            establishConnection();
+        }
+        catch (Exception exception)
+        {
+            logger(AREA, ERROR, "Polling Failed. Error : ", exception);
+            plcConnectionErrors++;
+        }
+
+        memoryBuffer = BitConverter.GetBytes((short)watchdogToPLC);
+
+        if (BitConverter.IsLittleEndian)
+        {
+            Array.Reverse(memoryBuffer);
+        }
+
+        logger(AREA, DEBUG, "Return Watchdog Parameter: " + BitConverter.ToString(memoryBuffer));
+
+        try
+        {
+            int result = 999;
+
+            result = dc.writeBytes(daveDB, taskControlDB, watchdogToPLCOffset, watchdogSize, memoryBuffer);
+
+            if (result != 0)
+            {
+                logger(AREA, ERROR, "Failed To Update Watchdog");
+                logger(AREA, ERROR, daveStrerror(result));
+                plcConnectionErrors++;
+            }
+            else
+            {
+                logger(AREA, DEBUG, "Task Status Updated To " + status);
+            }
+        }
+        catch (NullReferenceException exception)
+        {
+            logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
+            establishConnection();
+        }
+        catch (Exception exception)
+        {
+            logger(AREA, ERROR, "Failed To Write To PLC. Exception: ", exception);
+            plcConnectionErrors++;
+        }
     }
 
     /// <summary>

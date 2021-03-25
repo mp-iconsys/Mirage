@@ -67,6 +67,11 @@ namespace Mirage.plc
         {
             return Param[3].getValue();
         }
+
+        public void setTaskStatus(int value)
+        {
+            Param[4].setValue(value);
+        }
     }
 
     public class Parameters<T> where T : IParameters
