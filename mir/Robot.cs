@@ -99,10 +99,10 @@ public class Robot
             Group = new RobotGroup();
             schedule = new Scheduler();
 
-            Missions = new List<Mission>(new Mission[60]);
+            Missions = new List<Mission>(new Mission[80]);
             currentJob = new Job();
 
-            for (int i = 0; i < 60; i++)
+            for (int i = 0; i < 80; i++)
             {
                 Missions[i] = new Mission();
             }
@@ -587,7 +587,7 @@ public class Robot
             }
 
         // Now save registers to DB (from memory)
-        logger(AREA, INFO, "Saving The Registers In The DB");
+        //logger(AREA, INFO, "Saving The Registers In The DB");
 
         try
         {

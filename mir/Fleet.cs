@@ -401,8 +401,6 @@ namespace Mirage
                 //fleetManager.schedule.saveToMemory(fleetResponseTask.Result);  
             }
 
-            logger(AREA, INFO, "==== Mission Scheduler Updated ====");
-
             return functionStatus;
         }
 
@@ -570,7 +568,7 @@ namespace Mirage
         /// </summary>
         public async void pollRobots()
         {
-            logger(AREA, INFO, "Harvesting Data");
+            logger(AREA, INFO, "Polling Robots");
 
             try
             {
@@ -626,7 +624,7 @@ namespace Mirage
                 logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
             }
 
-            logger(AREA, INFO, "Obtained SOftware Logs");
+            logger(AREA, INFO, "Obtained Software Logs");
             Thread.Sleep(waitPeriod);
 
 /*            try
@@ -751,6 +749,12 @@ namespace Mirage
             for(int robotID = 0; robotID < sizeOfFleet; robotID++)
             {
                 issueGetRequest("status", robotID);
+            }
+
+            // Get latest job numbers
+            for(int robotID = 0; robotID < sizeOfFleet; robotID++)
+            {
+                mirFleet.robots[robotID].currentJob.getLatestJob(robotID);
             }
         }
     }

@@ -720,6 +720,11 @@ public static class Globals
                 mirFleet.fleetManager.Missions[i].created_by_id = created_by;
                 mirFleet.fleetManager.Missions[i].url_string = url_string;
 
+/*                if(i > 61)
+                {
+                    mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Missions[i].postRequest(true));
+                }*/
+
                 if(resumingSession == false)
                 {
                     logger(AREA, DEBUG, "Row: " + rdr.GetInt32(0) + " - GUID: " + guid + " - Name: " + name + "Desc: " + description + "Hidden: " + hidden + " group_id: " + group_id + " created_by: " + created_by + " URL: " + url_string);
@@ -752,6 +757,26 @@ public static class Globals
         SiemensPLC.fleetBlock.Param[SiemensPLC.fleetBlockControlParameters+1].setValue(mirFleet.returnParameter);
 
         int j = 0;
+        int robotsCurrentGroup;
+
+        //
+        // For each robot, check their robot group. 
+        // If it matches the group number, add it in. Otherwise, do nothing.
+        //
+        for (int group = 0; group < mirFleet.groups.Length; group++)
+        {
+            mirFleet.groups[group] = 0;
+
+            for (int robotID = 0; robotID < sizeOfFleet; robotID++)
+            {
+                robotsCurrentGroup = mirFleet.robots[robotID].s.robot_group_id;
+
+                if (robotsCurrentGroup == group)
+                {
+                    mirFleet.groups[group]++;
+                }
+            }
+        }
 
         for (int i = SiemensPLC.fleetBlockControlParameters + 2; i < SiemensPLC.fleetBlock.Param.Count; i++)
         {

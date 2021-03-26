@@ -431,7 +431,7 @@ class SiemensPLC
     /// </summary>
     public static void poll()
     {
-        logger(AREA, INFO, "Polling The PLC");
+        logger(AREA, DEBUG, "Polling The PLC");
 
         readFleetHeader();
 
@@ -617,119 +617,88 @@ class SiemensPLC
     {
         logger(AREA, DEBUG, "==== Reading Fleet Header====");
 
-        if (live)
+        int memoryres = 1;
+        byte[] memoryBuffer = new byte[fleetBlockControlParameters * 2];
+
+        try
         {
-            int memoryres = 1;
-            byte[] memoryBuffer = new byte[fleetBlockControlParameters * 2];
+            taskControlDB = 19;
 
-            try
+            memoryres = dc.readBytes(daveDB, taskControlDB, fleetBlock.Offset, fleetBlockControlParameters * 2, memoryBuffer);
+
+            //=========================================================|
+            //  Memoryres - return code from Libnodave:                |
+            //    0 - Obtained Data                                    |
+            //  < 0 - Error detected by Libnodave                      |
+            //  > 0 - Error from the PLC                               |
+            //=========================================================|
+            if (memoryres == 0)
             {
-                taskControlDB = 19;
+                logger(AREA, DEBUG, BitConverter.ToString(memoryBuffer));
 
-                    memoryres = dc.readBytes(daveDB, taskControlDB, fleetBlock.Offset, fleetBlockControlParameters * 2, memoryBuffer);
-
-                //=========================================================|
-                //  Memoryres - return code from Libnodave:                |
-                //    0 - Obtained Data                                    |
-                //  < 0 - Error detected by Libnodave                      |
-                //  > 0 - Error from the PLC                               |
-                //=========================================================|
-                if (memoryres == 0)
+                for (int i = 0; i < fleetBlockControlParameters; i++)
                 {
-                    logger(AREA, DEBUG, BitConverter.ToString(memoryBuffer));
+                    int size = 2;
+                    int byte1 = i * size;
+                    int byte2 = (i * size) + 1;
 
-                    for (int i = 0; i < fleetBlockControlParameters; i++)
+                    byte[] tempBytesForConversion = new byte[2] { memoryBuffer[byte1], memoryBuffer[byte2] };
+
+                    // Need to reverse the bytes to get actual values
+                    if (BitConverter.IsLittleEndian)
+                    { Array.Reverse(tempBytesForConversion); }
+
+                    if (i == 0)
                     {
-                        int size = 2;
-                        int byte1 = i * size;
-                        int byte2 = (i * size) + 1;
-
-                        byte[] tempBytesForConversion = new byte[2] { memoryBuffer[byte1], memoryBuffer[byte2] };
-
-                        // Need to reverse the bytes to get actual values
-                        if (BitConverter.IsLittleEndian)
-                        { Array.Reverse(tempBytesForConversion); }
-
-                        if(i == 0)
+                        //Used to be: fleetBlock.Param[0].getValue() == 0
+                        //Now is: fleetBlock.getTaskStatus()
+                        // BitConverter.ToInt16(tempBytesForConversion, 0) == 10 && fleetBlock.getTaskStatus() == 0
+                        if (BitConverter.ToInt16(tempBytesForConversion, 0) == 10 && fleetBlock.getTaskStatus() == 0)
                         {
-                            //Used to be: fleetBlock.Param[0].getValue() == 0
-                            //Now is: fleetBlock.getTaskStatus()
-                            // BitConverter.ToInt16(tempBytesForConversion, 0) == 10 && fleetBlock.getTaskStatus() == 0
-                            if (BitConverter.ToInt16(tempBytesForConversion, 0) == 10 && fleetBlock.getTaskStatus() == 0)
+                            logger(AREA, INFO, "Got A Mission For Fleet");
+
+                            for (int j = 0; j < fleetBlockControlParameters; j++)
                             {
-                                logger(AREA, INFO, "Got A Mission For Fleet");
-
-                                for (int j = 0; j < fleetBlockControlParameters; j++)
-                                {
-                                    fleetBlock.Param[j].print();
-                                }
-
-                                updateTaskStatus(fleetID, 10);
-                                newMsgs[0] = true;
-
-                                logger(AREA, INFO, "New Message Is: " + newMsgs[0].ToString());
-                                newMsg = true;
+                                fleetBlock.Param[j].print();
                             }
-                            else
-                            {
-                                logger(AREA, DEBUG, "PLC Fleet Block Idle");
-                                //newMsgs[0] = false;
-                            }
+
+                            updateTaskStatus(fleetID, 10);
+                            newMsgs[0] = true;
+
+                            logger(AREA, INFO, "New Message Is: " + newMsgs[0].ToString());
+                            newMsg = true;
                         }
-
-                        fleetBlock.Param[i].setValue(BitConverter.ToInt16(tempBytesForConversion, 0));
+                        else
+                        {
+                            logger(AREA, DEBUG, "PLC Fleet Block Idle");
+                            //newMsgs[0] = false;
+                        }
                     }
-                }
-                else
-                {
-                    logger(AREA, ERROR, "Failed to Poll");
-                    logger(AREA, ERROR, daveStrerror(memoryres));
-                    plcConnectionErrors++;
-                    //newMsg = false;
-                }
-            }
-            catch (NullReferenceException exception)
-            {
-                logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
-                plcConnectionErrors++;
-                //newMsg = false;
 
-                establishConnection();
+                    fleetBlock.Param[i].setValue(BitConverter.ToInt16(tempBytesForConversion, 0));
+                }
             }
-            catch (Exception exception)
+            else
             {
-                logger(AREA, ERROR, "Polling Failed. Error : ", exception);
+                logger(AREA, WARNING, "Failed to Poll");
+                logger(AREA, WARNING, daveStrerror(memoryres));
                 plcConnectionErrors++;
                 //newMsg = false;
             }
         }
-        else
+        catch (NullReferenceException exception)
         {
-            logger(AREA, INFO, "Simulating Messages From Console");
+            logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
+            plcConnectionErrors++;
+            //newMsg = false;
 
-            if (!newMsg)
-            {
-                for (int i = 0; i < fleetBlockControlParameters + 1; i++)
-                {
-                    fleetBlock.Param[i].simulateConsole();
-                }
-
-                string yn;
-
-                Console.WriteLine("Add Robot Commands Further On (y/n)");
-                yn = Console.ReadLine();
-
-                if (yn == "y" || yn == "Y")
-                {
-                    furtherMsg = true;
-                }
-                else if (yn == "n" || yn == "N")
-                {
-                    furtherMsg = false;
-                }
-
-                newMsg = true;
-            }
+            establishConnection();
+        }
+        catch (Exception exception)
+        {
+            logger(AREA, ERROR, "Polling Failed. Error : ", exception);
+            plcConnectionErrors++;
+            //newMsg = false;
         }
 
         logger(AREA, DEBUG, "==== Completed Fleet Header ====");
@@ -802,7 +771,7 @@ class SiemensPLC
                                 // Trigger a new message on rising edge
                                 if (i == 0)
                                 {
-                                    logger(AREA, INFO, "NEW PLC Task Status: " + BitConverter.ToInt16(tempBytesForConversion, 0) + " OLD PLC Task Status: " + robots[r].getTaskStatus());
+                                    //logger(AREA, INFO, "NEW PLC Task Status: " + BitConverter.ToInt16(tempBytesForConversion, 0) + " OLD PLC Task Status: " + robots[r].getTaskStatus());
                                     //robots[0].getPLCTaskStatus()
                                     //robots[r].Param[0].getValue() == 0
                                     if (BitConverter.ToInt16(tempBytesForConversion, 0) == 10 && robots[r].getTaskStatus() == 0)
@@ -1097,11 +1066,11 @@ class SiemensPLC
 
         for (int g = 1; g < sizeOfFleet+1; g++)
         {
-            logger(AREA, INFO, "Robot " + g + " Mirage Task Status: " + robots[g-1].getTaskStatus());
-            logger(AREA, INFO, "Robot " + g + " Mission Status (Memory): " + mirFleet.robots[g-1].schedule.state_id);
-            logger(AREA, INFO, "Robot " + g + " Mission Status (PLC Buffer): " + robots[g - 1].Param[5].getValue());
-            logger(AREA, INFO, "Robot " + g + " PLC Task Status: " + robots[g-1].getPLCTaskStatus());
-            logger(AREA, INFO, "Robot " + g + " Message Status: " + newMsgs[g].ToString());
+            logger(AREA, INFO, "Robot " + (g - 1) + " Mirage Task Status: " + robots[g-1].getTaskStatus());
+            logger(AREA, INFO, "Robot " + (g - 1) + " Mission Status (Memory): " + mirFleet.robots[g-1].schedule.state_id);
+            logger(AREA, INFO, "Robot " + (g - 1) + " Mission Status (PLC Buffer): " + robots[g - 1].Param[5].getValue());
+            logger(AREA, INFO, "Robot " + (g - 1) + " PLC Task Status: " + robots[g-1].getPLCTaskStatus());
+            logger(AREA, INFO, "Robot " + (g - 1) + " Message Status: " + newMsgs[g].ToString());
         }
     }
 
@@ -1412,7 +1381,7 @@ class SiemensPLC
                         }
                     }
 
-                    plcAlarms.printAllAlarms();
+                    //plcAlarms.printAllAlarms();
                     plcAlarms.checkAlarms();
                 }
                 else

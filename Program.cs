@@ -18,15 +18,9 @@ class Program
 
         mirFleet.getFleetRobotIDs();
 
-        //Console.ReadLine();
-
         initializeFleet();
 
-        //Console.ReadLine();
-
         mirFleet.getInitialFleetData();
-
-        //Console.ReadLine();
 
         logger(AREA, INFO, "==== Starting Main Loop ====");
 
@@ -188,9 +182,6 @@ class Program
                 //====================================================|
                 checkMissionAssignment(robotAssignmentTimer);
 
-                // Check if we need to write to fleet at the end of every loop (might not be needed)
-                getRobotGroups();
-
                 //====================================================|
                 //  Fetch High Frequency Data for the PLC             |
                 //====================================================|
@@ -202,6 +193,9 @@ class Program
 
                     SiemensPLC.writeRobotBlock(k);
                 }
+
+                // Check if we need to write to fleet at the end of every loop (might not be needed)
+                getRobotGroups();
             }
             else
             {
@@ -213,11 +207,10 @@ class Program
             // Poll MiR Fleet - async operation that happens every pollInterval
             if (timer.Elapsed.Seconds >= pollInterval)
             {
-                logger(AREA, INFO, "Harvesting Robots For KPI/OEM Data. " + timer.Elapsed.TotalSeconds + " seconds since last poll. Poll interval is: " + pollInterval);
+                logger(AREA, INFO, "Harvesting Robot Data And Checking Reports. " + timer.Elapsed.TotalSeconds + "s Since Last Poll");
 
                 calculationsAndReporting();
                 timer.Restart();
-                //mirFleet.saveFleetRegistersAsync();
                 mirFleet.pollRobots(); //TODO: -> make this quicker, get status from fleet?
             }
 
@@ -225,13 +218,12 @@ class Program
 
             checkPLCReset();
 
-            SiemensPLC.printNewMessageStatus();
-
-            //Console.ReadLine();
+            // For Debug Purposes
+            // SiemensPLC.printNewMessageStatus();
 
             logger(AREA, DEBUG, "==== Loop " + i + " Finished ====");
 
-            Thread.Sleep(200); // Remove in live deployment
+            Thread.Sleep(100); // Remove in live deployment
         }
 
         gracefulTermination();
@@ -264,7 +256,7 @@ class Program
         // PLC Missions start at 301. Internal Mirage and Fleet missions start at 0.
         int mission_number = plcMissionNumber - PLCMissionOffset;
         int restStatus;
-        int waitTimeForMissionAssignment = 500;
+        int waitTimeForMissionAssignment = 10;
 
         logger(AREA, INFO, "Sending A New Mission To The Fleet Scheduler");
         logger(AREA, INFO, "Mission " + plcMissionNumber + " : " + mirFleet.fleetManager.Missions[mission_number].name);
@@ -273,6 +265,11 @@ class Program
         if (robotID == fleetID)
         {
             logger(AREA, INFO, "It's For Any Robot In The Available Group");
+
+            if(mission_number > 16 && mission_number < 25)
+            {
+                mission_number = mission_number + 45;
+            }
 
             // If successfull, this returns Schedule ID and stores it in mirFleet.fleetManager.schedule.id
             restStatus = mirFleet.fleetManager.sendScheduleRequest(mirFleet.fleetManager.Missions[mission_number].postRequest());
@@ -397,19 +394,13 @@ class Program
     /// <returns></returns>
     private static void getRobotGroups()
     {
-        logger(AREA, INFO, "Saving Robot Groups In Fleet PLC Block");
+        logger(AREA, DEBUG, "Saving Robot Groups In Fleet PLC Block");
 
         // Comment out for now - we're relying on keeping track of the groups ourselves
         //int restStatus = mirFleet.issueGetRequest("robots?whitelist=robot_group_id", SiemensPLC.fleetID);
 
         fleetMemoryToPLC();
         SiemensPLC.writeFleetBlock(SiemensPLC.fleetBlock.getTaskStatus());
-
-        
-        //int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Group.putRequest(robotID, robotGroupID));
-
-        //logger(AREA, DEBUG, "REST API Status: " + restStatus);
-        //logger(AREA, DEBUG, "==== Fetched Robot Groups ====");
     }
 
     /// <summary>
@@ -488,7 +479,7 @@ class Program
     /// </summary>
     private static void checkMissionAssignment(Stopwatch robotAssignment)
     {
-        logger(AREA, INFO, "Checking Mission Assignment");
+        logger(AREA, DEBUG, "Checking Mission Assignment");
 
         if (mirFleet.fleetManager.schedule.working_response)
         {
@@ -497,8 +488,8 @@ class Program
             int currentMissionRobot = 0;
             int restStatus = 0;
 
-            logger(AREA, DEBUG, "Current Scheduler Fleet Robot ID is: " + mirFleet.fleetManager.schedule.robot_id);
-            logger(AREA, DEBUG, "Current Mission Schedule ID is: " + mirFleet.fleetManager.schedule.id);
+            logger(AREA, INFO, "Current Scheduler Fleet Robot ID is: " + mirFleet.fleetManager.schedule.robot_id);
+            logger(AREA, INFO, "Current Mission Schedule ID is: " + mirFleet.fleetManager.schedule.id);
 
             restStatus = mirFleet.issueGetRequest("mission_scheduler/" + mirFleet.fleetManager.schedule.id, fleetID);
 
@@ -546,7 +537,11 @@ class Program
             // Don't check if we're idling or if we aborted the job
             // Used to be: if (mirFleet.robots[r].schedule.id != Globals.TaskStatus.Idle)
             // Now we don't scan if the PLC Task Status is idle (since the mir isn't doing anything)
-            if (mirFleet.robots[r].schedule.id != Globals.TaskStatus.Idle && SiemensPLC.robots[r].getPLCTaskStatus() != Globals.TaskStatus.Idle)
+            // && SiemensPLC.robots[r].getPLCTaskStatus() != Globals.TaskStatus.Idle
+            if (mirFleet.robots[r].schedule.id != Globals.TaskStatus.Idle && 
+                (SiemensPLC.robots[r].getPLCTaskStatus() != Globals.TaskStatus.Idle 
+                || SiemensPLC.fleetBlock.getPLCTaskStatus() != Globals.TaskStatus.Idle 
+                || mirFleet.robots[r].schedule.state_id != Globals.TaskStatus.Idle))
             {
                 // Check the status of the mission assigned to robot r
                 logger(AREA, INFO, "Robot ID: " + r + " And Mission Scheduler Robot ID is: " + mirFleet.robots[r].fleetRobotID);
@@ -612,7 +607,7 @@ class Program
     /// </summary>
     private static int getRobotStatus(int robotID)
     {
-        logger(AREA, INFO, "Get Robot Status From Robots");
+        logger(AREA, DEBUG, "Get Robot Status From Robots");
 
         int restStatus = mirFleet.issueGetRequest("status", robotID);
 
@@ -738,8 +733,8 @@ class Program
         mirFleet.robots[robotID].currentJob.finishJob(robotID, false);
 
         // Add one to available group, subtract one from busy group
-        mirFleet.groups[1]++;
-        mirFleet.groups[2]--;
+        //mirFleet.groups[1]++;
+        //mirFleet.groups[2]--;
 
         return taskStat;
     }
@@ -813,8 +808,8 @@ class Program
         }
 
         // Add one to busy group, subtract one from available group
-        mirFleet.groups[2]++;
-        mirFleet.groups[1]--;
+        //mirFleet.groups[2]++;
+        //mirFleet.groups[1]--;
 
         return taskStat;
     }

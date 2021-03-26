@@ -39,6 +39,29 @@ namespace Mirage.rest
             missions = new List<JobMission>();
         }
 
+        public void getLatestJob(int robotID)
+        {
+            try
+            {
+                string sql = "SELECT MAX(JOB_ID) FROM jobs WHERE ROBOT_ID = " + robotID + ";";
+                using var cmd = new MySqlCommand(sql, db);
+                using MySqlDataReader rdr = cmd.ExecuteReader();
+
+                while (rdr.Read())
+                {
+                    job = rdr.GetInt32(0) + 1;
+                }
+
+                cmd.Dispose();
+                rdr.Close();
+            }
+            catch (Exception e)
+            {
+                logger(AREA, ERROR, "Failed To Get The Latest Job");
+                logger(AREA, ERROR, "Exception: ", e);
+            }
+        }
+
         public void startJob()
         {
             try
@@ -157,7 +180,6 @@ namespace Mirage.rest
             // Release the missions and clear the Job data
             try
             {
-                job++;
                 missions = new List<JobMission>();
                 start = DateTime.Now;
                 currentMission = 0;
