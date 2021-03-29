@@ -582,8 +582,34 @@ namespace Mirage
                         mirFleet.robots[robot].s.saveToDB(robot);
                     }
 
+                    //mirFleet.issueGetRequests("registers");
+                    //await mirFleet.saveFleetRegistersAsync();
+                }
+                catch (HttpRequestException exception)
+                {
+                    // TODO: Handle more exceptions
+                    // TODO: Remove the task which is causing the exception
+                    logger(AREA, ERROR, "HTTP Request Error. Couln't connect to the MiR robots.");
+                    logger(AREA, ERROR, "Check your network, dns settings, robot is up, etc. Error: ", exception);
+                }
+            }
+            catch (Exception exception)
+            {
+                logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
+            }
+        }
+
+        public async void getRegisters()
+        {
+            try
+            {
+                try
+                {
                     mirFleet.issueGetRequests("registers");
-                    await mirFleet.saveFleetRegistersAsync();
+                    for (int i = 0; i < sizeOfFleet; i++)
+                    {
+                        robots[i].saveRegistersWithoutDB(await httpResponseTasks[i]);
+                    }
                 }
                 catch (HttpRequestException exception)
                 {

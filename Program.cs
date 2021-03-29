@@ -177,6 +177,9 @@ class Program
                 //====================================================|
                 SiemensPLC.readAlarms();
 
+                // Need to get registers prior to 
+                mirFleet.getRegisters();
+
                 //====================================================|
                 //  Check Mission Progress From Fleet                 |
                 //====================================================|
@@ -551,35 +554,71 @@ class Program
 
                 logger(AREA, INFO, "Mission Status For Robot: " + r + " is: " + mirFleet.robots[r].schedule.state);
 
-                if (mirFleet.robots[r].schedule.state == "Pending")
+                if(SiemensPLC.robots[r].getTaskParameter() == 351 || SiemensPLC.robots[r].getTaskParameter() == 352)
                 {
-                    mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.TaskReceivedFromPLC;
-                }
-                else if (mirFleet.robots[r].schedule.state == "Executing")
-                {
-                    mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.StartedProcessing;
-                }
-                else if (mirFleet.robots[r].schedule.state == "Outbound")
-                {
-                    mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.StartedProcessing;
-                }
-                else if (mirFleet.robots[r].schedule.state == "Aborted")
-                {
-                    mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.CouldntProcessRequest;
-                    SiemensPLC.updateTaskStatus(r, Globals.TaskStatus.CouldntProcessRequest);
-                    //mirFleet.robots[r].currentJob.finishMission();
-                    mirFleet.robots[r].currentJob.finishJob(r, true);
-                }
-                else if (mirFleet.robots[r].schedule.state == "Done")
-                {
-                    mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.CompletedNoErrors;
-                    mirFleet.robots[r].schedule.id = 0;
-                    mirFleet.robots[r].currentJob.finishMission();
+                    logger(AREA, INFO, "Register 1 is: " + mirFleet.robots[r].Registers[1].value);
+                    logger(AREA, INFO, "Mission Status is: " + mirFleet.robots[r].schedule.state_id);
+
+                    if (mirFleet.robots[r].schedule.state == "Pending")
+                    {
+                        mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.TaskReceivedFromPLC;
+                    }
+                    else if (mirFleet.robots[r].schedule.state == "Executing" && (int)(mirFleet.robots[r].Registers[1].value) == 1)
+                    {
+                        mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.StartedProcessing;
+                    }
+                    else if (mirFleet.robots[r].schedule.state == "Outbound")
+                    {
+                        mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.TaskReceivedFromPLC;
+                    }
+                    else if (mirFleet.robots[r].schedule.state == "Aborted")
+                    {
+                        mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.CouldntProcessRequest;
+                        SiemensPLC.updateTaskStatus(r, Globals.TaskStatus.CouldntProcessRequest);
+                        //mirFleet.robots[r].currentJob.finishMission();
+                        mirFleet.robots[r].currentJob.finishJob(r, true);
+                    }
+                    else if (mirFleet.robots[r].schedule.state == "Done")
+                    {
+                        mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.CompletedNoErrors;
+                        mirFleet.robots[r].schedule.id = 0;
+                        mirFleet.robots[r].currentJob.finishMission();
+                    }
                 }
                 else
                 {
-                    mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.StartedProcessing;
+                    if (mirFleet.robots[r].schedule.state == "Pending")
+                    {
+                        mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.TaskReceivedFromPLC;
+                    }
+                    else if (mirFleet.robots[r].schedule.state == "Executing")
+                    {
+                        mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.StartedProcessing;
+                    }
+                    else if (mirFleet.robots[r].schedule.state == "Outbound")
+                    {
+                        mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.StartedProcessing;
+                    }
+                    else if (mirFleet.robots[r].schedule.state == "Aborted")
+                    {
+                        mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.CouldntProcessRequest;
+                        SiemensPLC.updateTaskStatus(r, Globals.TaskStatus.CouldntProcessRequest);
+                        //mirFleet.robots[r].currentJob.finishMission();
+                        mirFleet.robots[r].currentJob.finishJob(r, true);
+                    }
+                    else if (mirFleet.robots[r].schedule.state == "Done")
+                    {
+                        mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.CompletedNoErrors;
+                        mirFleet.robots[r].schedule.id = 0;
+                        mirFleet.robots[r].currentJob.finishMission();
+                    }
+                    else
+                    {
+                        mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.StartedProcessing;
+                    }
                 }
+
+
 
                 logger(AREA, DEBUG, "Mission Status For Robot: " + r + " State ID is: " + mirFleet.robots[r].schedule.state_id);
             }

@@ -32,7 +32,7 @@ public class Robot
     //=========================================================|
     //  Data which makes up the robot                          |     
     //=========================================================|
-    private List<Register> Registers { get; set; }
+    public List<Register> Registers { get; set; }
     private List<SoftwareLog> SoftwareLogs { get; set; }
     private List<Map> Maps { get; set; }
     private List<Setting> Settings { get; set; }
@@ -568,11 +568,32 @@ public class Robot
         }
 
 
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="response"></param>
-        public void saveRegisters(HttpResponseMessage response)
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="response"></param>
+    public void saveRegistersWithoutDB(HttpResponseMessage response)
+    {
+        logger(AREA, DEBUG, "==== Saving Registers ====");
+
+        try
+        {
+            Registers = JsonConvert.DeserializeObject<List<Register>>(response.Content.ReadAsStringAsync().Result);
+        }
+        catch (Exception exception)
+        {
+            logger(AREA, ERROR, "Failed to decode JSON data: ", exception);
+            logger(AREA, ERROR, response.Content.ReadAsStringAsync().Result);
+        }
+
+        logger(AREA, DEBUG, "==== Finished Saving Registers ====");
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="response"></param>
+    public void saveRegisters(HttpResponseMessage response)
         {
             logger(AREA, DEBUG, "==== Saving Registers ====");
 
