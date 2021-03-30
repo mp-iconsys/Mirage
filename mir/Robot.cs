@@ -15,7 +15,8 @@ using System.Data;
 // TODO: Clean-up so we're a bit more tidy
 public class Robot
 {
-    public int id {get; set; } //Used to be: public int id = 0; 
+    public int id {get; set; }
+    public bool isLive { get; set; }
     public int fleetRobotID { get; set; }
     public int plcRobotID { get; set; }
     public string ipAddress { get; set; } // TODO: change to actual IPAddress class from .net library
@@ -64,6 +65,7 @@ public class Robot
             plcRobotID = 0;
 
             currentJob = new Job();
+            isLive = true;
         }
 
         /// <summary>
@@ -81,6 +83,7 @@ public class Robot
             s = new Status();
             schedule = new Scheduler();
             currentJob = new Job();
+            isLive = true;
         }
 
         /// <summary>
@@ -106,6 +109,8 @@ public class Robot
             {
                 Missions[i] = new Mission();
             }
+
+            isLive = true;
         }
 
         /// <summary>
@@ -628,17 +633,6 @@ public class Robot
                 cmd.Parameters.AddWithValue(param, Registers[regNo].value);
                 cmd.Parameters[param].Direction = ParameterDirection.Input;
             }
-/*
-
-
-            cmd.Parameters.AddWithValue("@REG2", totalNoOfMissions);
-            cmd.Parameters["@REG2"].Direction = ParameterDirection.Input;
-
-            cmd.Parameters.AddWithValue("@REG3", start.ToString("yyyy-MM-dd HH:mm:ss"));
-            cmd.Parameters["@REG3"].Direction = ParameterDirection.Input;
-
-            cmd.Parameters.AddWithValue("@REG4", end.ToString("yyyy-MM-dd HH:mm:ss"));
-            cmd.Parameters["@REG4"].Direction = ParameterDirection.Input;*/
 
             cmd.ExecuteNonQuery();
             cmd.Dispose();

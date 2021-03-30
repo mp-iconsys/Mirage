@@ -1317,6 +1317,18 @@ class SiemensPLC
                     robotMemoryToPLC(robotID);
                     writeRobotBlock(robotID);
                 }
+                else if (robots[robotID].getPLCTaskStatus() == TaskStatus.PlcIdle && mirFleet.robots[robotID].schedule.state_id == TaskStatus.CouldntProcessRequest)
+                {
+                    mirFleet.robots[robotID].schedule.state_id = TaskStatus.Idle;
+                    robots[robotID].setTaskStatus(TaskStatus.Idle);
+                    //mirFleet.robots[robotID].schedule.state_id = TaskStatus.Idle;
+
+                    //updateTaskStatus(robotID, TaskStatus.Idle);
+
+                    // TODO: not needed since we write to PLC at the end anyway?
+                    robotMemoryToPLC(robotID);
+                    //writeRobotBlock(robotID);
+                }
             }
         }
         else

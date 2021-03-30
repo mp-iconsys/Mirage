@@ -130,22 +130,30 @@ namespace Mirage
         {
             for (int i = 0; i < sizeOfFleet; i++)
             {
-                try
-                {
+                if(robots[i].isLive)
+                { 
                     try
                     {
-                        httpResponseTasks[i] = robots[i].sendGetRequest(type);
+                        try
+                        {
+                            httpResponseTasks[i] = robots[i].sendGetRequest(type);
+                        }
+                        catch (HttpRequestException exception)
+                        {
+                            // TODO: Remove the task which is causing the exception
+                            logger(AREA, ERROR, "HTTP Request Error. Couln't connect to the MiR robots.");
+                            logger(AREA, ERROR, "Check your network, dns settings, robot is up, etc. Error: ", exception);
+                            robots[i].isLive = false;
+                        }
                     }
-                    catch (HttpRequestException exception)
+                    catch (System.Net.WebException exception)
                     {
-                        // TODO: Remove the task which is causing the exception
-                        logger(AREA, ERROR, "HTTP Request Error. Couln't connect to the MiR robots.");
-                        logger(AREA, ERROR, "Check your network, dns settings, robot is up, etc. Error: ", exception);
+                        logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
                     }
                 }
-                catch (System.Net.WebException exception)
+                else
                 {
-                    logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
+                    logger(AREA, WARNING, "Robot " + i + " Is Not Live");
                 }
             }
         }
@@ -162,6 +170,7 @@ namespace Mirage
 
             int functionStatus = Globals.TaskStatus.CompletedNoErrors;
 
+            //if(robots[])
             try
             {
                 try
@@ -309,17 +318,6 @@ namespace Mirage
                         group[i].robot_group_id = group[i].robot_group_id - 2;
                     }
                 }
-
-/*                for (int i = 0; i < group.Length; i++)
-                {
-                    for(int j = 0; j < groups.Length; j++)
-                    {
-                        if(group[i].robot_group_id == j)
-                        {
-                            groups[j]++;
-                        }
-                    }
-                }*/
             }
 
             logger(AREA, DEBUG, "==== Completed Get Request ====");
@@ -606,9 +604,10 @@ namespace Mirage
                 try
                 {
                     mirFleet.issueGetRequests("registers");
+
                     for (int i = 0; i < sizeOfFleet; i++)
                     {
-                        robots[i].saveRegistersWithoutDB(await httpResponseTasks[i]);
+                        robots[i].saveRegistersWithoutDB(httpResponseTasks[i].Result);
                     }
                 }
                 catch (HttpRequestException exception)
