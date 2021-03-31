@@ -99,8 +99,8 @@ class Program
                         //SiemensPLC.updateTaskStatus(fleetID, taskStatus);
                         //SiemensPLC.updateTaskStatus(fleetID, Globals.TaskStatus.StartedProcessing);
 
-                        //SiemensPLC.writeFleetBlock(Globals.TaskStatus.StartedProcessing);
-                        SiemensPLC.writeFleetBlock(taskStatus);
+                        SiemensPLC.writeFleetBlock(Globals.TaskStatus.StartedProcessing);
+                        //SiemensPLC.writeFleetBlock(taskStatus);
 
                         SiemensPLC.newMsgs[0] = false;
 
@@ -226,7 +226,7 @@ class Program
             checkPLCReset();
 
             // For Debug Purposes
-            // SiemensPLC.printNewMessageStatus();
+            SiemensPLC.printNewMessageStatus();
 
             logger(AREA, DEBUG, "==== Loop " + i + " Finished ====");
 
@@ -551,7 +551,7 @@ class Program
                 || mirFleet.robots[r].schedule.state_id != Globals.TaskStatus.Idle))
             {
                 // Check the status of the mission assigned to robot r
-                logger(AREA, INFO, "Robot ID: " + r + " And Mission Scheduler Robot ID is: " + mirFleet.robots[r].fleetRobotID);
+                logger(AREA, INFO, "==== Robot ID: " + r + " And Mission Scheduler Robot ID is: " + mirFleet.robots[r].fleetRobotID + " ====");
                 logger(AREA, INFO, "Mission Schedule ID is: " + mirFleet.robots[r].schedule.id);
 
                 restStatus = mirFleet.checkMissionSchedule("mission_scheduler/" + mirFleet.robots[r].schedule.id + "?whilelist=state", SiemensPLC.fleetID, r);
@@ -560,7 +560,7 @@ class Program
 
                 if(SiemensPLC.robots[r].getTaskParameter() == 351 || SiemensPLC.robots[r].getTaskParameter() == 352)
                 {
-                    logger(AREA, INFO, "Register 1 is: " + mirFleet.robots[r].Registers[1].value);
+                    logger(AREA, INFO, "Conveyor Running On MiR is: " + mirFleet.robots[r].Registers[1].value);
                     logger(AREA, INFO, "Mission Status is: " + mirFleet.robots[r].schedule.state_id);
 
                     if (mirFleet.robots[r].schedule.state == "Pending")
