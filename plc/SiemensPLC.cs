@@ -4,7 +4,6 @@ using MySql.Data.MySqlClient;
 using static Globals;
 using static Globals.DebugLevel;
 using static DotNetSiemensPLCToolBoxLibrary.Communication.LibNoDave.libnodave;
-using System.Collections.Generic;
 using Mirage.plc;
 using System.Collections;
 
@@ -59,7 +58,7 @@ class SiemensPLC
     //  Both Task Control and Data are in the same DB.         |
     //=========================================================|
     public static RobotBlock fleetBlock;
-    public static int fleetID = 666;
+// public static int fleetID = Globals.fleetID;
     public static int fleetBlockControlParameters = 4;
     public static int fleetBlockSize;
     public static bool furtherMsg;
@@ -242,7 +241,7 @@ class SiemensPLC
                             if (rowcount != 0)
                             {
                                 // The offset for the current parameter is equal to:
-                                //  Robot Offset + Previous Parameter Offset + Previous Parameter Size
+                                // Robot Offset + Previous Parameter Offset + Previous Parameter Size
                                 param_offset = fleetBlock.Param[rowcount - 1].getOffset() + fleetBlock.Param[rowcount - 1].getSize();
                             }
 
@@ -255,7 +254,7 @@ class SiemensPLC
                             if (rowcount != 0)
                             {
                                 // The offset for the current parameter is equal to:
-                                //  Robot Offset + Previous Parameter Offset + Previous Parameter Size
+                                // Robot Offset + Previous Parameter Offset + Previous Parameter Size
                                 param_offset = fleetBlock.Param[rowcount - 1].getOffset() + fleetBlock.Param[rowcount - 1].getSize();
                             }
 
@@ -267,20 +266,22 @@ class SiemensPLC
                     rowcount++;
                 }
             }
-            catch(Exception)
+            catch(Exception e)
             {
-
+                logger(AREA, ERROR, "Failed To Initialize Fleet Data Block");
+                logger(AREA, ERROR, "Exception is: ", e);
             }
 
             //=========================================================|
-            //  Instantiate robot array                                |
+            //  Instantiate the PLC robot array                        |
             //=========================================================|
             robots = new RobotBlock[noOfRobots];
 
             for (int i = 0; i < noOfRobots; i++)
-            {   
+            {
+                // We're not interested in Robot 0 so start reading at robot 1
                 int id = i;
-                int offset = (fleetBlockSize + robotBlockSize) + (i * robotBlockSize);
+                int offset = (fleetBlockSize + robotBlockSize) + (i * robotBlockSize); 
 
                 robots[i] = new RobotBlock(id, offset);
             }
@@ -312,7 +313,7 @@ class SiemensPLC
                             if (rowcount != 0)
                             {
                                 // The offset for the current parameter is equal to:
-                                //  Robot Offset + Previous Parameter Offset + Previous Parameter Size
+                                // Robot Offset + Previous Parameter Offset + Previous Parameter Size
                                 param_offset = robots[i].Param[rowcount - 1].getOffset() + robots[i].Param[rowcount - 1].getSize();
                             }
 
@@ -325,7 +326,7 @@ class SiemensPLC
                             if (rowcount != 0)
                             {
                                 // The offset for the current parameter is equal to:
-                                //  Robot Offset + Previous Parameter Offset + Previous Parameter Size
+                                // Robot Offset + Previous Parameter Offset + Previous Parameter Size
                                 param_offset = robots[i].Param[rowcount - 1].getOffset() + robots[i].Param[rowcount - 1].getSize();
                             }
 
@@ -338,14 +339,15 @@ class SiemensPLC
                     rowcount++;
                 }
             }
-            catch(Exception)
+            catch(Exception e)
             {
-
+                logger(AREA, ERROR, "Failed To Initialize Robot Data Blocks");
+                logger(AREA, ERROR, "Exception is: ", e);
             }
         }
         catch (Exception e)
         {
-            logger(AREA, ERROR, "==== Failed To Fetch Robot Block Data From Database ====");
+            logger(AREA, ERROR, "Failed To Fetch PLC Data Block Information From Database");
             logger(AREA, ERROR, "Exception: ", e);
         }
 
@@ -365,7 +367,7 @@ class SiemensPLC
             }
         }
 
-        logger(AREA, INFO, "==== PLC Initialization Completed ====");
+        logger(AREA, INFO, "PLC Initialization Completed");
     }
 
     /// <summary>
@@ -437,180 +439,7 @@ class SiemensPLC
 
         readRobots();
 
-        logger(AREA, DEBUG, "==== Completed Polling ====");
-    }
-
-    /// <summary>
-    /// Writes data to the Siemens PLC Data Storage block and updates the Status Code.
-    /// </summary>
-    /// <param name="type">The variable name we want to write to the PLC.</param>
-    /// <param name="statusCode">Status code based on the HTTP request.</param>
-    /// <param name="data">The data obtained from the MiR/Fleet.</param>
-    public static void writeData(string type, int statusCode, float data)
-    {
-        logger(AREA, DEBUG, "==== Starting To Write Data ====");
-
-        int result = 1;
-
-        if(live)
-        {
-            logger(AREA, DEBUG, "Type : " + type);
-            logger(AREA, DEBUG, "Status Code : " + statusCode);
-            logger(AREA, DEBUG, "Data : " + data);
-
-            // First, check if the data response was successful
-            if (statusCode == TaskStatus.CompletedPartially || statusCode == TaskStatus.CompletedNoErrors)
-            {
-                logger(AREA, DEBUG, "Request Completed Or Completed Partially. Status Code : " + statusCode);
-
-                byte[] tempBytes = BitConverter.GetBytes(data);
-                if (BitConverter.IsLittleEndian) { Array.Reverse(tempBytes); }
-
-                // TODO: This should really use an enum instead of strings
-                if (type == "moved")
-                {
-                    try
-                    {
-                        result = dc.writeBytes(daveDB, dataStorageDB, 4, 8, tempBytes);
-                    }
-                    catch
-                    {
-                        logger(AREA, ERROR, "Failed To Save Data In PLC. Check PLC Connectivity.");
-                    }
-                }
-                else if (type == "battery")
-                {
-                    try
-                    {
-                        result = dc.writeBytes(daveDB, dataStorageDB, 0, 4, tempBytes);
-                    }
-                    catch
-                    {
-                        logger(AREA, ERROR, "Failed To Save Data In PLC. Check PLC Connectivity.");
-                    }
-                }
-
-                if (result != 0)
-                {
-                    logger(AREA, ERROR, "Failed To Save Data In PLC. Check PLC Connectivity.");
-                    logger(AREA, ERROR, daveStrerror(result));
-                    plcConnectionErrors++;
-                }
-                else
-                {
-                    updateTaskStatus(TaskStatus.CompletedNoErrors);
-                }
-            }
-            else if (statusCode == TaskStatus.CouldntProcessRequest)
-            {
-                logger(AREA, WARNING, "We Couldn't Process The Request. Status Code : " + statusCode);
-                updateTaskStatus(TaskStatus.CouldntProcessRequest);
-            }
-            else if (statusCode == TaskStatus.FatalError)
-            {
-                logger(AREA, WARNING, "Fatal Error. Status Code : " + statusCode);
-                updateTaskStatus(TaskStatus.FatalError);
-            }
-            else
-            {
-                logger(AREA, WARNING, "Unknown Status. Status Code : " + statusCode);
-                updateTaskStatus(TaskStatus.FatalError);
-                // Unknown Status ??? - > Treat like a fatal error
-            }
-        }
-        else
-        {
-            logger(AREA, INFO, "==== Running In Simulation Mode ====");
-            logger(AREA, INFO, "Type : " + type);
-            logger(AREA, INFO, "Status Code : " + statusCode);
-            logger(AREA, INFO, "Data : " + data);
-        }
-
-        logger(AREA, INFO, "==== Completed Data Write ====");
-    }
-
-    /// <summary>
-    /// Writes data to the Siemens PLC Data Storage block and updates the Status Code.
-    /// </summary>
-    /// <param name="type">The variable name we want to write to the PLC.</param>
-    /// <param name="statusCode">Status code based on the HTTP request.</param>
-    /// <param name="data">The data obtained from the MiR/Fleet.</param>
-    public static void writeData(string type, int statusCode, string data)
-    {
-        logger(AREA, DEBUG, "==== Starting To Write Data ====");
-
-        int result = 1;
-
-        if(live)
-        {
-            logger(AREA, DEBUG, "Type : " + type);
-            logger(AREA, DEBUG, "Status Code : " + statusCode);
-            logger(AREA, DEBUG, "Data : " + data);
-
-            // First, check if the data response was successful
-            if (statusCode == TaskStatus.CompletedPartially || statusCode == TaskStatus.CompletedNoErrors)
-            {
-                logger(AREA, DEBUG, "Request Completed Or Completed Partially. Status Code : " + statusCode);
-
-                byte[] tempBytes = System.Text.Encoding.ASCII.GetBytes(data);
-                if (BitConverter.IsLittleEndian) { Array.Reverse(tempBytes); }
-
-                if (type == "mission_text")
-                {
-                    try
-                    {
-                        result = dc.writeBytes(daveDB, dataStorageDB, 8, 256, tempBytes);
-                    }
-                    catch
-                    {
-                        logger(AREA, ERROR, "Failed To Save Data In PLC. Check PLC Connectivity.");
-                    }
-                }
-                else if (type == "mission_schedule")
-                {
-                    try
-                    {
-                        result = dc.writeBytes(daveDB, dataStorageDB, 264, 256, tempBytes);
-                    }
-                    catch
-                    {
-                        logger(AREA, ERROR, "Failed To Save Data In PLC. Check PLC Connectivity.");
-                    }
-                }
-
-                if (result != 0)
-                {
-                    logger(AREA, ERROR, "Failed To Save Data In PLC. Check PLC Connectivity.");
-                    logger(AREA, ERROR, daveStrerror(result));
-                    plcConnectionErrors++;
-                }
-            }
-            else if (statusCode == TaskStatus.CouldntProcessRequest)
-            {
-                logger(AREA, WARNING, "We Couldn't Process The Request. Status Code : " + statusCode);
-                updateTaskStatus(TaskStatus.CouldntProcessRequest);
-            }
-            else if (statusCode == TaskStatus.FatalError)
-            {
-                logger(AREA, WARNING, "Fatal Error. Status Code : " + statusCode);
-                updateTaskStatus(TaskStatus.FatalError);
-            }
-            else
-            {
-                logger(AREA, WARNING, "Unknown Status. Status Code : " + statusCode);
-                updateTaskStatus(TaskStatus.FatalError);
-                // Unknown Status ??? - > Treat like a fatal error
-            }
-        }
-        else
-        {
-            logger(AREA, INFO, "==== Running In Simulation Mode ====");
-            logger(AREA, INFO, "Type : " + type);
-            logger(AREA, INFO, "Status Code : " + statusCode);
-            logger(AREA, INFO, "Data : " + data);
-        }
-
-        logger(AREA, INFO, "==== Completed Data Write ====");
+        logger(AREA, DEBUG, "Completed Polling");
     }
 
     public static void readFleetHeader()
@@ -985,6 +814,8 @@ class SiemensPLC
         {
             PDU p2 = (PDU)dc.prepareWriteRequest();
 
+            logger(AREA, INFO, "Writing Robot Data For Robot " + robot);
+
             //  Go through all the Write Parameters
             //  First, convert all the values to Bytes
             //  Then reverse cause fuck Siemens
@@ -992,24 +823,26 @@ class SiemensPLC
             for (int i = robotBlockControlParameters; i < robots[robot].Param.Count; i++)
             {
                 //logger(AREA, DEBUG, "Robot: " + i + " Param: " + robots[robot].Param[i].getName() + " Offset: " + robots[robot].Param[i].getOffset());
-
-                dataStorageDB = 19;
+                //
+                //dataStorageDB = 19;
 
                 byte[] tempBytes;
 
                 if (robots[robot].Param[i].getSize() == 2)
                 {
                     tempBytes = BitConverter.GetBytes(robots[robot].Param[i].getValue());
+                    logger(AREA, INFO, " Param: " + robots[robot].Param[i].getName() + " Value: " + robots[robot].Param[i].getValue()); // For Debugging
                 }
                 else
                 {
                     tempBytes = BitConverter.GetBytes(robots[robot].Param[i].getFloat());
+                    logger(AREA, INFO, " Param: " + robots[robot].Param[i].getName() + " Value: " + robots[robot].Param[i].getFloat()); // For Debugging
                 }
 
-                Array.Reverse(tempBytes);
-
-                //if (BitConverter.IsLittleEndian)
-                //{ Array.Reverse(tempBytes); }
+                if (BitConverter.IsLittleEndian)
+                { 
+                    Array.Reverse(tempBytes);
+                }
 
                 p2.addVarToWriteRequest(daveDB, dataStorageDB, robots[robot].Param[i].getOffset(), robots[robot].Param[i].getSize(), tempBytes);
             }
@@ -1023,7 +856,8 @@ class SiemensPLC
                 logger(AREA, ERROR, "Failed to Write Exception", e);
             }
 
-/*            for (int i = 0; i < robots[robot].Param.Count; i++)
+            /*
+            for (int i = 0; i < robots[robot].Param.Count; i++)
             {
                 result = rs.getErrorOfResult(i);
                 logger(AREA, DEBUG, "Error Code From Robot: " + robot + " Param: " + robots[robot].Param[i].getName() + " Code Is: " + result);
@@ -1261,7 +1095,7 @@ class SiemensPLC
     /// <summary>
     /// Checks to make sure PLC processed and parsed the reponse.
     /// </summary>
-    public static void checkResponse()
+    public static void checkPLCResponse()
     {
         logger(AREA, DEBUG, "Checking PLC Response");
 
@@ -1294,18 +1128,17 @@ class SiemensPLC
                     logger(AREA, INFO, "Resetting Task And Mission Status To 0 (Idle) For Robot : " + robotID);
 
                     // This should already be 0 from the read we did at the top
-                    // robots[robotID].Param[0].setValue(TaskStatus.Idle);
                     mirFleet.robots[robotID].schedule.state_id = TaskStatus.Idle;
                     robots[robotID].setTaskStatus(TaskStatus.Idle);
-                    //mirFleet.robots[robotID].schedule.state_id = TaskStatus.Idle;
 
-                    //updateTaskStatus(robotID, TaskStatus.Idle);
+                    // Added as new feature:
+                    mirFleet.robots[robotID].schedule.id = 0;
 
-                    // TODO: not needed since we write to PLC at the end anyway?
-                    robotMemoryToPLC(robotID);
-                    writeRobotBlock(robotID);
+                    // TODO: Uncommented for now - check if it needs to be uncommented on 06/04/2021
+                    // robotMemoryToPLC(robotID);
+                    // writeRobotBlock(robotID);
                 }
-                else if(robots[robotID].getPLCTaskStatus() == TaskStatus.PlcIdle && mirFleet.robots[robotID].schedule.state_id == TaskStatus.CompletedNoErrors)
+                else if(robots[robotID].getPLCTaskStatus() == TaskStatus.PlcIdle && (mirFleet.robots[robotID].schedule.state_id == TaskStatus.CompletedNoErrors))
                 {
                     mirFleet.robots[robotID].schedule.state_id = TaskStatus.Idle;
                     robots[robotID].setTaskStatus(TaskStatus.Idle);
@@ -1329,6 +1162,26 @@ class SiemensPLC
                     robotMemoryToPLC(robotID);
                     //writeRobotBlock(robotID);
                 }
+           
+                // If PLC is Idle AND:
+                // - Our Task Status is not idle
+                // - Or Our Mission Status is either complete or failed
+                if(  robots[robotID].getPLCTaskStatus() == TaskStatus.PlcIdle
+                  && (robots[robotID].getTaskStatus() != TaskStatus.PlcIdle
+                  || mirFleet.robots[robotID].schedule.state_id == TaskStatus.CompletedNoErrors
+                  || mirFleet.robots[robotID].schedule.state_id == TaskStatus.CouldntProcessRequest))
+                {
+                    logger(AREA, INFO, "Resetting Task And Mission Status To 0 (Idle) For Robot : " + robotID);
+
+                    // This should already be 0 from the read we did at the top
+                    mirFleet.robots[robotID].schedule.state_id = TaskStatus.Idle;
+                    robots[robotID].setTaskStatus(TaskStatus.Idle);
+
+                    // Added as new feature:
+                    mirFleet.robots[robotID].schedule.id = 0;
+                    robotMemoryToPLC(robotID);
+                }
+            
             }
         }
         else

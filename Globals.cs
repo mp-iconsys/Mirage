@@ -76,9 +76,6 @@ public static class Globals
         public const int CreateMission = 101;
         public const int SendMissionToScheduler = 102;
         public const int ClearScheduler = 103;
-        public const int GetBattery = 200;
-        public const int GetDistance = 201;
-        public const int GetRobotStatus = 202;
         public const int SendRobotMission = 208;
         public const int ReleaseRobot = 353;
     }

@@ -48,7 +48,7 @@ namespace Mirage.rest
             logger(AREA, INFO, "mission: " + mission);
             logger(AREA, INFO, "mission_id: " + mission_id);
             logger(AREA, INFO, "description: " + description);
-            logger(AREA, INFO, "==== Finished RobotGroup Print ====");
+            logger(AREA, INFO, "==== Finished Scheduler Print ====");
             logger(AREA, INFO, "");
         }
 
