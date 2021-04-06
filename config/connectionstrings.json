@@ -1,0 +1,5 @@
+{
+  "connectionstrings": {
+    "mysql": "server=localhost;Port=3306;database=mir;Uid=root;Pwd=dlsysmgr;"
+  }
+}

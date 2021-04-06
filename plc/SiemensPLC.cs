@@ -377,15 +377,23 @@ class SiemensPLC
     {
         logger(AREA, DEBUG, "==== Establishing A Connection ====");
 
-        if(live)
-        {
+        try
+        { 
             fds.rfd = openSocket(port, IP);
             fds.wfd = fds.rfd;
+        }
+        catch (Exception e)
+        {
+            logger(AREA, ERROR, "Failed To Open Libnodave Socket");
+            logger(AREA, ERROR, "Exception: ", e);
+        }
 
-            if (fds.rfd != IntPtr.Zero)
+        if (fds.rfd != IntPtr.Zero)
+        {
+            logger(AREA, DEBUG, "Socket Opened Successfully");
+
+            try
             {
-                logger(AREA, DEBUG, "Socket Opened Successfully");
-
                 di = new daveInterface(fds, "IF1", 0, daveProtoISOTCP, daveSpeed187k);
                 di.setTimeout(1000000);
                 dc = new daveConnection(di, 0, rack, slot);
@@ -403,26 +411,21 @@ class SiemensPLC
 
                     plcConnectionErrors++;
                     plcConnected = false;
-                    newMsg = false;
                 }
             }
-            else
+            catch (Exception e)
             {
-                logger(AREA, ERROR, "Socket Failed To Open. DaveOSserialType is initialized to " + fds.rfd);
-                logger(AREA, ERROR, daveStrerror(fds.rfd.ToInt32()));
-
-                plcConnectionErrors++;
-                newMsg = false;
-                plcConnected = false;
+                logger(AREA, ERROR, "Failed To Connect To The PLC");
+                logger(AREA, ERROR, "Exception: ", e);
             }
         }
         else
         {
+            logger(AREA, ERROR, "Socket Failed To Open. DaveOSserialType is initialized to " + fds.rfd);
+            logger(AREA, ERROR, daveStrerror(fds.rfd.ToInt32()));
 
-            logger(AREA, INFO, "==== Running In Sim Mode ====");
-
-            plcConnected = true;
-            newMsg = false;
+            plcConnectionErrors++;
+            plcConnected = false;
         }
 
         logger(AREA, DEBUG, "==== Established A Connection ====");
@@ -449,85 +452,97 @@ class SiemensPLC
         int memoryres = 1;
         byte[] memoryBuffer = new byte[fleetBlockControlParameters * 2];
 
-        try
+        if (plcConnected)
         {
-            taskControlDB = 19;
+            try
+            {                
+                taskControlDB = 19;
 
-            memoryres = dc.readBytes(daveDB, taskControlDB, fleetBlock.Offset, fleetBlockControlParameters * 2, memoryBuffer);
+                memoryres = dc.readBytes(daveDB, taskControlDB, fleetBlock.Offset, fleetBlockControlParameters * 2, memoryBuffer);
 
-            //=========================================================|
-            //  Memoryres - return code from Libnodave:                |
-            //    0 - Obtained Data                                    |
-            //  < 0 - Error detected by Libnodave                      |
-            //  > 0 - Error from the PLC                               |
-            //=========================================================|
-            if (memoryres == 0)
-            {
-                logger(AREA, DEBUG, BitConverter.ToString(memoryBuffer));
-
-                for (int i = 0; i < fleetBlockControlParameters; i++)
+                //=========================================================|
+                //  Memoryres - return code from Libnodave:                |
+                //    0 - Obtained Data                                    |
+                //  < 0 - Error detected by Libnodave                      |
+                //  > 0 - Error from the PLC                               |
+                //=========================================================|
+                if (memoryres == 0)
                 {
-                    int size = 2;
-                    int byte1 = i * size;
-                    int byte2 = (i * size) + 1;
+                    logger(AREA, DEBUG, BitConverter.ToString(memoryBuffer));
 
-                    byte[] tempBytesForConversion = new byte[2] { memoryBuffer[byte1], memoryBuffer[byte2] };
-
-                    // Need to reverse the bytes to get actual values
-                    if (BitConverter.IsLittleEndian)
-                    { Array.Reverse(tempBytesForConversion); }
-
-                    if (i == 0)
+                    for (int i = 0; i < fleetBlockControlParameters; i++)
                     {
-                        //Used to be: fleetBlock.Param[0].getValue() == 0
-                        //Now is: fleetBlock.getTaskStatus()
-                        // BitConverter.ToInt16(tempBytesForConversion, 0) == 10 && fleetBlock.getTaskStatus() == 0
-                        if (BitConverter.ToInt16(tempBytesForConversion, 0) == 10 && fleetBlock.getTaskStatus() == 0)
-                        {
-                            logger(AREA, INFO, "Got A Mission For Fleet");
+                        int size = 2;
+                        int byte1 = i * size;
+                        int byte2 = (i * size) + 1;
 
-                            for (int j = 0; j < fleetBlockControlParameters; j++)
+                        byte[] tempBytesForConversion = new byte[2] { memoryBuffer[byte1], memoryBuffer[byte2] };
+
+                        // Need to reverse the bytes to get actual values
+                        if (BitConverter.IsLittleEndian)
+                        { Array.Reverse(tempBytesForConversion); }
+
+                        if (i == 0)
+                        {
+                            //Used to be: fleetBlock.Param[0].getValue() == 0
+                            //Now is: fleetBlock.getTaskStatus()
+                            // BitConverter.ToInt16(tempBytesForConversion, 0) == 10 && fleetBlock.getTaskStatus() == 0
+                            if (BitConverter.ToInt16(tempBytesForConversion, 0) == 10 && fleetBlock.getTaskStatus() == 0)
                             {
-                                fleetBlock.Param[j].print();
+                                logger(AREA, INFO, "Got A Mission For Fleet");
+
+                                for (int j = 0; j < fleetBlockControlParameters; j++)
+                                {
+                                    fleetBlock.Param[j].print();
+                                }
+
+                                updateTaskStatus(fleetID, 10);
+                                newMsgs[0] = true;
+
+                                logger(AREA, INFO, "New Message Is: " + newMsgs[0].ToString());
+                                newMsg = true;
                             }
-
-                            updateTaskStatus(fleetID, 10);
-                            newMsgs[0] = true;
-
-                            logger(AREA, INFO, "New Message Is: " + newMsgs[0].ToString());
-                            newMsg = true;
+                            else
+                            {
+                                logger(AREA, DEBUG, "PLC Fleet Block Idle");
+                                //newMsgs[0] = false;
+                            }
                         }
-                        else
-                        {
-                            logger(AREA, DEBUG, "PLC Fleet Block Idle");
-                            //newMsgs[0] = false;
-                        }
+
+                        fleetBlock.Param[i].setValue(BitConverter.ToInt16(tempBytesForConversion, 0));
                     }
-
-                    fleetBlock.Param[i].setValue(BitConverter.ToInt16(tempBytesForConversion, 0));
                 }
+                else
+                {
+                    logger(AREA, WARNING, "Failed to Poll");
+                    logger(AREA, WARNING, daveStrerror(memoryres));
+                    plcConnectionErrors++;
+                    //newMsg = false;
+                }
+
+
             }
-            else
+            catch (NullReferenceException exception)
             {
-                logger(AREA, WARNING, "Failed to Poll");
-                logger(AREA, WARNING, daveStrerror(memoryres));
+                logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
+                plcConnectionErrors++;
+                //newMsg = false;
+
+                establishConnection();
+            }
+            catch (Exception exception)
+            {
+                logger(AREA, ERROR, "Polling Failed. Error : ", exception);
                 plcConnectionErrors++;
                 //newMsg = false;
             }
         }
-        catch (NullReferenceException exception)
+        else
         {
-            logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
+            logger(AREA, ERROR, "Not Connected To The PLC During Fleet Header Read. Trying to re-establish connection");
             plcConnectionErrors++;
-            //newMsg = false;
 
             establishConnection();
-        }
-        catch (Exception exception)
-        {
-            logger(AREA, ERROR, "Polling Failed. Error : ", exception);
-            plcConnectionErrors++;
-            //newMsg = false;
         }
 
         logger(AREA, DEBUG, "==== Completed Fleet Header ====");
@@ -537,7 +552,7 @@ class SiemensPLC
     {
         logger(AREA, DEBUG, "==== Reading Robot Task Control ====");
 
-        if (live)
+        if (plcConnected)
         {
             // TODO: Check the size of robotBlockSize buffer. 
             // If bigger than 222, break down into robots?
@@ -647,20 +662,10 @@ class SiemensPLC
         }
         else
         {
-            logger(AREA, INFO, "Simulating Messages From Console");
+            logger(AREA, ERROR, "Not Connected To The PLC During Robot Header Read. Trying to re-establish connection");
+            plcConnectionErrors++;
 
-            if (furtherMsg)
-            {
-                for (int r = 0; r < noOfRobots; r++)
-                {
-                    for (int i = 0; i < robotBlockControlParameters + 1; i++)
-                    {
-                        robots[r].Param[i].simulateConsole();
-                    }
-                }
-
-                newMsg = true;
-            }
+            establishConnection();
         }
 
         logger(AREA, DEBUG, "==== Completed Robot Task Control ====");
@@ -681,7 +686,7 @@ class SiemensPLC
         int result = 1;
         resultSet rs = new resultSet();
 
-        if (live)
+        if (plcConnected)
         {
             logger(AREA, DEBUG, "Starting A Write Request");
 
@@ -725,12 +730,11 @@ class SiemensPLC
                 logger(AREA, DEBUG, "Error Code From: " + fleetBlock.Param[i].getName() + " Code Is: " + result);
             }
 */
-            // If no error
-            //
         }
         else
         {
-            logger(AREA, INFO, "==== Running In Sim Mode ====");
+            logger(AREA, ERROR, "Cannot Write To Fleet Block As The PLC Is Not Connected");
+            establishConnection();
         }
     }
 
@@ -752,7 +756,7 @@ class SiemensPLC
         int result = 1;
         resultSet rs = new resultSet();
 
-        if (live)
+        if (plcConnected)
         {
             PDU p2 = (PDU)dc.prepareWriteRequest();
 
@@ -793,7 +797,8 @@ class SiemensPLC
         }
         else
         {
-            logger(AREA, INFO, "==== Running In Sim Mode ====");
+            logger(AREA, ERROR, "Cannot Write To Fleet Block As The PLC Is Not Connected");
+            establishConnection();
         }
     }
 
@@ -810,11 +815,11 @@ class SiemensPLC
         int result = 1;
         resultSet rs = new resultSet();
 
-        if (live)
+        if (plcConnected)
         {
             PDU p2 = (PDU)dc.prepareWriteRequest();
 
-            logger(AREA, INFO, "Writing Robot Data For Robot " + robot);
+            logger(AREA, DEBUG, "Writing Robot Data For Robot " + robot);
 
             //  Go through all the Write Parameters
             //  First, convert all the values to Bytes
@@ -823,20 +828,18 @@ class SiemensPLC
             for (int i = robotBlockControlParameters; i < robots[robot].Param.Count; i++)
             {
                 //logger(AREA, DEBUG, "Robot: " + i + " Param: " + robots[robot].Param[i].getName() + " Offset: " + robots[robot].Param[i].getOffset());
-                //
-                //dataStorageDB = 19;
 
                 byte[] tempBytes;
 
                 if (robots[robot].Param[i].getSize() == 2)
                 {
                     tempBytes = BitConverter.GetBytes(robots[robot].Param[i].getValue());
-                    logger(AREA, INFO, " Param: " + robots[robot].Param[i].getName() + " Value: " + robots[robot].Param[i].getValue()); // For Debugging
+                    logger(AREA, DEBUG, " Param: " + robots[robot].Param[i].getName() + " Value: " + robots[robot].Param[i].getValue()); // For Debugging
                 }
                 else
                 {
                     tempBytes = BitConverter.GetBytes(robots[robot].Param[i].getFloat());
-                    logger(AREA, INFO, " Param: " + robots[robot].Param[i].getName() + " Value: " + robots[robot].Param[i].getFloat()); // For Debugging
+                    logger(AREA, DEBUG, " Param: " + robots[robot].Param[i].getName() + " Value: " + robots[robot].Param[i].getFloat()); // For Debugging
                 }
 
                 if (BitConverter.IsLittleEndian)
@@ -865,7 +868,8 @@ class SiemensPLC
         }
         else
         {
-            logger(AREA, INFO, "==== Running In Sim Mode ====");
+            logger(AREA, ERROR, "Cannot Write To Fleet Block As The PLC Is Not Connected");
+            establishConnection();
         }
     }
 
@@ -894,17 +898,17 @@ class SiemensPLC
     /// </summary>
     public static void printNewMessageStatus()
     {
-        logger(AREA, INFO, "Fleet Mirage Task Status: " + fleetBlock.getTaskStatus());
-        logger(AREA, INFO, "Fleet PLC Task Status: " + fleetBlock.getPLCTaskStatus());
-        logger(AREA, INFO, "Fleet Message Status: " + newMsgs[0].ToString());
+        logger(AREA, DEBUG, "Fleet Mirage Task Status: " + fleetBlock.getTaskStatus());
+        logger(AREA, DEBUG, "Fleet PLC Task Status: " + fleetBlock.getPLCTaskStatus());
+        logger(AREA, DEBUG, "Fleet Message Status: " + newMsgs[0].ToString());
 
         for (int g = 1; g < sizeOfFleet+1; g++)
         {
-            logger(AREA, INFO, "Robot " + (g - 1) + " Mirage Task Status: " + robots[g-1].getTaskStatus());
-            logger(AREA, INFO, "Robot " + (g - 1) + " Mission Status (Memory): " + mirFleet.robots[g-1].schedule.state_id);
-            logger(AREA, INFO, "Robot " + (g - 1) + " Mission Status (PLC Buffer): " + robots[g - 1].Param[5].getValue());
-            logger(AREA, INFO, "Robot " + (g - 1) + " PLC Task Status: " + robots[g-1].getPLCTaskStatus());
-            logger(AREA, INFO, "Robot " + (g - 1) + " Message Status: " + newMsgs[g].ToString());
+            logger(AREA, DEBUG, "Robot " + (g - 1) + " Mirage Task Status: " + robots[g-1].getTaskStatus());
+            logger(AREA, DEBUG, "Robot " + (g - 1) + " Mission Status (Memory): " + mirFleet.robots[g-1].schedule.state_id);
+            logger(AREA, DEBUG, "Robot " + (g - 1) + " Mission Status (PLC Buffer): " + robots[g - 1].Param[5].getValue());
+            logger(AREA, DEBUG, "Robot " + (g - 1) + " PLC Task Status: " + robots[g-1].getPLCTaskStatus());
+            logger(AREA, DEBUG, "Robot " + (g - 1) + " Message Status: " + newMsgs[g].ToString());
         }
     }
 
@@ -918,7 +922,7 @@ class SiemensPLC
     {
         logger(AREA, DEBUG, "==== Updating Task Status In PLC ====");
 
-        if(live)
+        if(plcConnected)
         {
             byte[] tempBytes = BitConverter.GetBytes(status);
 
@@ -952,7 +956,8 @@ class SiemensPLC
         }
         else
         {
-            logger(AREA, INFO, "==== Running In Sim Mode ====");
+            logger(AREA, ERROR, "Cannot Update Task Status As The PLC Is Not Connected");
+            establishConnection();
         }
 
         logger(AREA, DEBUG, "==== Update Completed ====");
@@ -970,7 +975,7 @@ class SiemensPLC
 
         int Task_Status_ID = 4;
 
-        if (live)
+        if (plcConnected)
         {
             byte[] tempBytes;
 
@@ -1033,7 +1038,8 @@ class SiemensPLC
         }
         else
         {
-            logger(AREA, INFO, "==== Running In Sim Mode ====");
+            logger(AREA, ERROR, "Cannot Update Task Status As The PLC Is Not Connected");
+            establishConnection();
         }
 
         logger(AREA, DEBUG, "==== Update Completed ====");
@@ -1055,7 +1061,7 @@ class SiemensPLC
         logger(AREA, INFO, "Reseting Sequence ID: " + resetID);
         logger(AREA, INFO, "Start Bit Is:  " + startBit);
 
-        if (live)
+        if (plcConnected)
         {
             byte[] tempBytes = new byte[] { 255 };
 
@@ -1090,6 +1096,11 @@ class SiemensPLC
                 plcConnectionErrors++;
             }
         }
+        else
+        {
+            logger(AREA, ERROR, "Cannot Send Reset Bits As The PLC Is Not Connected");
+            establishConnection();
+        }
     }
 
     /// <summary>
@@ -1099,7 +1110,7 @@ class SiemensPLC
     {
         logger(AREA, DEBUG, "Checking PLC Response");
 
-        if (live)
+        if (plcConnected)
         {
             readFleetHeader();
 
@@ -1148,7 +1159,7 @@ class SiemensPLC
 
                     // TODO: not needed since we write to PLC at the end anyway?
                     robotMemoryToPLC(robotID);
-                    writeRobotBlock(robotID);
+                    //writeRobotBlock(robotID);
                 }
                 else if (robots[robotID].getPLCTaskStatus() == TaskStatus.PlcIdle && mirFleet.robots[robotID].schedule.state_id == TaskStatus.CouldntProcessRequest)
                 {
@@ -1181,12 +1192,12 @@ class SiemensPLC
                     mirFleet.robots[robotID].schedule.id = 0;
                     robotMemoryToPLC(robotID);
                 }
-            
             }
         }
         else
         {
-            status = TaskStatus.PlcIdle;
+            logger(AREA, ERROR, "Cannot Check PLC Idle/Sending/Processing As the PLC is Not Connected");
+            establishConnection();
         }
 
         logger(AREA, DEBUG, "Response Check Completed");
@@ -1200,12 +1211,7 @@ class SiemensPLC
     {
         logger(AREA, DEBUG, "Reading PLC Alarms");
 
-        // TODO: remove, they're defined at the top
-        // TODO: define in the database
-        //int alarmOffset = 424;
-        //int alarmBlockSize = 22;
-
-        if (live)
+        if (plcConnected)
         {
             int memoryres;
             byte[] memoryBuffer = new byte[alarmBlockSize];
@@ -1269,6 +1275,11 @@ class SiemensPLC
                 logger(AREA, ERROR, "PLC Polling Failed. Error : ", exception);
                 plcConnectionErrors++;
             }
+        }
+        else
+        {
+            logger(AREA, ERROR, "Cannot Read Alarms As the PLC is Not Connected");
+            establishConnection();
         }
 
         logger(AREA, DEBUG, "Completed Reading PLC Alarms");
@@ -1337,87 +1348,95 @@ class SiemensPLC
         //==========================================================|
         // First, get the PLC Watchdog integer                      |
         //==========================================================|
-        try
+        if (plcConnected)
         {
-            memoryres = dc.readBytes(daveDB, taskControlDB, watchdogFromPLCOffset, watchdogSize, memoryBuffer);
-
-            if (memoryres == 0)
+            try
             {
-                logger(AREA, DEBUG, BitConverter.ToString(memoryBuffer));
+                memoryres = dc.readBytes(daveDB, taskControlDB, watchdogFromPLCOffset, watchdogSize, memoryBuffer);
 
-                if (BitConverter.IsLittleEndian)
+                if (memoryres == 0)
                 {
-                    Array.Reverse(memoryBuffer);
-                }
+                    logger(AREA, DEBUG, BitConverter.ToString(memoryBuffer));
 
-                watchdogFromPLC = BitConverter.ToInt16(memoryBuffer);
+                    if (BitConverter.IsLittleEndian)
+                    {
+                        Array.Reverse(memoryBuffer);
+                    }
 
-                if(watchdogFromPLC <= watchdogMaxValue)
-                {
-                    watchdogToPLC = watchdogFromPLC;
+                    watchdogFromPLC = BitConverter.ToInt16(memoryBuffer);
+
+                    if (watchdogFromPLC <= watchdogMaxValue)
+                    {
+                        watchdogToPLC = watchdogFromPLC;
+                    }
+                    else
+                    {
+                        logger(AREA, WARNING, "PLC Watchdig Exceeded Maximum Value For Signed Int16. Resetting To 0");
+                        watchdogToPLC = 0;
+                    }
+
+                    logger(AREA, INFO, "PLC Watchdog Is: " + watchdogFromPLC);
                 }
                 else
                 {
-                    logger(AREA, WARNING, "PLC Watchdig Exceeded Maximum Value For Signed Int16. Resetting To 0");
-                    watchdogToPLC = 0;
+                    logger(AREA, ERROR, "Failed to Poll");
+                    logger(AREA, ERROR, daveStrerror(memoryres));
+                    plcConnectionErrors++;
                 }
-                
-                logger(AREA, INFO, "PLC Watchdog Is: " + watchdogFromPLC);
             }
-            else
+            catch (NullReferenceException exception)
             {
-                logger(AREA, ERROR, "Failed to Poll");
-                logger(AREA, ERROR, daveStrerror(memoryres));
+                logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
+                plcConnectionErrors++;
+                establishConnection();
+            }
+            catch (Exception exception)
+            {
+                logger(AREA, ERROR, "Polling Failed. Error : ", exception);
+                plcConnectionErrors++;
+            }
+
+            memoryBuffer = BitConverter.GetBytes((short)watchdogToPLC);
+
+            if (BitConverter.IsLittleEndian)
+            {
+                Array.Reverse(memoryBuffer);
+            }
+
+            logger(AREA, DEBUG, "Return Watchdog Parameter: " + BitConverter.ToString(memoryBuffer));
+
+            try
+            {
+                int result = 999;
+
+                result = dc.writeBytes(daveDB, taskControlDB, watchdogToPLCOffset, watchdogSize, memoryBuffer);
+
+                if (result != 0)
+                {
+                    logger(AREA, ERROR, "Failed To Update Watchdog");
+                    logger(AREA, ERROR, daveStrerror(result));
+                    plcConnectionErrors++;
+                }
+                else
+                {
+                    logger(AREA, DEBUG, "Task Status Updated To " + status);
+                }
+            }
+            catch (NullReferenceException exception)
+            {
+                logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
+                establishConnection();
+            }
+            catch (Exception exception)
+            {
+                logger(AREA, ERROR, "Failed To Write To PLC. Exception: ", exception);
                 plcConnectionErrors++;
             }
         }
-        catch (NullReferenceException exception)
+        else
         {
-            logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
-            plcConnectionErrors++;
+            logger(AREA, ERROR, "Cannot Update PLC Watchdog As the PLC is Not Connected");
             establishConnection();
-        }
-        catch (Exception exception)
-        {
-            logger(AREA, ERROR, "Polling Failed. Error : ", exception);
-            plcConnectionErrors++;
-        }
-
-        memoryBuffer = BitConverter.GetBytes((short)watchdogToPLC);
-
-        if (BitConverter.IsLittleEndian)
-        {
-            Array.Reverse(memoryBuffer);
-        }
-
-        logger(AREA, DEBUG, "Return Watchdog Parameter: " + BitConverter.ToString(memoryBuffer));
-
-        try
-        {
-            int result = 999;
-
-            result = dc.writeBytes(daveDB, taskControlDB, watchdogToPLCOffset, watchdogSize, memoryBuffer);
-
-            if (result != 0)
-            {
-                logger(AREA, ERROR, "Failed To Update Watchdog");
-                logger(AREA, ERROR, daveStrerror(result));
-                plcConnectionErrors++;
-            }
-            else
-            {
-                logger(AREA, DEBUG, "Task Status Updated To " + status);
-            }
-        }
-        catch (NullReferenceException exception)
-        {
-            logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
-            establishConnection();
-        }
-        catch (Exception exception)
-        {
-            logger(AREA, ERROR, "Failed To Write To PLC. Exception: ", exception);
-            plcConnectionErrors++;
         }
     }
 

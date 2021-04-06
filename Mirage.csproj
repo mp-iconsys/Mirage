@@ -11,6 +11,10 @@
     <DockerfileContext>.</DockerfileContext>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <WarningLevel>5</WarningLevel>
+  </PropertyGroup>
+
   <ItemGroup>
     <Compile Remove="robot\**" />
     <EmbeddedResource Remove="robot\**" />
@@ -30,6 +34,7 @@
     <PackageReference Include="Json.Net" Version="1.0.23" />
     <PackageReference Include="log4net" Version="2.0.8" />
     <PackageReference Include="log4net.Csv" Version="1.0.1" />
+    <PackageReference Include="MicroKnights.Log4NetAdoNetAppender" Version="2.2.0" />
     <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="5.2.7" />
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.10.9" />
     <PackageReference Include="MySql.Data" Version="8.0.21" />

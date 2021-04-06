@@ -16,6 +16,7 @@ using static Globals.DebugLevel;
 using Mirage.Reporting;
 using System.Text;
 using System.Threading;
+using System.Data;
 
 public static class Globals
 {
@@ -27,6 +28,7 @@ public static class Globals
     public static int pollInterval;
     public static int sizeOfFleet;
     public static MySqlConnection db;
+    public static MySqlConnection log_db;
     public static HttpClient comms;
     public static AuthenticationHeaderValue fleetManagerAuthToken;
     public static string fleetManagerIP;
@@ -117,9 +119,6 @@ public static class Globals
             Console.WriteLine(exception);
         }
 
-        logger(AREA, INFO, "Starting Mirage v0.18");
-        logger(AREA, INFO, "Obtaining Settings");
-
         try
         {
             connectToDB();
@@ -177,6 +176,11 @@ public static class Globals
             db = new MySqlConnection(ConfigurationManager.ConnectionStrings["master"].ConnectionString);
             db.Open();
 
+            log_db = new MySqlConnection(ConfigurationManager.ConnectionStrings["master"].ConnectionString);
+            log_db.Open();
+
+            logger(AREA, INFO, "Starting Mirage v0.18");
+            logger(AREA, INFO, "Obtaining Settings");
             logger(AREA, INFO, "Connected To Master DB");
         }
         catch (MySqlException exception)
@@ -188,6 +192,9 @@ public static class Globals
             {
                 db = new MySqlConnection(ConfigurationManager.ConnectionStrings["slave"].ConnectionString);
                 db.Open();
+
+                log_db = new MySqlConnection(ConfigurationManager.ConnectionStrings["slave"].ConnectionString);
+                log_db.Open();
 
                 logger(AREA, INFO, "Connected To Slave DB");
                 sendSMS("Failed to connect to master database.");
@@ -344,8 +351,6 @@ public static class Globals
     /// <param name="cmd"></param>
     public static void issueQuery(MySqlCommand cmd)
     {
-        logger(AREA, DEBUG, "==== Closing Connections ====");
-
         int rowsAffected = 0;
 
         try
@@ -353,21 +358,12 @@ public static class Globals
             cmd.Connection = db;
             cmd.Prepare();
             rowsAffected = cmd.ExecuteNonQuery();
-
-            if (rowsAffected == 0)
-            {
-                // Query Worked (for transactions and procedures)
-                logger(AREA, DEBUG, "MySQL Transaction Was Successful");
-            }
-
             cmd.Dispose();
         }
         catch (Exception exception)
         {
             logger(AREA, ERROR, "MySQL Query Failed with error: ", exception);
         }
-
-        logger(AREA, DEBUG, "==== Closing Connections ====");
     }
 
     /// <summary>
@@ -437,12 +433,12 @@ public static class Globals
             bool plcResetRequired = false;
 
             string sql = "SELECT reset_required FROM plc_reset;";
-            using var cmd = new MySqlCommand(sql, db);
-            using MySqlDataReader rdr = cmd.ExecuteReader();
+            using var cmd4 = new MySqlCommand(sql, db);
+            using MySqlDataReader rdr2 = cmd4.ExecuteReader();
 
-            while (rdr.Read())
+            while (rdr2.Read())
             {
-                if (rdr.GetInt16(0) == 1)
+                if (rdr2.GetInt16(0) == 1)
                 {
                     plcResetRequired = true;
                 }
@@ -455,8 +451,8 @@ public static class Globals
 
                 try
                 {
-                    cmd.Dispose();
-                    rdr.Close();
+                    cmd4.Dispose();
+                    rdr2.Close();
                 }
                 catch
                 {
@@ -858,6 +854,36 @@ public static class Globals
         }
     }
 
+    public static void saveLogToDB(Type type, DebugLevel debug, string message)
+    {
+        MySqlCommand cmd = new MySqlCommand("store_app_log");
+
+        try
+        {
+            cmd.CommandType = CommandType.StoredProcedure;
+            cmd.Parameters.Add(new MySqlParameter("AREA", type.ToString()));
+            cmd.Parameters.Add(new MySqlParameter("TYPE", debug));
+            cmd.Parameters.Add(new MySqlParameter("MESSAGE", message));
+
+            try
+            {
+                cmd.Connection = log_db;
+                cmd.Prepare();
+                int rowsAffected = cmd.ExecuteNonQuery();
+                cmd.Dispose();
+            }
+            catch (Exception exception)
+            {
+                logger(AREA, ERROR, "MySQL Query Failed with error: ", exception);
+            }
+        }
+        catch (Exception exception)
+        {
+            cmd.Dispose();
+            logger(AREA, ERROR, "MySQL Quert Error: ", exception);
+        }
+    }
+
     /// <summary>
     /// 
     /// </summary>
@@ -872,22 +898,27 @@ public static class Globals
         {
             case DebugLevel.INFO:
                 log.Info(message);
+                saveLogToDB(type, debug, message);
                 break;
             case DebugLevel.DEBUG:
                 if(debugLevel > 1)
                 { 
                     log.Debug(message);
+                    saveLogToDB(type, debug, message);
                 }
                 break;
             case DebugLevel.WARNING:
                 log.Warn(message);
+                saveLogToDB(type, debug, message);
                 break;
             case DebugLevel.ERROR:
                 log.Error(message);
+                saveLogToDB(type, debug, message);
                 // Send an SMS message
                 break;
             case DebugLevel.FATAL:
                 log.Error(message);
+                saveLogToDB(type, debug, message);
                 // Send an SMS message
                 break;
         }
@@ -908,18 +939,22 @@ public static class Globals
         {
             case DebugLevel.INFO:
                 log.Info(message, exception);
+                saveLogToDB(type, debug, message);
                 break;
             case DebugLevel.DEBUG:
                 if (debugLevel > 1)
                 {
                     log.Debug(message, exception);
+                    saveLogToDB(type, debug, message);
                 }
                 break;
             case DebugLevel.WARNING:
                 log.Warn(message, exception);
+                saveLogToDB(type, debug, message);
                 break;
             case DebugLevel.ERROR:
                 log.Error(message, exception);
+                saveLogToDB(type, debug, message);
                 // Send an SMS message
                 break;
         }
