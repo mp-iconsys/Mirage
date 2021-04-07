@@ -212,7 +212,7 @@ class Program
 
             logger(AREA, DEBUG, "==== Loop " + i + " Finished ====");
 
-            Thread.Sleep(100); // Remove in live deployment
+            Thread.Sleep(10000); // Remove in live deployment
         }
 
         gracefulTermination();
@@ -399,8 +399,6 @@ class Program
         logger(AREA, INFO, "==== Create New Mission In Robot " + SiemensPLC.robotID + " ====");
 
         int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Missions[0].createMission(SiemensPLC.parameter));
-
-        SiemensPLC.updateTaskStatus(restStatus);
 
         logger(AREA, DEBUG, "==== Created New Mission ====");
 
@@ -649,6 +647,12 @@ class Program
         int fleetRobotID = mirFleet.robots[robotID].fleetRobotID;
 
         logger(AREA, INFO, "Releasing Robot " + robotID + " (Fleet ID: " + fleetRobotID + ") From The Busy Group");
+
+        //======================================================================|
+        // In case the release robot command is driven by a sequence break,     |
+        // Clear any errors from the robot.                                     |
+        //======================================================================|
+        mirFleet.robots[robotID].sendRESTdata(mirFleet.robots[robotID].s.putRequest(mirFleet.robots[robotID].getBaseURI()));
 
         // Sending a delete request
         restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.busy.deleteRequest(fleetRobotID));

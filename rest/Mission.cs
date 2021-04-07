@@ -12,7 +12,7 @@ namespace Mirage.rest
     public class Mission : IRest
     {
         public int missionNumber { get; set; }
-        public string guid { get; set; }// Add mission number to that
+        public string guid { get; set; }
         public string hidden { get; set; }
         public string group_id { get; set; }
         public string description { get; set; }

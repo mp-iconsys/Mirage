@@ -151,13 +151,12 @@ public static class Globals
         //=========================================================|
         if (fleetManagerIP != null && fleetManagerAuthToken != null)
         {
-            //sendSMS("Starting AMR-Connect");
-            logger(AREA, INFO, "Fleet Data Assigned");
+            logger(AREA, INFO, "Fleet Connection Details Assigned");
             mirFleet = new Fleet(sizeOfFleet, fleetManagerIP, fleetManagerAuthToken);
         }
         else
         {
-            logger(AREA, INFO, "Fleet Data Missing Or Fleet Not Used");
+            logger(AREA, WARNING, "Fleet Data Missing Or Fleet Not Used");
             mirFleet = new Fleet(sizeOfFleet);
         }
 
@@ -420,6 +419,7 @@ public static class Globals
         catch(Exception e)
         {
             logger(AREA, ERROR, "Failed Runtime Parameter Update Check");
+            logger(AREA, ERROR, "Exception: ", e);
         }
     }
 

@@ -58,7 +58,6 @@ class SiemensPLC
     //  Both Task Control and Data are in the same DB.         |
     //=========================================================|
     public static RobotBlock fleetBlock;
-// public static int fleetID = Globals.fleetID;
     public static int fleetBlockControlParameters = 4;
     public static int fleetBlockSize;
     public static bool furtherMsg;
@@ -70,7 +69,6 @@ class SiemensPLC
 
     public static int alarmOffset = 424;
     public static int alarmBlockSize = 22;
-   // public static BitArray[] alrm;
     public static Alarms plcAlarms = new Alarms();
 
     //=========================================================|
@@ -92,7 +90,6 @@ class SiemensPLC
     public static bool[] newMsgs = new bool[10];
     public static bool newMsg;
     public static bool plcConnected;
-    public static bool live;
 
     //=========================================================|
     //  Used For Logging & Debugging                           |     
@@ -107,14 +104,16 @@ class SiemensPLC
     {
         logger(AREA, DEBUG, "==== Starting Initialization ====");
 
-        for(int i = 0; i < sizeOfFleet+1; i++)
+        for (int i = 0; i < sizeOfFleet + 1; i++)
         {
             newMsgs[i] = false;
         }
 
         int rowcount = 0;
 
-        // First, try to get configuration data from the database
+        //==========================================================|
+        // First, try to get configuration data from the database   |
+        //==========================================================|
         try
         {
             string sql = "SELECT * FROM plc_config;";
@@ -133,39 +132,39 @@ class SiemensPLC
                 }
                 else if (rdr.GetString(1) == "Port")
                 {
-                    port = Int32.Parse(rdr.GetString(2));
+                    port = int.Parse(rdr.GetString(2));
                 }
                 else if (rdr.GetString(1) == "rack")
                 {
-                    rack = Int32.Parse(rdr.GetString(2));
+                    rack = int.Parse(rdr.GetString(2));
                 }
                 else if (rdr.GetString(1) == "slot")
                 {
-                    slot = Int32.Parse(rdr.GetString(2));
+                    slot = int.Parse(rdr.GetString(2));
                 }
                 else if (rdr.GetString(1) == "taskControlDB")
                 {
-                    taskControlDB = Int32.Parse(rdr.GetString(2));
+                    taskControlDB = int.Parse(rdr.GetString(2));
                 }
                 else if (rdr.GetString(1) == "dataStorageDB")
                 {
-                    dataStorageDB = Int32.Parse(rdr.GetString(2));
+                    dataStorageDB = int.Parse(rdr.GetString(2));
                 }
                 else if (rdr.GetString(1) == "Live")
                 {
-                    live = Boolean.Parse(rdr.GetString(2));
+                    bool live = bool.Parse(rdr.GetString(2));
                 }
                 else if (rdr.GetString(1) == "NoOfRobots")
                 {
-                    noOfRobots = Int32.Parse(rdr.GetString(2));
+                    noOfRobots = int.Parse(rdr.GetString(2));
                 }
                 else if (rdr.GetString(1) == "RobotBlockSize")
                 {
-                    robotBlockSize = Int32.Parse(rdr.GetString(2));
+                    robotBlockSize = int.Parse(rdr.GetString(2));
                 }
                 else if (rdr.GetString(1) == "FleetBlockSIze")
                 {
-                    fleetBlockSize = Int32.Parse(rdr.GetString(2));
+                    fleetBlockSize = int.Parse(rdr.GetString(2));
                 }
             }
         }
@@ -175,7 +174,10 @@ class SiemensPLC
             logger(AREA, ERROR, "Exception: ", e);
         }
 
-        // If we don't have all the configs from the database, read from the file
+        //==========================================================|
+        // If we don't have all the configs from the database       | 
+        // read from the XML config file                            |
+        //==========================================================|
         if (rowcount < 9)
         {
             try
@@ -189,7 +191,6 @@ class SiemensPLC
                 slot = short.Parse(doc.DocumentElement.SelectSingleNode("/configuration/plc/connectionString/slot").InnerText);
                 taskControlDB = short.Parse(doc.DocumentElement.SelectSingleNode("/configuration/plc/data/taskControlDB").InnerText);
                 dataStorageDB = short.Parse(doc.DocumentElement.SelectSingleNode("/configuration/plc/data/dataStorageDB").InnerText);
-                live = false;
 
                 logger(AREA, DEBUG, "IP : " + IP);
                 logger(AREA, DEBUG, "Port : " + port);
@@ -197,12 +198,11 @@ class SiemensPLC
                 logger(AREA, DEBUG, "Slot : " + slot);
                 logger(AREA, DEBUG, "Task Control DB No : " + taskControlDB);
                 logger(AREA, DEBUG, "Data Storage DB No : " + dataStorageDB);
-                logger(AREA, DEBUG, "Simulating : " + live);
             }
             catch (Exception exception)
             {
                 keepRunning = false;
-                logger(AREA, ERROR, "Failed to load PLC configuration file. Mirage will terminate. Exception : ", exception);
+                logger(AREA, ERROR, "Failed to load PLC configuration file. Mirage will terminate. Exception: ", exception);
             }
         }
 
@@ -210,7 +210,10 @@ class SiemensPLC
 
         rowcount = 0;
 
-        // Alrigh, we're setting up corresponding data blocks for talking with PLC
+        //==========================================================|
+        // Alright, Now we're going to set up the corresponding     |
+        // data blocks for talking with the PLC                     |
+        //==========================================================|
         try
         {
             //=========================================================|
@@ -232,48 +235,52 @@ class SiemensPLC
                 {
                     logger(AREA, DEBUG, "Row: " + rdr.GetInt32(0) + " - Parameter: " + rdr.GetString(1) + " - Size: " + rdr.GetString(2) + " - Datatype: " + rdr.GetString(3));
 
-                        string param_name = rdr.GetString(1);
-                        int param_size = Int32.Parse(rdr.GetString(2));
-                        int param_offset = fleetBlock.Offset;
+                    string param_name = rdr.GetString(1);
+                    int param_size = int.Parse(rdr.GetString(2));
+                    int param_offset = fleetBlock.Offset;
 
-                        if (rdr.GetString(3) == "INT")
+                    if (rdr.GetString(3) == "INT")
+                    {
+                        if (rowcount != 0)
                         {
-                            if (rowcount != 0)
-                            {
-                                // The offset for the current parameter is equal to:
-                                // Robot Offset + Previous Parameter Offset + Previous Parameter Size
-                                param_offset = fleetBlock.Param[rowcount - 1].getOffset() + fleetBlock.Param[rowcount - 1].getSize();
-                            }
-
-                            Parameter_INT temp = new Parameter_INT(param_name, param_size, param_offset);
-
-                            fleetBlock.Param.Add(temp);
+                            //==================================================================|       
+                            // The offset for the current parameter is equal to:                |
+                            // Robot Offset + Previous Param Offset + Previous Param Size       |
+                            //==================================================================| 
+                            param_offset = fleetBlock.Param[rowcount - 1].getOffset() + fleetBlock.Param[rowcount - 1].getSize();
                         }
-                        else if (rdr.GetString(3) == "FLOAT")
+
+                        Parameter_INT temp = new Parameter_INT(param_name, param_size, param_offset);
+
+                        fleetBlock.Param.Add(temp);
+                    }
+                    else if (rdr.GetString(3) == "FLOAT")
+                    {
+                        if (rowcount != 0)
                         {
-                            if (rowcount != 0)
-                            {
-                                // The offset for the current parameter is equal to:
-                                // Robot Offset + Previous Parameter Offset + Previous Parameter Size
-                                param_offset = fleetBlock.Param[rowcount - 1].getOffset() + fleetBlock.Param[rowcount - 1].getSize();
-                            }
-
-                            Parameter_FLOAT temp = new Parameter_FLOAT(param_name, param_size, param_offset);
-
-                            fleetBlock.Param.Add(temp);
+                            //==================================================================|       
+                            // The offset for the current parameter is equal to:                |
+                            // Robot Offset + Previous Param Offset + Previous Param Size       |
+                            //==================================================================| 
+                            param_offset = fleetBlock.Param[rowcount - 1].getOffset() + fleetBlock.Param[rowcount - 1].getSize();
                         }
+
+                        Parameter_FLOAT temp = new Parameter_FLOAT(param_name, param_size, param_offset);
+
+                        fleetBlock.Param.Add(temp);
+                    }
 
                     rowcount++;
                 }
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 logger(AREA, ERROR, "Failed To Initialize Fleet Data Block");
                 logger(AREA, ERROR, "Exception is: ", e);
             }
 
             //=========================================================|
-            //  Instantiate the PLC robot array                        |
+            //  Instantiate robot block array                          |
             //=========================================================|
             robots = new RobotBlock[noOfRobots];
 
@@ -281,7 +288,7 @@ class SiemensPLC
             {
                 // We're not interested in Robot 0 so start reading at robot 1
                 int id = i;
-                int offset = (fleetBlockSize + robotBlockSize) + (i * robotBlockSize); 
+                int offset = (fleetBlockSize + robotBlockSize) + (i * robotBlockSize);
 
                 robots[i] = new RobotBlock(id, offset);
             }
@@ -305,15 +312,17 @@ class SiemensPLC
                     for (int i = 0; i < noOfRobots; i++)
                     {
                         string param_name = rdr.GetString(1);
-                        int param_size = Int32.Parse(rdr.GetString(2));
+                        int param_size = int.Parse(rdr.GetString(2));
                         int param_offset = robots[i].Offset;
 
                         if (rdr.GetString(3) == "INT")
                         {
                             if (rowcount != 0)
                             {
-                                // The offset for the current parameter is equal to:
-                                // Robot Offset + Previous Parameter Offset + Previous Parameter Size
+                                //==================================================================|       
+                                // The offset for the current parameter is equal to:                |
+                                // Robot Offset + Previous Param Offset + Previous Param Size       |
+                                //==================================================================| 
                                 param_offset = robots[i].Param[rowcount - 1].getOffset() + robots[i].Param[rowcount - 1].getSize();
                             }
 
@@ -321,12 +330,14 @@ class SiemensPLC
 
                             robots[i].Param.Add(temp);
                         }
-                        else if(rdr.GetString(3) == "FLOAT")
+                        else if (rdr.GetString(3) == "FLOAT")
                         {
                             if (rowcount != 0)
                             {
-                                // The offset for the current parameter is equal to:
-                                // Robot Offset + Previous Parameter Offset + Previous Parameter Size
+                                //==================================================================|       
+                                // The offset for the current parameter is equal to:                |
+                                // Robot Offset + Previous Param Offset + Previous Param Size       |
+                                //==================================================================| 
                                 param_offset = robots[i].Param[rowcount - 1].getOffset() + robots[i].Param[rowcount - 1].getSize();
                             }
 
@@ -339,7 +350,7 @@ class SiemensPLC
                     rowcount++;
                 }
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 logger(AREA, ERROR, "Failed To Initialize Robot Data Blocks");
                 logger(AREA, ERROR, "Exception is: ", e);
@@ -361,7 +372,7 @@ class SiemensPLC
 
         for (int i = 0; i < noOfRobots; i++)
         {
-            for(int j = 0; j < robots[0].Param.Count; j++ )
+            for (int j = 0; j < robots[0].Param.Count; j++)
             {
                 robots[i].Param[j].print();
             }
@@ -378,7 +389,7 @@ class SiemensPLC
         logger(AREA, DEBUG, "==== Establishing A Connection ====");
 
         try
-        { 
+        {
             fds.rfd = openSocket(port, IP);
             fds.wfd = fds.rfd;
         }
@@ -445,6 +456,9 @@ class SiemensPLC
         logger(AREA, DEBUG, "Completed Polling");
     }
 
+    /// <summary>
+    /// 
+    /// </summary>
     public static void readFleetHeader()
     {
         logger(AREA, DEBUG, "==== Reading Fleet Header====");
@@ -455,7 +469,7 @@ class SiemensPLC
         if (plcConnected)
         {
             try
-            {                
+            {
                 taskControlDB = 19;
 
                 memoryres = dc.readBytes(daveDB, taskControlDB, fleetBlock.Offset, fleetBlockControlParameters * 2, memoryBuffer);
@@ -548,6 +562,9 @@ class SiemensPLC
         logger(AREA, DEBUG, "==== Completed Fleet Header ====");
     }
 
+    /// <summary>
+    /// 
+    /// </summary>
     public static void readRobots()
     {
         logger(AREA, DEBUG, "==== Reading Robot Task Control ====");
@@ -716,7 +733,7 @@ class SiemensPLC
             {
                 result = dc.execWriteRequest(p2, rs);
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 logger(AREA, ERROR, "Failed To Write Data TO PLC");
                 logger(AREA, ERROR, "Exception: ", e);
@@ -724,12 +741,12 @@ class SiemensPLC
 
             logger(AREA, DEBUG, "Wrote A Request");
 
-/*            for (int i = 0; i < fleetBlock.Param.Count - fleetBlockControlParameters; i++)
-            {
-                result = rs.getErrorOfResult(i);
-                logger(AREA, DEBUG, "Error Code From: " + fleetBlock.Param[i].getName() + " Code Is: " + result);
-            }
-*/
+            /*            for (int i = 0; i < fleetBlock.Param.Count - fleetBlockControlParameters; i++)
+                        {
+                            result = rs.getErrorOfResult(i);
+                            logger(AREA, DEBUG, "Error Code From: " + fleetBlock.Param[i].getName() + " Code Is: " + result);
+                        }
+            */
         }
         else
         {
@@ -843,7 +860,7 @@ class SiemensPLC
                 }
 
                 if (BitConverter.IsLittleEndian)
-                { 
+                {
                     Array.Reverse(tempBytes);
                 }
 
@@ -851,7 +868,7 @@ class SiemensPLC
             }
 
             try
-            { 
+            {
                 result = dc.execWriteRequest(p2, rs);
             }
             catch (Exception e)
@@ -891,10 +908,11 @@ class SiemensPLC
             daveAddVarToReadRequest(&p, daveFlags, 0, 12, 2);
             res = dc.daveExecReadRequest(dc, &p, &rs);
         }*/
-    
+
 
     /// <summary>
-    /// Helper method that prints the message and task status
+    /// Helper method that prints the message and task status.
+    /// Only used for debugging - no functional purpose
     /// </summary>
     public static void printNewMessageStatus()
     {
@@ -902,65 +920,14 @@ class SiemensPLC
         logger(AREA, DEBUG, "Fleet PLC Task Status: " + fleetBlock.getPLCTaskStatus());
         logger(AREA, DEBUG, "Fleet Message Status: " + newMsgs[0].ToString());
 
-        for (int g = 1; g < sizeOfFleet+1; g++)
+        for (int g = 1; g < sizeOfFleet + 1; g++)
         {
-            logger(AREA, DEBUG, "Robot " + (g - 1) + " Mirage Task Status: " + robots[g-1].getTaskStatus());
-            logger(AREA, DEBUG, "Robot " + (g - 1) + " Mission Status (Memory): " + mirFleet.robots[g-1].schedule.state_id);
+            logger(AREA, DEBUG, "Robot " + (g - 1) + " Mirage Task Status: " + robots[g - 1].getTaskStatus());
+            logger(AREA, DEBUG, "Robot " + (g - 1) + " Mission Status (Memory): " + mirFleet.robots[g - 1].schedule.state_id);
             logger(AREA, DEBUG, "Robot " + (g - 1) + " Mission Status (PLC Buffer): " + robots[g - 1].Param[5].getValue());
-            logger(AREA, DEBUG, "Robot " + (g - 1) + " PLC Task Status: " + robots[g-1].getPLCTaskStatus());
+            logger(AREA, DEBUG, "Robot " + (g - 1) + " PLC Task Status: " + robots[g - 1].getPLCTaskStatus());
             logger(AREA, DEBUG, "Robot " + (g - 1) + " Message Status: " + newMsgs[g].ToString());
         }
-    }
-
-
-    /// <summary>
-    /// Updates the PLC Task Status memory, in the Task Control Data Block.
-    /// </summary>
-    /// <param name="status">Designates Task Status Code: still processing, success, failure, etc.</param>
-    /// See <see cref="Globals.TaskStatus"/> for possible task status codes.
-    public static void updateTaskStatus(int status)
-    {
-        logger(AREA, DEBUG, "==== Updating Task Status In PLC ====");
-
-        if(plcConnected)
-        {
-            byte[] tempBytes = BitConverter.GetBytes(status);
-
-            if (BitConverter.IsLittleEndian) { Array.Reverse(tempBytes); }
-
-            try
-            {
-                int result = dc.writeBytes(daveDB, taskControlDB, 12, 4, tempBytes);
-
-                if (result != 0)
-                {
-                    logger(AREA, ERROR, "Task Status Update Was Unsuccessful");
-                    logger(AREA, ERROR, daveStrerror(result));
-                    plcConnectionErrors++;
-                }
-                else
-                {
-                    logger(AREA, DEBUG, "Task Status Updated To " + status);
-                }
-            }
-            catch (NullReferenceException exception)
-            {
-                logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
-                establishConnection();
-            }
-            catch (Exception exception)
-            {
-                logger(AREA, ERROR, "Failed To Write To PLC. Exception: ", exception);
-                plcConnectionErrors++;
-            }
-        }
-        else
-        {
-            logger(AREA, ERROR, "Cannot Update Task Status As The PLC Is Not Connected");
-            establishConnection();
-        }
-
-        logger(AREA, DEBUG, "==== Update Completed ====");
     }
 
     /// <summary>
@@ -971,8 +938,6 @@ class SiemensPLC
     /// See <see cref="Globals.TaskStatus"/> for possible task status codes.
     public static void updateTaskStatus(int robot, int status)
     {
-        logger(AREA, DEBUG, "==== Updating Task Status For " + robot + " ====");
-
         int Task_Status_ID = 4;
 
         if (plcConnected)
@@ -981,11 +946,15 @@ class SiemensPLC
 
             if (robot == fleetID)
             {
+                logger(AREA, DEBUG, "Updating Task Status For Fleet To " + status);
+
                 fleetBlock.Param[Task_Status_ID].setValue(status);
                 fleetBlock.Param[Task_Status_ID].print();
             }
             else
             {
+                logger(AREA, DEBUG, "Updating Task Status For Robot " + robot + " To " + status);
+
                 robots[robot].Param[Task_Status_ID].setValue(status);
                 robots[robot].Param[Task_Status_ID].print();
             }
@@ -1004,9 +973,8 @@ class SiemensPLC
             {
                 int result;
 
-                if (robot==fleetID)
+                if (robot == fleetID)
                 {
-                    result = dc.writeBytes(daveDB, 19, 8, 2, tempBytes);
                     result = dc.writeBytes(daveDB, 19, fleetBlock.Param[Task_Status_ID].getOffset(), fleetBlock.Param[Task_Status_ID].getSize(), tempBytes);
                 }
                 else
@@ -1016,13 +984,12 @@ class SiemensPLC
 
                 if (result != 0)
                 {
-                    logger(AREA, ERROR, "Task Status Update Was Unsuccessful");
-                    logger(AREA, ERROR, daveStrerror(result));
+                    logger(AREA, ERROR, "Task Status Update Was Unsuccessful: " + daveStrerror(result));
                     plcConnectionErrors++;
                 }
                 else
                 {
-                    logger(AREA, DEBUG, "Task Status Updated To " + status);
+                    logger(AREA, DEBUG, "Task Status Was Updated Sucessfully");
                 }
             }
             catch (NullReferenceException exception)
@@ -1125,7 +1092,7 @@ class SiemensPLC
                 logger(AREA, INFO, "Resetting Task Status And Fleet Return Parameter To 0 (Idle) From " + fleetBlock.getTaskStatus());
 
                 mirFleet.returnParameter = 0;
-                updateTaskStatus(fleetID, TaskStatus.Idle);   
+                updateTaskStatus(fleetID, TaskStatus.Idle);
             }
 
             for (int robotID = 0; robotID < sizeOfFleet; robotID++)
@@ -1149,7 +1116,7 @@ class SiemensPLC
                     // robotMemoryToPLC(robotID);
                     // writeRobotBlock(robotID);
                 }
-                else if(robots[robotID].getPLCTaskStatus() == TaskStatus.PlcIdle && (mirFleet.robots[robotID].schedule.state_id == TaskStatus.CompletedNoErrors))
+                else if (robots[robotID].getPLCTaskStatus() == TaskStatus.PlcIdle && (mirFleet.robots[robotID].schedule.state_id == TaskStatus.CompletedNoErrors))
                 {
                     mirFleet.robots[robotID].schedule.state_id = TaskStatus.Idle;
                     robots[robotID].setTaskStatus(TaskStatus.Idle);
@@ -1173,11 +1140,11 @@ class SiemensPLC
                     robotMemoryToPLC(robotID);
                     //writeRobotBlock(robotID);
                 }
-           
+
                 // If PLC is Idle AND:
                 // - Our Task Status is not idle
                 // - Or Our Mission Status is either complete or failed
-                if(  robots[robotID].getPLCTaskStatus() == TaskStatus.PlcIdle
+                if (robots[robotID].getPLCTaskStatus() == TaskStatus.PlcIdle
                   && (robots[robotID].getTaskStatus() != TaskStatus.PlcIdle
                   || mirFleet.robots[robotID].schedule.state_id == TaskStatus.CompletedNoErrors
                   || mirFleet.robots[robotID].schedule.state_id == TaskStatus.CouldntProcessRequest))
@@ -1235,7 +1202,7 @@ class SiemensPLC
 
                     int alarmPosition = 0;
 
-                    for(int i = 0; i < alarmBlockSize/2; i++)
+                    for (int i = 0; i < alarmBlockSize / 2; i++)
                     {
                         int size = 2;
                         int byte1 = i * size;
@@ -1303,8 +1270,8 @@ class SiemensPLC
             logger(AREA, WARNING, "Error Counter Passed 5. Trying To Re-establish Connection.");
 
             // Re-establish connection every fifth loop
-            if(plcConnectionErrors % 5 == 0)
-            { 
+            if (plcConnectionErrors % 5 == 0)
+            {
                 establishConnection();
             }
 

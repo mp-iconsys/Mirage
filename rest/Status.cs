@@ -237,14 +237,48 @@ namespace Mirage.rest
         /// <returns></returns>
         public HttpRequestMessage putRequest()
         {
-            string payload = "stuff";
+            // TODO: change the session ID to be dynamic
+            string payload;
+            payload = "{\"clear_error\": true }";
+
+            logger(AREA, DEBUG, payload);
+
+            Uri uri = new Uri("http://" + 122 + "/api/v2.0.0/missions");
+
+            HttpRequestMessage request = new HttpRequestMessage
+            {
+                Content = new StringContent(payload, Encoding.UTF8, "application/json"),
+                Method = HttpMethod.Post,
+                RequestUri = uri
+            };
+
+            logger(AREA, DEBUG, "Request Created");
+
+            return request;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        public HttpRequestMessage putRequest(string base_uri)
+        {
+            // TODO: change the session ID to be dynamic
+            string payload;
+            payload = "{\"clear_error\": true }";
+
+            logger(AREA, DEBUG, payload);
+
+            Uri uri = new Uri(base_uri + "status");
 
             HttpRequestMessage request = new HttpRequestMessage
             {
                 Content = new StringContent(payload, Encoding.UTF8, "application/json"),
                 Method = HttpMethod.Put,
-                RequestUri = new Uri("mission_scheduler")
+                RequestUri = uri
             };
+
+            logger(AREA, DEBUG, "Request Created");
 
             return request;
         }
