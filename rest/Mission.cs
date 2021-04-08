@@ -320,22 +320,31 @@ namespace Mirage.rest
             payload = "{\"mission_id\": \"" + guid + "\", ";
             payload += "\"robot_id\": " + robotID + "} ";
 
-            if(robotID == fleetID)
-            {
-                // Send available mission
-                /* 
-                string payload = "{\r\n  \"mission_id\": \"" + guid + "\"\r\n}";
-
-                           if(fleet == fleetID)
-                            {
-                                payload = "{\r\n  \"mission_id\": \"" + guid + "\"\r
-                                payload += \n}";
-                            }*/
-            }
-
-
             logger(AREA, DEBUG, payload);
 
+            Uri uri = new Uri("http://" + fleetManagerIP + "/api/v2.0.0/mission_scheduler");
+
+            //string payload = "{\r\n  \"mission_id\": \"a5e518af-820d-11e9-8328-0000000000" + stringyfyMission(missionNumber) + "\"\r\n}";
+
+            HttpRequestMessage request = new HttpRequestMessage
+            {
+                Content = new StringContent(payload, Encoding.UTF8, "application/json"),
+                Method = HttpMethod.Post,
+                RequestUri = uri
+                //RequestUri = new Uri("mission_scheduler")
+            };
+
+            logger(AREA, DEBUG, "Request Created");
+
+            return request;
+        }
+
+        public HttpRequestMessage urgentReleaseRobot(int robotID)
+        {
+            string payload;
+            payload = "{\"mission_id\": \"" + guid + "\", ";
+            payload += "\"high_priority\": true,";
+            payload += "\"robot_id\": " + robotID + "} ";
 
             logger(AREA, DEBUG, payload);
 

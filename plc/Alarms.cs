@@ -255,22 +255,25 @@ namespace Mirage.plc
 
         public void checkAlarms()
         {
-            for (int i = 0; i < alarmBlockSize * 8; i++)
+            if (SiemensPLC.plcConnected)
             {
-                if(alarm_array[i].triggered && !alarm_array[i].old_triggered)
+                for (int i = 0; i < alarmBlockSize * 8; i++)
                 {
-                    // Rising Edge on the alarm
-                    logger(AREA, INFO, alarm_array[i].area + " -- " + alarm_array[i].name + " Rising Edge");
-                    alarm_array[i].old_triggered = true;
-                    alarm_array[i].saveRisingEdgeToDB();
-                }
-                else if(!alarm_array[i].triggered && alarm_array[i].old_triggered)
-                {
-                    // Falling Edge on the alarm
-                    logger(AREA, INFO, alarm_array[i].area + " -- " + alarm_array[i].name + " Falling Edge");
-                    alarm_array[i].old_triggered = false;
-                    alarm_array[i].saveFallingEdgeToDB();
-                    alarm_array[i].id = 0;
+                    if (alarm_array[i].triggered && !alarm_array[i].old_triggered)
+                    {
+                        // Rising Edge on the alarm
+                        logger(AREA, INFO, alarm_array[i].area + " -- " + alarm_array[i].name + " Rising Edge");
+                        alarm_array[i].old_triggered = true;
+                        alarm_array[i].saveRisingEdgeToDB();
+                    }
+                    else if (!alarm_array[i].triggered && alarm_array[i].old_triggered)
+                    {
+                        // Falling Edge on the alarm
+                        logger(AREA, INFO, alarm_array[i].area + " -- " + alarm_array[i].name + " Falling Edge");
+                        alarm_array[i].old_triggered = false;
+                        alarm_array[i].saveFallingEdgeToDB();
+                        alarm_array[i].id = 0;
+                    }
                 }
             }
         }

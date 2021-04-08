@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Linq;
 using System.Text;
 using static Globals;
 using static Globals.DebugLevel;
@@ -153,7 +154,27 @@ namespace Mirage.rest
         {
             try
             {
-                if(isJobInProgress)
+                if(!missions.Any())
+                {
+                    //totalNoOfMissions = currentMission;
+
+                    // We're finishing a job without the robot starting a job - ignore this
+                    logger(AREA, INFO, "Ignoring Job " + job + ". It Had " + totalNoOfMissions + " Missions In Total");
+
+                    isJobInProgress = false;
+/*                    end = DateTime.Now;
+
+                    missions[currentMission].end_time = DateTime.Now;
+
+
+                    // Save Job Data to DB
+                    saveJob(robotID, isAborted);
+
+                    logger(AREA, INFO, "Saving Missions Now");
+
+                    saveMissions(robotID);*/
+                }
+                else if(isJobInProgress)
                 {
                     totalNoOfMissions = currentMission;
 

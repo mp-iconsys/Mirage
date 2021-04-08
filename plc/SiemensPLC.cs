@@ -6,6 +6,7 @@ using static Globals.DebugLevel;
 using static DotNetSiemensPLCToolBoxLibrary.Communication.LibNoDave.libnodave;
 using Mirage.plc;
 using System.Collections;
+using System.Data;
 
 /// <summary>
 /// Contains all the methods and data related to a Siemens PLC.
@@ -528,35 +529,26 @@ class SiemensPLC
                 }
                 else
                 {
-                    logger(AREA, WARNING, "Failed to Poll");
+                    logger(AREA, WARNING, "Failed to read PLC in readFleetHeader()");
                     logger(AREA, WARNING, daveStrerror(memoryres));
-                    plcConnectionErrors++;
-                    //newMsg = false;
+                    restartConnection();
                 }
-
-
             }
             catch (NullReferenceException exception)
             {
                 logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
-                plcConnectionErrors++;
-                //newMsg = false;
-
-                establishConnection();
+                restartConnection();
             }
             catch (Exception exception)
             {
                 logger(AREA, ERROR, "Polling Failed. Error : ", exception);
-                plcConnectionErrors++;
-                //newMsg = false;
+                restartConnection();
             }
         }
         else
         {
             logger(AREA, ERROR, "Not Connected To The PLC During Fleet Header Read. Trying to re-establish connection");
-            plcConnectionErrors++;
-
-            establishConnection();
+            restartConnection();
         }
 
         logger(AREA, DEBUG, "==== Completed Fleet Header ====");
@@ -654,35 +646,27 @@ class SiemensPLC
                     }
                     else
                     {
-                        logger(AREA, ERROR, "Failed to Poll");
+                        logger(AREA, ERROR, "Failed to Poll in readRobots()");
                         logger(AREA, ERROR, daveStrerror(memoryres));
-                        plcConnectionErrors++;
+                        restartConnection();
                     }
                 }
-
-
             }
             catch (NullReferenceException exception)
             {
                 logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
-                plcConnectionErrors++;
-                //newMsg = false;
-
-                establishConnection();
+                restartConnection();
             }
             catch (Exception exception)
             {
                 logger(AREA, ERROR, "Polling Failed. Error : ", exception);
-                plcConnectionErrors++;
-                //newMsg = false;
+                restartConnection();
             }
         }
         else
         {
             logger(AREA, ERROR, "Not Connected To The PLC During Robot Header Read. Trying to re-establish connection");
-            plcConnectionErrors++;
-
-            establishConnection();
+            restartConnection();
         }
 
         logger(AREA, DEBUG, "==== Completed Robot Task Control ====");
@@ -735,8 +719,9 @@ class SiemensPLC
             }
             catch (Exception e)
             {
-                logger(AREA, ERROR, "Failed To Write Data TO PLC");
+                logger(AREA, ERROR, "Failed To Write To PLC in writeFleetBlock()");
                 logger(AREA, ERROR, "Exception: ", e);
+                restartConnection();
             }
 
             logger(AREA, DEBUG, "Wrote A Request");
@@ -751,7 +736,7 @@ class SiemensPLC
         else
         {
             logger(AREA, ERROR, "Cannot Write To Fleet Block As The PLC Is Not Connected");
-            establishConnection();
+            restartConnection();
         }
     }
 
@@ -815,7 +800,7 @@ class SiemensPLC
         else
         {
             logger(AREA, ERROR, "Cannot Write To Fleet Block As The PLC Is Not Connected");
-            establishConnection();
+            restartConnection();
         }
     }
 
@@ -873,7 +858,8 @@ class SiemensPLC
             }
             catch (Exception e)
             {
-                logger(AREA, ERROR, "Failed to Write Exception", e);
+                logger(AREA, ERROR, "Failed to Write Exception in writeRobotBlock()", e);
+                restartConnection();
             }
 
             /*
@@ -886,7 +872,7 @@ class SiemensPLC
         else
         {
             logger(AREA, ERROR, "Cannot Write To Fleet Block As The PLC Is Not Connected");
-            establishConnection();
+            restartConnection();
         }
     }
 
@@ -985,7 +971,7 @@ class SiemensPLC
                 if (result != 0)
                 {
                     logger(AREA, ERROR, "Task Status Update Was Unsuccessful: " + daveStrerror(result));
-                    plcConnectionErrors++;
+                    restartConnection();
                 }
                 else
                 {
@@ -995,18 +981,18 @@ class SiemensPLC
             catch (NullReferenceException exception)
             {
                 logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
-                establishConnection();
+                restartConnection();
             }
             catch (Exception exception)
             {
                 logger(AREA, ERROR, "Failed To Write To PLC. Exception: ", exception);
-                plcConnectionErrors++;
+                restartConnection();
             }
         }
         else
         {
             logger(AREA, ERROR, "Cannot Update Task Status As The PLC Is Not Connected");
-            establishConnection();
+            restartConnection();
         }
 
         logger(AREA, DEBUG, "==== Update Completed ====");
@@ -1045,7 +1031,7 @@ class SiemensPLC
                 {
                     logger(AREA, ERROR, "Sequence Reset Was Unsuccessful");
                     logger(AREA, ERROR, daveStrerror(result));
-                    plcConnectionErrors++;
+                    restartConnection();
                 }
                 else
                 {
@@ -1055,18 +1041,18 @@ class SiemensPLC
             catch (NullReferenceException exception)
             {
                 logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
-                establishConnection();
+                restartConnection();
             }
             catch (Exception exception)
             {
                 logger(AREA, ERROR, "Failed To Write To PLC. Exception: ", exception);
-                plcConnectionErrors++;
+                restartConnection();
             }
         }
         else
         {
             logger(AREA, ERROR, "Cannot Send Reset Bits As The PLC Is Not Connected");
-            establishConnection();
+            restartConnection();
         }
     }
 
@@ -1226,27 +1212,25 @@ class SiemensPLC
                 {
                     logger(AREA, ERROR, "Failed to Poll PLC For Alarms");
                     logger(AREA, ERROR, daveStrerror(memoryres));
-                    plcConnectionErrors++;
+                    restartConnection();
                 }
             }
             catch (NullReferenceException exception)
             {
                 logger(AREA, WARNING, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
                 logger(AREA, WARNING, "Trying To Establish Connection Again");
-                plcConnectionErrors++;
-
-                establishConnection();
+                restartConnection();
             }
             catch (Exception exception)
             {
                 logger(AREA, ERROR, "PLC Polling Failed. Error : ", exception);
-                plcConnectionErrors++;
+                restartConnection();
             }
         }
         else
         {
             logger(AREA, ERROR, "Cannot Read Alarms As the PLC is Not Connected");
-            establishConnection();
+            restartConnection();
         }
 
         logger(AREA, DEBUG, "Completed Reading PLC Alarms");
@@ -1262,7 +1246,7 @@ class SiemensPLC
 
         if (!plcConnected)
         {
-            plcConnectionErrors++;
+            restartConnection();
         }
 
         if (plcConnectionErrors > 5)
@@ -1342,70 +1326,98 @@ class SiemensPLC
                         watchdogToPLC = 0;
                     }
 
-                    logger(AREA, INFO, "PLC Watchdog Is: " + watchdogFromPLC);
+                    updateWatchdogInDB(watchdogFromPLC);
+                    //logger(AREA, INFO, "Watchdog: " + watchdogFromPLC);
                 }
                 else
                 {
-                    logger(AREA, ERROR, "Failed to Poll");
-                    logger(AREA, ERROR, daveStrerror(memoryres));
-                    plcConnectionErrors++;
+                    logger(AREA, WARNING, "Failed to read PLC in SiemensPLC.updateWatchdog");
+                    logger(AREA, WARNING, daveStrerror(memoryres));
+
+                    restartConnection();
                 }
             }
             catch (NullReferenceException exception)
             {
                 logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
-                plcConnectionErrors++;
-                establishConnection();
+                //plcConnectionErrors++;
+                restartConnection();
             }
             catch (Exception exception)
             {
                 logger(AREA, ERROR, "Polling Failed. Error : ", exception);
-                plcConnectionErrors++;
+                //plcConnectionErrors++;
+                restartConnection();
             }
 
-            memoryBuffer = BitConverter.GetBytes((short)watchdogToPLC);
-
-            if (BitConverter.IsLittleEndian)
+            if (plcConnected)
             {
-                Array.Reverse(memoryBuffer);
-            }
+                memoryBuffer = BitConverter.GetBytes((short)watchdogToPLC);
 
-            logger(AREA, DEBUG, "Return Watchdog Parameter: " + BitConverter.ToString(memoryBuffer));
-
-            try
-            {
-                int result = 999;
-
-                result = dc.writeBytes(daveDB, taskControlDB, watchdogToPLCOffset, watchdogSize, memoryBuffer);
-
-                if (result != 0)
+                if (BitConverter.IsLittleEndian)
                 {
-                    logger(AREA, ERROR, "Failed To Update Watchdog");
-                    logger(AREA, ERROR, daveStrerror(result));
-                    plcConnectionErrors++;
+                    Array.Reverse(memoryBuffer);
                 }
-                else
+
+                logger(AREA, DEBUG, "Return Watchdog Parameter: " + BitConverter.ToString(memoryBuffer));
+
+                try
                 {
-                    logger(AREA, DEBUG, "Task Status Updated To " + status);
+                    int result = 999;
+
+                    result = dc.writeBytes(daveDB, taskControlDB, watchdogToPLCOffset, watchdogSize, memoryBuffer);
+
+                    if (result != 0)
+                    {
+                        logger(AREA, ERROR, "Failed To Update Watchdog");
+                        logger(AREA, ERROR, daveStrerror(result));
+                        restartConnection();
+                    }
+                    else
+                    {
+                        logger(AREA, DEBUG, "Task Status Updated To " + status);
+                    }
                 }
-            }
-            catch (NullReferenceException exception)
-            {
-                logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
-                establishConnection();
-            }
-            catch (Exception exception)
-            {
-                logger(AREA, ERROR, "Failed To Write To PLC. Exception: ", exception);
-                plcConnectionErrors++;
+                catch (NullReferenceException exception)
+                {
+                    logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
+                    restartConnection();
+                }
+                catch (Exception exception)
+                {
+                    logger(AREA, ERROR, "Failed To Write To PLC. Exception: ", exception);
+                    restartConnection();
+                }
             }
         }
         else
         {
             logger(AREA, ERROR, "Cannot Update PLC Watchdog As the PLC is Not Connected");
-            establishConnection();
+            restartConnection();
         }
     }
+
+    private static void updateWatchdogInDB(int newWatchdog)
+    {
+        try
+        {
+            MySqlCommand cmd = new MySqlCommand();
+            cmd.Connection = db;
+            cmd.CommandText = "store_plc_watchdog";
+            cmd.CommandType = CommandType.StoredProcedure;
+
+            cmd.Parameters.AddWithValue("@Watchdog", newWatchdog);
+            cmd.Parameters["@Watchdog"].Direction = ParameterDirection.Input;
+
+            cmd.ExecuteNonQuery();
+            cmd.Dispose();
+        }
+        catch (Exception exception)
+        {
+            logger(AREA, ERROR, "MySQL Query Error: ", exception);
+        }
+    }
+
 
     /// <summary>
     /// Breaks the connection with a PLC. 
@@ -1430,5 +1442,15 @@ class SiemensPLC
         }
 
         logger(AREA, DEBUG, "==== PLC Disconnection Completed ====");
+    }
+
+
+    private static void restartConnection()
+    {
+        logger(AREA, WARNING, "Restarting Connection");
+
+        disconnect();
+
+        establishConnection();
     }
 }

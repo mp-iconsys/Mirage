@@ -874,13 +874,14 @@ public static class Globals
             }
             catch (Exception exception)
             {
-                logger(AREA, ERROR, "MySQL Query Failed with error: ", exception);
+                cmd.Dispose();
+                logger(AREA, ERROR, "MySQL Query In Globals.saveLogToDB Failed with error: ", exception);
             }
         }
         catch (Exception exception)
         {
             cmd.Dispose();
-            logger(AREA, ERROR, "MySQL Quert Error: ", exception);
+            logger(AREA, ERROR, "MySQL Query Error In Globals.saveLogToDB: ", exception);
         }
     }
 

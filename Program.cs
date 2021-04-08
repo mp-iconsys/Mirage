@@ -34,6 +34,9 @@ class Program
         Stopwatch robotAssignmentTimer = new Stopwatch();
                   robotAssignmentTimer.Start();
 
+        // Timer to check robot downtime
+        Stopwatch robotDowntimeTimer = new Stopwatch();
+
         //====================================================|
         //  M A I N      L O O P                              |
         //====================================================|
@@ -90,11 +93,7 @@ class Program
                                 break;
                         }
 
-                        //SiemensPLC.updateTaskStatus(fleetID, taskStatus);
-                        //SiemensPLC.updateTaskStatus(fleetID, Globals.TaskStatus.StartedProcessing);
-
                         writeFleetBlock(Globals.TaskStatus.StartedProcessing);
-                        //SiemensPLC.writeFleetBlock(taskStatus);
 
                         newMsgs[0] = false;
 
@@ -109,7 +108,7 @@ class Program
                         // Message 0 is reserved for Fleet tasks, so offset by 1
                         int robotMessage = j + 1;
                         
-                        if (SiemensPLC.newMsgs[robotMessage])
+                        if (newMsgs[robotMessage])
                         {
                             logger(AREA, INFO, "Task For Robot: " + j);
                             logger(AREA, INFO, "Task Number: " + SiemensPLC.robots[j].getTaskNumber());
@@ -118,11 +117,11 @@ class Program
                             //New Mission, so set Mission Status to Idle
                             mirFleet.robots[j].schedule.state_id = Globals.TaskStatus.Idle;
 
-                            SiemensPLC.updateTaskStatus(j, Globals.TaskStatus.StartedProcessing);
+                            updateTaskStatus(j, Globals.TaskStatus.StartedProcessing);
 
                             int taskStatus = Globals.TaskStatus.StartedProcessing;
 
-                            switch (SiemensPLC.robots[j].getTaskNumber())
+                            switch (robots[j].getTaskNumber())
                             {
                                 case Tasks.SendMissionToScheduler:
                                     taskStatus = sendMissionToScheduler(SiemensPLC.robots[j].getTaskParameter(), j);
@@ -144,10 +143,10 @@ class Program
                                     break;
                             }
 
-                            SiemensPLC.updateTaskStatus(j, taskStatus);
+                            updateTaskStatus(j, taskStatus);
                             //SiemensPLC.writeRobotBlock(j, taskStatus);
 
-                            SiemensPLC.newMsgs[robotMessage] = false;
+                            newMsgs[robotMessage] = false;
                         }
                     }
 
@@ -196,11 +195,24 @@ class Program
             // Poll MiR Fleet - async operation that happens every pollInterval
             if (timer.Elapsed.Seconds >= pollInterval)
             {
-                logger(AREA, INFO, "Harvesting Robot Data And Checking Reports. " + timer.Elapsed.TotalSeconds + "s Since Last Poll");
+                logger(AREA, INFO, "Harvesting Data" + timer.Elapsed.TotalSeconds + "s Since Last Poll");
+
+                checkRESTConnectivity(robotDowntimeTimer);
 
                 calculationsAndReporting();
                 timer.Restart();
                 mirFleet.pollRobots();
+            }
+
+            if(robotDowntimeTimer.Elapsed.TotalMilliseconds > 1000)
+            {
+                for(int robotID = 0; robotID < sizeOfFleet; robotID++)
+                {
+                    if(!mirFleet.robots[robotID].isLive)
+                    {
+                        mirFleet.robots[robotID].killConnectionCheckRequest(robotDowntimeTimer);
+                    }
+                }
             }
 
             checkConfigChanges();
@@ -212,10 +224,31 @@ class Program
 
             logger(AREA, DEBUG, "==== Loop " + i + " Finished ====");
 
-            Thread.Sleep(10000); // Remove in live deployment
+            Thread.Sleep(100); // Remove in live deployment
         }
 
         gracefulTermination();
+    }
+
+
+    private static void checkRESTConnectivity(Stopwatch timer)
+    {
+        logger(AREA, DEBUG, "Checking REST Connections");
+
+        if(!mirFleet.fleetManager.isLive)
+        {
+            mirFleet.fleetManager.CheckConnection(timer);
+        }
+
+        for(int robotID = 0; robotID < sizeOfFleet; robotID++)
+        {
+            if(!mirFleet.robots[robotID].isLive)
+            {
+                logger(AREA, INFO, "Checking Connection For Robot " + robotID);
+
+                mirFleet.robots[robotID].CheckConnection(timer);
+            }
+        }
     }
 
     /// <summary>
@@ -259,52 +292,6 @@ class Program
             //======================================================|
             restStatus = mirFleet.fleetManager.sendScheduleRequest(mirFleet.fleetManager.Missions[mission_number].postRequest());
             mirFleet.fleetManager.schedule.mission_number = mission_number;
-
-            // Wait for a response from Fleet, to see which robot it assigns
-            // Might not be needed - TODO: check if necessary
-            //Thread.Sleep(waitTimeForMissionAssignment);
-
-            // TODO: check if removing this is ok
-            // Check the mission_scheduler we've just created to return with the robot ID
-            // If we're still waiting for a response (which we will)
-/*            if (mirFleet.fleetManager.schedule.working_response)
-            {
-                int currentMissionRobot = 0;
-
-                logger(AREA, DEBUG, "Mission Scheduler Fleet Robot ID is: " + mirFleet.fleetManager.schedule.robot_id);
-                logger(AREA, DEBUG, "Mission Schedule ID is: " + mirFleet.fleetManager.schedule.id);
-
-                // Check fleet manager mission scheduler to see which robot is doing the mission
-                restStatus = mirFleet.issueGetRequest("mission_scheduler/" + mirFleet.fleetManager.schedule.id, fleetID);
-
-                //mirFleet.fleetManager.schedule.mission_number = mission_number;
-
-                logger(AREA, DEBUG, "Mission Scheduler Robot ID After polling is: " + mirFleet.fleetManager.schedule.robot_id);
-
-                if (restStatus == Globals.TaskStatus.CompletedNoErrors && mirFleet.fleetManager.schedule.robot_id != 0)
-                {
-                    currentMissionRobot = mirFleet.getInternalRobotID(mirFleet.fleetManager.schedule.robot_id);
-
-                    //mirFleet.returnParameter = (short)(currentMissionRobot+1);
-                    mirFleet.returnParameter = (short)(mirFleet.robots[currentMissionRobot].plcRobotID);
-
-                    mirFleet.robots[currentMissionRobot].schedule.id = mirFleet.fleetManager.schedule.id;
-
-                    logger(AREA, INFO, "Mission Assigned Immediately After Despatch, To Robot: " + currentMissionRobot);
-
-                    occupyRobot(currentMissionRobot);
-
-                    // Add a record to the robot's job ledger - we're starting a new job since this is coming from Fleet
-                    mirFleet.robots[currentMissionRobot].currentJob.startJob(mission_number, mirFleet.fleetManager.Missions[mission_number].name);
-
-                    mirFleet.fleetManager.schedule.working_response = false;
-                }
-                else
-                {
-                    restStatus = Globals.TaskStatus.StartedProcessing;
-                    mirFleet.fleetManager.schedule.working_response = true;
-                }
-            }*/
         }
         else
         {
@@ -319,7 +306,16 @@ class Program
             logger(AREA, INFO, "PLC Mission No:" + plcMissionNumber + " : " + mirFleet.fleetManager.Missions[mission_number].name);
             mirFleet.fleetManager.Missions[mission_number].print();
 
-            restStatus = mirFleet.robots[robotID].sendScheduleRequest(mirFleet.fleetManager.Missions[mission_number].postRequest(fleetRobotID));
+            if(mission_number == (Tasks.ReleaseRobot - PLCMissionOffset))
+            {
+                restStatus = mirFleet.robots[robotID].sendScheduleRequest(mirFleet.fleetManager.Missions[mission_number].urgentReleaseRobot(fleetRobotID));
+            }
+            else
+            {
+                restStatus = mirFleet.robots[robotID].sendScheduleRequest(mirFleet.fleetManager.Missions[mission_number].postRequest(fleetRobotID));
+            }
+
+            //restStatus = mirFleet.robots[robotID].sendScheduleRequest(mirFleet.fleetManager.Missions[mission_number].postRequest(fleetRobotID));
             mirFleet.robots[robotID].schedule.mission_number = mission_number;
 
             logger(AREA, INFO, "The Schedule ID IS: " + mirFleet.robots[robotID].schedule.id);
@@ -560,7 +556,7 @@ class Program
                     else if (mirFleet.robots[r].schedule.state == "Done")
                     {
                         // Used to be else if (mirFleet.robots[r].schedule.state == "Done")
-
+                        // Potentially remove this condition as the dock prox checks are now done inside MiRs
                         if ((int)(mirFleet.robots[r].Registers[2].value) == 1)
                         {
                             mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.CompletedNoErrors;

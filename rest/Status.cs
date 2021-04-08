@@ -53,6 +53,32 @@ namespace Mirage.rest
         public Status() 
         {
             robot_group_id = 0;
+            mode_id = 0;
+            state_id = 0;
+            uptime = 0;
+            battery_time_remaining = 0;
+            battery_percentage = 0;
+            distance_to_next_target = 0;
+            moved = 0;
+            footprint = "0";
+            joystick_low_speed_mode_enabled = "0";
+            joystick_web_session_id = "0";
+            map_id = "0";
+            mission_queue_id = "0";
+            mission_queue_url = "0";
+            mission_text = "0";
+            mode_key_state = "0";
+            mode_text = "0";
+            robot_model = "0";
+            robot_name = "0";
+            safety_system_muted = "0";
+            serial_number = "0";
+            session_id = "0";
+            state_text = "0";
+            unloaded_map_changes = "0";
+
+            position = new Position();
+            velocity = new Velocity();
         }
 
         /// <summary>
@@ -164,6 +190,7 @@ namespace Mirage.rest
                 cmd.Parameters.Add(new MySqlParameter("SAFETY_SYSTEM_MUTED", convertToInt(safety_system_muted)));
                 cmd.Parameters.Add(new MySqlParameter("UNLOADED_MAP_CHANGES", convertToInt(unloaded_map_changes)));
                 cmd.Parameters.Add(new MySqlParameter("USER_PROMPT_ID", user_prompt));
+                cmd.Parameters.Add(new MySqlParameter("ROBOT_GROUP_ID", robot_group_id));
 
                 issueQuery(cmd);
             }
@@ -291,6 +318,13 @@ namespace Mirage.rest
             public double x { get; set; }
             public double y { get; set; }
             public double orientation { get; set; }
+
+            public Position()
+            {
+                x = 0;
+                y = 0;
+                orientation = 0;
+            }
         }
 
         /// <summary>
@@ -310,6 +344,12 @@ namespace Mirage.rest
         {
             public double linear { get; set; }
             public double angular { get; set; }
+
+            public Velocity()
+            {
+                linear = 0;
+                angular = 0;
+            }
         }
 
         /// <summary>

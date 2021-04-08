@@ -11,12 +11,13 @@ using Mirage.rest;
 using static Globals;
 using static Globals.DebugLevel;
 using System.Data;
+using System.Threading;
+using System.Diagnostics; 
 
 // TODO: Clean-up so we're a bit more tidy
 public class Robot
 {
-    public int id {get; set; }
-    public bool isLive { get; set; }
+    public int id { get; set; }
     public int fleetRobotID { get; set; }
     public int plcRobotID { get; set; }
     public string ipAddress { get; set; } // TODO: change to actual IPAddress class from .net library
@@ -25,9 +26,6 @@ public class Robot
     //=========================================================|
     //  KPI, OEM & Statistics                                  |
     //=========================================================|
-    /*    public long job { get; set; }
-        public List<int> MissionsForDB { get; set; }
-    */
     public int maxRegister = 13;
 
     //=========================================================|
@@ -44,202 +42,371 @@ public class Robot
     public RobotGroup Group { get; set; }
     public Job currentJob { get; set; }
 
+    // Dead Or Alive Helper Variables
+    public bool isLive { get; set; }
+    public int alarm_id;
+    public bool deadRobotAlarmNotTriggered = true;
+    private CancellationTokenSource _cts = new CancellationTokenSource();
 
     //=========================================================|
     //  Used For Logging & Debugging                           |     
     //=========================================================|
     private static readonly Type AREA = typeof(Robot);
 
-        /// <summary>
-        /// Instantiate with connection details
-        /// </summary>
-        public Robot()
-        {
-            fetchConnectionDetails();
+    /// <summary>
+    /// Instantiate with connection details
+    /// </summary>
+    public Robot()
+    {
+        fetchConnectionDetails();
 
-            Registers = new List<Register>(new Register[200]);
-            s = new Status();
-            schedule = new Scheduler();
+        Registers = new List<Register>(new Register[200]);
+        s = new Status();
+        schedule = new Scheduler();
 
-            fleetRobotID = 0;
-            plcRobotID = 0;
+        fleetRobotID = 0;
+        plcRobotID = 0;
 
-            currentJob = new Job();
-            isLive = true;
-        }
-
-        /// <summary>
-        /// Instantiate with connection details
-        /// </summary>
-        /// <param name="id"></param>
-        public Robot(int id)
-        {
-            this.id = id;
-            plcRobotID = id + 1; // The PLC Uses Robot 0 as a spare while it's used for us so we need to offset by 1 
-
-            fetchConnectionDetails();
-
-            Registers = new List<Register>(new Register[200]);
-            s = new Status();
-            schedule = new Scheduler();
-            currentJob = new Job();
-            isLive = true;
-        }
-
-        /// <summary>
-        /// For when we're fetching the details from the database
-        /// </summary>
-        /// <param name="ipAddress"></param>
-        /// <param name="authValue"></param>
-        public Robot(string ipAddress, AuthenticationHeaderValue authValue)
-        {
-            this.ipAddress = ipAddress;
-            this.authValue = authValue;
-
-            Registers = new List<Register>(new Register[200]);
-            s = new Status();
-            FireAlarm = new FireAlarms();
-            Group = new RobotGroup();
-            schedule = new Scheduler();
-
-            Missions = new List<Mission>(new Mission[80]);
-            currentJob = new Job();
-
-            for (int i = 0; i < 80; i++)
-            {
-                Missions[i] = new Mission();
-            }
-
-            isLive = true;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        public void fetchConnectionDetails()
-        {
-            string apiUsername, apiPassword;
-
-            if (resumingSession)
-            {
-                // We're resuming an existing session so fetch the robot connection details from a database
-                string query = "SELECT IP, AUTH FROM robot WHERE ROBOT_ID =" + id;
-                var getRobotData = new MySqlCommand(query, db);
-
-                using (MySqlDataReader reader = getRobotData.ExecuteReader())
-                {
-                    while (reader.Read())
-                    {
-                        ipAddress = reader.GetString("IP");
-                        authValue = new AuthenticationHeaderValue("Basic", reader.GetString("AUTH"));
-                    }
-                }
-            }
-            else
-            {
-                // We've got a new session so input the details manually in the terminal
-                // Firstm fetch the details
-
-                Console.WriteLine("Please Enter The IP Address Of The Robot No " + id + ":");
-                ipAddress = Console.ReadLine();
-                // TODO: Check that the input is correct - length & type
-
-                Console.WriteLine("Enter API Username:");
-                apiUsername = Console.ReadLine();
-
-                Console.WriteLine("Enter API Password:");
-                apiPassword = Console.ReadLine();
-
-                // Basic Auth type for the API. Set up as follows: BASE64( username: sha256(pass) )
-                // So, first get sha256 of the pass, Concat to "username:" and then do base64 conversion
-                authValue = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes($"{apiUsername}:{ComputeSha256Hash(apiPassword)}")));
-
-                logger(AREA, DEBUG, authValue.ToString());
-
-                // Store the data in the DB
-                //string query = "REPLACE INTO robot (`ROBOT_ID`, `IP`, `AUTH`) VALUES ('" + id + "', '" + ipAddress + "', '" + Convert.ToBase64String(Encoding.UTF8.GetBytes($"{apiUsername}:{ComputeSha256Hash(apiPassword)}")) + "');";
-                //Globals.issueInsertQuery(query);
-
-                // Change the App.config setting so that we load an existing config next time
-                //Globals.AddUpdateAppSettings("resumingSession", "true");
-            }
-        }
-
-        /// <summary>
-        /// Private cause we're only using it to get the Hash
-        /// Within the Robot class. Should really salt it if we're 
-        /// Storing it within a DB
-        /// </summary>
-        /// <param name="rawData"></param>
-        /// <returns></returns>
-        private string ComputeSha256Hash(string rawData)
-        {
-            // Create a SHA256   
-            using (SHA256 sha256Hash = SHA256.Create())
-            {
-                // ComputeHash - returns byte array  
-                byte[] bytes = sha256Hash.ComputeHash(Encoding.UTF8.GetBytes(rawData));
-
-                // Convert byte array to a string   
-                StringBuilder builder = new StringBuilder();
-
-                for (int i = 0; i < bytes.Length; i++)
-                {
-                    builder.Append(bytes[i].ToString("x2"));
-                }
-
-                return builder.ToString();
-            }
-        }
-
-        /// <summary>
-        /// Fetch base uri used for.
-        /// </summary>
-        /// <returns></returns>
-        public string getBaseURI()
-        {
-            return "http://" + ipAddress + "/api/v2.0.0/";
-        }
-
-        /// <summary>
-        /// Forms a connection with a robot.
-        /// </summary>
-        public void formConnection()
-        {
-            //setUpDefaultComms();
-
-            //comms.BaseAddress = new Uri("http://" + ipAddress + "/api/v2.0.0/"); //-> hhtpClient is a singleton so we can only set the defaults once
-
-            comms.DefaultRequestHeaders.Authorization = authValue; // This might cause problems if we're using many robots with different auth strings
-
-            logger(AREA, DEBUG, "The IP is: " + ipAddress);
-            logger(AREA, DEBUG, "Set the base address");
+        currentJob = new Job();
+        isLive = true;
+        deadRobotAlarmNotTriggered = true;
     }
 
-        /// <summary>
-        /// This sends an async API get request to the robot to fetch data at the specified uri
-        /// It does not return data straight away. This allows us to make a bunch of calls
-        /// For all of the robots and then wait for the data to get to us as it comes through.
-        /// </summary>
-        /// <param name="uri"></param>
-        /// <returns></returns>
-        public async Task<HttpResponseMessage> sendGetRequest(string uri)
+    /// <summary>
+    /// Instantiate with connection details
+    /// </summary>
+    /// <param name="id"></param>
+    public Robot(int id)
+    {
+        this.id = id;
+        plcRobotID = id + 1; // The PLC Uses Robot 0 as a spare while it's used for us so we need to offset by 1 
+
+        fetchConnectionDetails();
+
+        Registers = new List<Register>(new Register[200]);
+        s = new Status();
+        schedule = new Scheduler();
+        currentJob = new Job();
+        isLive = true;
+        deadRobotAlarmNotTriggered = true;
+    }
+
+    /// <summary>
+    /// For when we're fetching the details from the database
+    /// </summary>
+    /// <param name="ipAddress"></param>
+    /// <param name="authValue"></param>
+    public Robot(string ipAddress, AuthenticationHeaderValue authValue)
+    {
+        this.ipAddress = ipAddress;
+        this.authValue = authValue;
+
+        Registers = new List<Register>(new Register[200]);
+        s = new Status();
+        FireAlarm = new FireAlarms();
+        Group = new RobotGroup();
+        schedule = new Scheduler();
+
+        Missions = new List<Mission>(new Mission[80]);
+        currentJob = new Job();
+
+        for (int i = 0; i < 80; i++)
         {
-            formConnection();
-            return await comms.GetAsync(getBaseURI() + uri);
+            Missions[i] = new Mission();
         }
 
-        /// <summary>
-        /// Send a REST Request, either Post, Put or DELETE
-        /// </summary>
-        /// <param name="request"></param>
-        /// <returns></returns>
-        public int sendRESTdata(HttpRequestMessage request)
+        isLive = true;
+        deadRobotAlarmNotTriggered = true;
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    public void fetchConnectionDetails()
+    {
+        string apiUsername, apiPassword;
+
+        if (resumingSession)
         {
-            formConnection();
+            // We're resuming an existing session so fetch the robot connection details from a database
+            string query = "SELECT IP, AUTH FROM robot WHERE ROBOT_ID =" + id;
+            var getRobotData = new MySqlCommand(query, db);
 
-            int statusCode = 0;
+            using (MySqlDataReader reader = getRobotData.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    ipAddress = reader.GetString("IP");
+                    authValue = new AuthenticationHeaderValue("Basic", reader.GetString("AUTH"));
+                }
+            }
+        }
+        else
+        {
+            // We've got a new session so input the details manually in the terminal
+            // Firstm fetch the details
 
+            Console.WriteLine("Please Enter The IP Address Of The Robot No " + id + ":");
+            ipAddress = Console.ReadLine();
+            // TODO: Check that the input is correct - length & type
+
+            Console.WriteLine("Enter API Username:");
+            apiUsername = Console.ReadLine();
+
+            Console.WriteLine("Enter API Password:");
+            apiPassword = Console.ReadLine();
+
+            // Basic Auth type for the API. Set up as follows: BASE64( username: sha256(pass) )
+            // So, first get sha256 of the pass, Concat to "username:" and then do base64 conversion
+            authValue = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes($"{apiUsername}:{ComputeSha256Hash(apiPassword)}")));
+
+            logger(AREA, DEBUG, authValue.ToString());
+
+            // Store the data in the DB
+            //string query = "REPLACE INTO robot (`ROBOT_ID`, `IP`, `AUTH`) VALUES ('" + id + "', '" + ipAddress + "', '" + Convert.ToBase64String(Encoding.UTF8.GetBytes($"{apiUsername}:{ComputeSha256Hash(apiPassword)}")) + "');";
+            //Globals.issueInsertQuery(query);
+
+            // Change the App.config setting so that we load an existing config next time
+            //Globals.AddUpdateAppSettings("resumingSession", "true");
+        }
+    }
+
+    /// <summary>
+    /// Private cause we're only using it to get the Hash
+    /// Within the Robot class. Should really salt it if we're 
+    /// Storing it within a DB
+    /// </summary>
+    /// <param name="rawData"></param>
+    /// <returns></returns>
+    private string ComputeSha256Hash(string rawData)
+    {
+        // Create a SHA256   
+        using (SHA256 sha256Hash = SHA256.Create())
+        {
+            // ComputeHash - returns byte array  
+            byte[] bytes = sha256Hash.ComputeHash(Encoding.UTF8.GetBytes(rawData));
+
+            // Convert byte array to a string   
+            StringBuilder builder = new StringBuilder();
+
+            for (int i = 0; i < bytes.Length; i++)
+            {
+                builder.Append(bytes[i].ToString("x2"));
+            }
+
+            return builder.ToString();
+        }
+    }
+
+    /// <summary>
+    /// Fetch base uri used for.
+    /// </summary>
+    /// <returns></returns>
+    public string getBaseURI()
+    {
+        return "http://" + ipAddress + "/api/v2.0.0/";
+    }
+
+    /// <summary>
+    /// Forms a connection with a robot.
+    /// </summary>
+    public void formConnection()
+    {
+        //setUpDefaultComms();
+
+        //comms.BaseAddress = new Uri("http://" + ipAddress + "/api/v2.0.0/"); //-> hhtpClient is a singleton so we can only set the defaults once
+
+        comms.DefaultRequestHeaders.Authorization = authValue; // This might cause problems if we're using many robots with different auth strings
+
+        logger(AREA, DEBUG, "The IP is: " + ipAddress);
+        logger(AREA, DEBUG, "Set the base address");
+    }
+
+    /// <summary>
+    /// This sends an async API get request to the robot to fetch data at the specified uri
+    /// It does not return data straight away. This allows us to make a bunch of calls
+    /// For all of the robots and then wait for the data to get to us as it comes through.
+    /// </summary>
+    /// <param name="uri"></param>
+    /// <returns></returns>
+    public async Task<HttpResponseMessage> sendGetRequest(string uri)
+    {
+        formConnection();
+
+        HttpResponseMessage temp;
+
+        if(isLive)
+        {
+            try
+            {
+                return await comms.GetAsync(getBaseURI() + uri);
+            }
+            catch (HttpRequestException e)
+            {
+                string warning, robot_details;
+
+                if(id == fleetID)
+                {
+                    warning = "Fleet Manager";
+                    robot_details = "Fleet Manager has IP of " + ipAddress;
+                }
+                else
+                {
+                    warning = " Robot " + id;
+                    robot_details = "Robot Name: " + s.robot_name + " IP: " + ipAddress;
+                }
+
+                logger(AREA, WARNING, "Lost REST Connection To " + warning);
+                logger(AREA, WARNING, "Please check that it's still powered-on and connected to the WiFi");
+                logger(AREA, WARNING, robot_details);
+                deadRobotAlarm();
+            }
+            catch (System.IO.IOException e)
+            {
+                logger(AREA, WARNING, "Lost REST Connection To Robot " + id);
+                logger(AREA, WARNING, "Please check that the robot is still powered-on and connected to the WiFi");
+                logger(AREA, WARNING, "Robot Name: " + s.robot_name + " IP: " + ipAddress);
+                deadRobotAlarm();
+            }
+            catch (Exception e)
+            {
+                logger(AREA, ERROR, "Failed To Get REST Data For Robot " + id);
+                logger(AREA, ERROR, "Exception in Robot.sendGetRequest: ", e);
+                deadRobotAlarm();
+            }
+
+            temp = new HttpResponseMessage();
+        }
+        else
+        {
+            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Inhibiting GET Requests");
+            logger(AREA, WARNING, "Returning Empty Response");
+
+            temp = new HttpResponseMessage();
+        }
+
+        return temp;
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <returns></returns>
+    public async void CheckConnection(Stopwatch timer)
+    {
+        formConnection();
+
+        string uri = "status";
+
+        try
+        {
+            timer.Start();
+            HttpResponseMessage result = await comms.GetAsync(getBaseURI() + uri, _cts.Token);
+
+            if (result.IsSuccessStatusCode)
+            {
+                isLive = true;
+                // clear the alarm
+                clearDeadRobotAlarm();
+                timer.Reset();
+            }
+        }
+        catch (TaskCanceledException e)
+        {
+            // We need to swallow the task cancelled exception
+            // It's not a real error as we're the ones killing the task
+        }
+        catch (System.Net.Http.HttpRequestException e)
+        {
+            logger(AREA, WARNING, "The Target Robot Actively Refused A Connection - Robot.CheckConnection() Function");
+        }
+        catch (Exception e)
+        {
+            logger(AREA, ERROR, "Failed to check REST Connection");
+            logger(AREA, ERROR, "Exception in Robot.checkConnection(): ", e);
+        }
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    public void killConnectionCheckRequest(Stopwatch timer)
+    {
+        logger(AREA, INFO, "Killing The Connectivity Check REST Request - the timer elapsed: " + timer.Elapsed.TotalMilliseconds + " ms");
+
+        _cts.Cancel();
+        _cts = new CancellationTokenSource();
+        timer.Reset();
+    }
+
+
+    public void deadRobotAlarm()
+    {
+        isLive = false;
+
+        string area = "MiR/Fleet Connection";
+        string name = "Robot " + s.robot_name + ", Serial Number: " + s.serial_number + ", ID: " + id + " Lost Connection To AMR-Connect";
+
+        try
+        {
+            MySqlCommand cmd = new MySqlCommand();
+            cmd.Connection = db;
+            cmd.CommandText = "rising_edge_alarm";
+            cmd.CommandType = CommandType.StoredProcedure;
+
+            cmd.Parameters.AddWithValue("@ALARM_AREA", area);
+            cmd.Parameters["@ALARM_AREA"].Direction = ParameterDirection.Input;
+
+            cmd.Parameters.AddWithValue("@ALARM_TEXT", name);
+            cmd.Parameters["@ALARM_TEXT"].Direction = ParameterDirection.Input;
+
+            cmd.Parameters.Add("@LID", MySqlDbType.Int32);
+            cmd.Parameters["@LID"].Direction = ParameterDirection.Output;
+
+            cmd.ExecuteNonQuery();
+            alarm_id = (int)cmd.Parameters["@LID"].Value;
+
+            deadRobotAlarmNotTriggered = false;
+            cmd.Dispose();
+        }
+        catch (Exception exception)
+        {
+            logger(AREA, ERROR, "MySQL Query Error: ", exception);
+        }
+    }
+
+    public void clearDeadRobotAlarm()
+    {
+        MySqlCommand cmd = new MySqlCommand("falling_edge_alarm");
+
+        try
+        {
+            cmd.CommandType = CommandType.StoredProcedure;
+            cmd.Parameters.Add(new MySqlParameter("LID", alarm_id));
+            issueQuery(cmd);
+        }
+        catch (Exception exception)
+        {
+            cmd.Dispose();
+            logger(AREA, ERROR, "MySQL Query Error: ", exception);
+        }
+
+        deadRobotAlarmNotTriggered = true;
+    }
+
+    /// <summary>
+    /// Send a REST Request, either Post, Put or DELETE
+    /// </summary>
+    /// <param name="request"></param>
+    /// <returns></returns>
+    public int sendRESTdata(HttpRequestMessage request)
+    {
+        formConnection();
+
+        int statusCode = 0;
+
+        if (isLive)
+        {
             try
             {
                 HttpResponseMessage result = comms.SendAsync(request).Result;
@@ -283,7 +450,7 @@ public class Robot
                         statusCode = Globals.TaskStatus.FatalError;
                     }
                 }
-                else if((int)result.StatusCode == 409)
+                else if ((int)result.StatusCode == 409)
                 {
                     logger(AREA, INFO, "Robot Already Moved out of the group");
                     statusCode = Globals.TaskStatus.CompletedNoErrors;
@@ -300,9 +467,14 @@ public class Robot
             {
                 logger(AREA, ERROR, "Failed to decode send REST request: ", exception);
             }
-
-            return statusCode;
         }
+        else
+        {
+            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Robot Groups");
+        }
+
+        return statusCode;
+    }
 
     /// <summary>
     /// Sends a mission schedule, either to a robot (through fleet) or to the fleet.
@@ -316,65 +488,69 @@ public class Robot
 
         int statusCode = 0;
 
-        try
+        if (isLive)
         {
-            HttpResponseMessage result = comms.SendAsync(request).Result;
-
-            logger(AREA, DEBUG, "Status Code: " + result.StatusCode);
-
-            if (result.IsSuccessStatusCode)
+            try
             {
-                logger(AREA, INFO, "Status Code: ");
+                HttpResponseMessage result = comms.SendAsync(request).Result;
 
-                statusCode = (int)result.StatusCode;
+                logger(AREA, DEBUG, "Status Code: " + result.StatusCode);
 
-                logger(AREA, INFO, "Status Code: ");
-
-                schedule = JsonConvert.DeserializeObject<Scheduler>(result.Content.ReadAsStringAsync().Result);
-                schedule.working_response = true;
-
-                if (result.StatusCode.ToString() == "BadRequest")
+                if (result.IsSuccessStatusCode)
                 {
-                    logger(AREA, DEBUG, "Bad Request - Failed to process");
-                    statusCode = Globals.TaskStatus.CouldntProcessRequest;
+                    statusCode = (int)result.StatusCode;
+
+                    logger(AREA, INFO, "REST Status Code: ");
+
+                    schedule = JsonConvert.DeserializeObject<Scheduler>(result.Content.ReadAsStringAsync().Result);
+                    schedule.working_response = true;
+
+                    if (result.StatusCode.ToString() == "BadRequest")
+                    {
+                        logger(AREA, DEBUG, "Bad Request - Failed to process");
+                        statusCode = Globals.TaskStatus.CouldntProcessRequest;
+                    }
+                    else if (statusCode == 409)
+                    {
+                        logger(AREA, INFO, "Robot Already Moved out of the group");
+                        statusCode = Globals.TaskStatus.CompletedNoErrors;
+                    }
+                    else if ((statusCode > 199 && statusCode < 400) || result.StatusCode == System.Net.HttpStatusCode.OK)
+                    {
+                        logger(AREA, DEBUG, "Data Sent Successfully");
+                        statusCode = Globals.TaskStatus.CompletedNoErrors;
+                    }
+                    else if (statusCode > 399)
+                    {
+                        logger(AREA, DEBUG, "Data send did not succeed");
+                        statusCode = Globals.TaskStatus.CouldntProcessRequest;
+                    }
+                    else
+                    {
+                        logger(AREA, DEBUG, "Unknown Error");
+                        statusCode = Globals.TaskStatus.FatalError;
+                    }
                 }
-                else if (statusCode == 409)
+                else if ((int)result.StatusCode == 409)
                 {
                     logger(AREA, INFO, "Robot Already Moved out of the group");
                     statusCode = Globals.TaskStatus.CompletedNoErrors;
                 }
-                else if ((statusCode > 199 && statusCode < 400) || result.StatusCode == System.Net.HttpStatusCode.OK)
-                {
-                    logger(AREA, DEBUG, "Data Sent Successfully");
-                    statusCode = Globals.TaskStatus.CompletedNoErrors;
-                }
-                else if (statusCode > 399)
-                {
-                    logger(AREA, DEBUG, "Data send did not succeed");
-                    statusCode = Globals.TaskStatus.CouldntProcessRequest;
-                }
                 else
                 {
-                    logger(AREA, DEBUG, "Unknown Error");
-                    statusCode = Globals.TaskStatus.FatalError;
+                    logger(AREA, DEBUG, "Bad Request - Failed to process");
+                    statusCode = Globals.TaskStatus.CouldntProcessRequest;
+                    schedule.working_response = false;
                 }
             }
-            else if ((int)result.StatusCode == 409)
+            catch (Exception exception)
             {
-                logger(AREA, INFO, "Robot Already Moved out of the group");
-                statusCode = Globals.TaskStatus.CompletedNoErrors;
-            }
-            else
-            {
-                logger(AREA, DEBUG, "Bad Request - Failed to process");
-                statusCode = Globals.TaskStatus.CouldntProcessRequest;
-
-                schedule.working_response = false;
+                logger(AREA, ERROR, "Failed to decode send REST request: ", exception);
             }
         }
-        catch (Exception exception)
+        else
         {
-            logger(AREA, ERROR, "Failed to decode send REST request: ", exception);
+            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Robot Groups");
         }
 
         return statusCode;
@@ -387,9 +563,11 @@ public class Robot
     /// </summary>
     /// <param name="response"></param>
     public void saveSoftwareLogs(HttpResponseMessage response)
-        {
-            logger(AREA, DEBUG, "==== Saving Software Logs ====");
+    {
+        logger(AREA, DEBUG, "==== Saving Software Logs ====");
 
+        if (isLive)
+        {
             try
             {
                 SoftwareLogs = JsonConvert.DeserializeObject<List<SoftwareLog>>(response.Content.ReadAsStringAsync().Result);
@@ -403,38 +581,47 @@ public class Robot
             {
                 logger(AREA, ERROR, "Failed to decode JSON data: ", exception);
                 logger(AREA, ERROR, response.Content.ReadAsStringAsync().Result);
+                deadRobotAlarm();
             }
 
             logger(AREA, DEBUG, "==== Finished Saving Software Logs ====");
         }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="response"></param>
-        public void saveRobotGroup(HttpResponseMessage response)
+        else if(deadRobotAlarmNotTriggered)
         {
-            logger(AREA, DEBUG, "==== Saving Robot Group Data ====");
+            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Robot Groups");
+        }
+    }
 
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="response"></param>
+    public void saveRobotGroup(HttpResponseMessage response)
+    {
+        logger(AREA, DEBUG, "==== Saving Robot Group Data ====");
+
+        if (isLive)
+        {
             try
             {
                 Group = JsonConvert.DeserializeObject<RobotGroup>(response.Content.ReadAsStringAsync().Result);
 
                 Group.print();
-
-/*                for (int i = 0; i < SoftwareLogs.Count; i++)
-                {
-                    SoftwareLogs[i].saveToDB(id);
-                }*/
             }
             catch (Exception exception)
             {
                 logger(AREA, ERROR, "Failed to decode JSON data: ", exception);
                 logger(AREA, ERROR, response.Content.ReadAsStringAsync().Result);
+                deadRobotAlarm();
             }
 
             logger(AREA, DEBUG, "==== Finished Saving Software Logs ====");
         }
+        else if(deadRobotAlarmNotTriggered)
+        {
+            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Robot Groups");
+        }
+    }
 
 
     /// <summary>
@@ -442,9 +629,10 @@ public class Robot
     /// </summary>
     /// <param name="response"></param>
     public void saveMaps(HttpResponseMessage response)
+    {
+        logger(AREA, DEBUG, "==== Saving Maps ====");
+        if (isLive)
         {
-            logger(AREA, DEBUG, "==== Saving Maps ====");
-
             try
             {
                 Maps = JsonConvert.DeserializeObject<List<Map>>(response.Content.ReadAsStringAsync().Result);
@@ -468,19 +656,27 @@ public class Robot
             {
                 logger(AREA, ERROR, "Failed to decode JSON data: ", exception);
                 logger(AREA, ERROR, response.Content.ReadAsStringAsync().Result);
+                deadRobotAlarm();
             }
 
             logger(AREA, DEBUG, "==== Finished Saving Maps ====");
         }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="response"></param>
-        public void saveSettings(HttpResponseMessage response)
+        else if (deadRobotAlarmNotTriggered)
         {
-            logger(AREA, DEBUG, "==== Saving Robot Settings ====");
+            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Robot Groups");
+        }
+    }
 
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="response"></param>
+    public void saveSettings(HttpResponseMessage response)
+    {
+        logger(AREA, DEBUG, "==== Saving Robot Settings ====");
+
+        if (isLive)
+        {
             try
             {
                 Settings = JsonConvert.DeserializeObject<List<Setting>>(response.Content.ReadAsStringAsync().Result);
@@ -495,19 +691,27 @@ public class Robot
             {
                 logger(AREA, ERROR, "Failed to decode JSON data: ", exception);
                 logger(AREA, ERROR, response.Content.ReadAsStringAsync().Result);
+                deadRobotAlarm();
             }
 
             logger(AREA, DEBUG, "==== Finished Saving Settings ====");
         }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="response"></param>
-        public void saveStatus(HttpResponseMessage response)
+        else if (deadRobotAlarmNotTriggered)
         {
-            logger(AREA, DEBUG, "==== Saving Status Data ====");
+            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Settings");
+        }
+    }
 
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="response"></param>
+    public void saveStatus(HttpResponseMessage response)
+    {
+        logger(AREA, DEBUG, "==== Saving Status Data ====");
+
+        if (isLive)
+        {
             try
             {
                 s = JsonConvert.DeserializeObject<Status>(response.Content.ReadAsStringAsync().Result);
@@ -519,48 +723,64 @@ public class Robot
             {
                 logger(AREA, ERROR, "Failed to decode JSON data: ", exception);
                 logger(AREA, ERROR, response.Content.ReadAsStringAsync().Result);
+                deadRobotAlarm();
             }
 
             logger(AREA, DEBUG, "==== Finished Saving Status ====");
         }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="response"></param>
-        public void saveMissions(HttpResponseMessage response)
+        else if (deadRobotAlarmNotTriggered)
         {
-            logger(AREA, DEBUG, "==== Saving Missions ====");
+            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Status");
+        }
+    }
 
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="response"></param>
+    public void saveMissions(HttpResponseMessage response)
+    {
+        logger(AREA, DEBUG, "==== Saving Missions ====");
+
+        if (isLive)
+        {
             try
             {
                 Missions = JsonConvert.DeserializeObject<List<Mission>>(response.Content.ReadAsStringAsync().Result);
 
-            logger(AREA, DEBUG, "no of missions is: " + Missions.Count);
+                logger(AREA, DEBUG, "no of missions is: " + Missions.Count);
 
                 for (int i = 0; i < Missions.Count; i++)
                 {
                     Missions[i].saveToDB(id, i);
-                    Missions[i].print();       
+                    Missions[i].print();
                 }
             }
             catch (Exception exception)
             {
                 logger(AREA, ERROR, "Failed to decode JSON data: ", exception);
                 logger(AREA, ERROR, response.Content.ReadAsStringAsync().Result);
+                deadRobotAlarm();
             }
 
             logger(AREA, DEBUG, "==== Finished Saving Missions ====");
         }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="response"></param>
-        public void saveStatusInMemory(HttpResponseMessage response)
+        else if (deadRobotAlarmNotTriggered)
         {
-            logger(AREA, DEBUG, "==== Saving Status In Memory ====");
+            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Missions");
+        }
+    }
 
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="response"></param>
+    public void saveStatusInMemory(HttpResponseMessage response)
+    {
+        logger(AREA, DEBUG, "==== Saving Status In Memory ====");
+
+        if (isLive)
+        {
             try
             {
                 s = JsonConvert.DeserializeObject<Status>(response.Content.ReadAsStringAsync().Result);
@@ -569,8 +789,14 @@ public class Robot
             {
                 logger(AREA, ERROR, "Failed to decode JSON data: ", exception);
                 logger(AREA, ERROR, response.Content.ReadAsStringAsync().Result);
+                deadRobotAlarm();
             }
         }
+        else if (deadRobotAlarmNotTriggered)
+        {
+            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Status");
+        }
+    }
 
 
     /// <summary>
@@ -581,27 +807,8 @@ public class Robot
     {
         logger(AREA, DEBUG, "==== Saving Registers ====");
 
-        try
+        if (isLive)
         {
-            Registers = JsonConvert.DeserializeObject<List<Register>>(response.Content.ReadAsStringAsync().Result);
-        }
-        catch (Exception exception)
-        {
-            logger(AREA, ERROR, "Failed to decode JSON data: ", exception);
-            logger(AREA, ERROR, response.Content.ReadAsStringAsync().Result);
-        }
-
-        logger(AREA, DEBUG, "==== Finished Saving Registers ====");
-    }
-
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <param name="response"></param>
-    public void saveRegisters(HttpResponseMessage response)
-        {
-            logger(AREA, DEBUG, "==== Saving Registers ====");
-
             try
             {
                 Registers = JsonConvert.DeserializeObject<List<Register>>(response.Content.ReadAsStringAsync().Result);
@@ -610,38 +817,71 @@ public class Robot
             {
                 logger(AREA, ERROR, "Failed to decode JSON data: ", exception);
                 logger(AREA, ERROR, response.Content.ReadAsStringAsync().Result);
+                deadRobotAlarm();
             }
 
-        // Now save registers to DB (from memory)
-        //logger(AREA, INFO, "Saving The Registers In The DB");
-
-        try
-        {
-            MySqlCommand cmd = new MySqlCommand();
-            cmd.Connection = db;
-            cmd.CommandText = "store_12_registers";
-            cmd.CommandType = CommandType.StoredProcedure;
-
-            cmd.Parameters.AddWithValue("@ROBOT_ID", id);
-            cmd.Parameters["@ROBOT_ID"].Direction = ParameterDirection.Input;
-            
-            string param = "";
-
-            for (int regNo = 0; regNo < maxRegister; regNo++)
-            {
-                param = "@REG" + (regNo + 1);
-                cmd.Parameters.AddWithValue(param, Registers[regNo].value);
-                cmd.Parameters[param].Direction = ParameterDirection.Input;
-            }
-
-            cmd.ExecuteNonQuery();
-            cmd.Dispose();
+            logger(AREA, DEBUG, "==== Finished Saving Registers ====");
         }
-        catch (Exception exception)
+        else if (deadRobotAlarmNotTriggered)
         {
-            logger(AREA, ERROR, "MySQL Query Error: ", exception);
-        }
-
-        logger(AREA, DEBUG, "==== Finished Saving Registers ====");
+            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Registers");
         }
     }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="response"></param>
+    public void saveRegisters(HttpResponseMessage response)
+    {
+        logger(AREA, DEBUG, "==== Saving Registers ====");
+
+        if (isLive)
+        {
+            try
+            {
+                Registers = JsonConvert.DeserializeObject<List<Register>>(response.Content.ReadAsStringAsync().Result);
+            }
+            catch (Exception exception)
+            {
+                logger(AREA, ERROR, "Failed to decode JSON data: ", exception);
+                logger(AREA, ERROR, response.Content.ReadAsStringAsync().Result);
+                deadRobotAlarm();
+            }
+
+            // Now save registers to DB (from memory)
+            try
+            {
+                MySqlCommand cmd = new MySqlCommand();
+                cmd.Connection = db;
+                cmd.CommandText = "store_12_registers";
+                cmd.CommandType = CommandType.StoredProcedure;
+
+                cmd.Parameters.AddWithValue("@ROBOT_ID", id);
+                cmd.Parameters["@ROBOT_ID"].Direction = ParameterDirection.Input;
+
+                string param = "";
+
+                for (int regNo = 0; regNo < maxRegister; regNo++)
+                {
+                    param = "@REG" + (regNo + 1);
+                    cmd.Parameters.AddWithValue(param, Registers[regNo].value);
+                    cmd.Parameters[param].Direction = ParameterDirection.Input;
+                }
+
+                cmd.ExecuteNonQuery();
+                cmd.Dispose();
+            }
+            catch (Exception exception)
+            {
+                logger(AREA, ERROR, "MySQL Query Error: ", exception);
+            }
+
+            logger(AREA, DEBUG, "==== Finished Saving Registers ====");
+        }
+        else if (deadRobotAlarmNotTriggered)
+        {
+            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Registers");
+        }
+    }
+}
