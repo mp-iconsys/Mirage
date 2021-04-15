@@ -162,8 +162,6 @@ class Program
                 //====================================================|
                 readAlarms();
 
-                checkConveyors();
-
                 //====================================================|
                 // Fetch registers prior to checking mission status   |
                 //====================================================|
@@ -206,7 +204,6 @@ class Program
 
                 checkRESTConnectivity(robotDowntimeTimer);
 
-                calculationsAndReporting();
                 timer.Restart();
                 mirFleet.pollRobots();
             }
