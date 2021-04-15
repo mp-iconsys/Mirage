@@ -60,8 +60,8 @@ namespace Mirage
                 group[i] = new RobotGroup(); 
             }
 
-            available = new ChargingGroup(2, "FullCharge", "/v2.0.0/charging_groups/2");
-            busy = new ChargingGroup(3, "EmptyCharge", "/v2.0.0/charging_groups/3");
+            available = new ChargingGroup(1, "FullCharge", "/v2.0.0/charging_groups/1");
+            busy = new ChargingGroup(2, "EmptyCharge", "/v2.0.0/charging_groups/2");
 
             instantiateRobots(sizeOfFleet);
         }
@@ -82,8 +82,8 @@ namespace Mirage
             groups = new short[8] { 0, (short)sizeOfFleet, 0, 0, 0, 0, 0, 0 };
             logger(AREA, DEBUG, "Assigned Basics");
 
-            available = new ChargingGroup(2, "FullCharge", "/v2.0.0/charging_groups/2");
-            busy = new ChargingGroup(3, "EmptyCharge", "/v2.0.0/charging_groups/3");
+            available = new ChargingGroup(1, "FullCharge", "/v2.0.0/charging_groups/1");
+            busy = new ChargingGroup(2, "EmptyCharge", "/v2.0.0/charging_groups/2");
 
             instantiateRobots(sizeOfFleet, fleetManagerIP, fleetManagerAuthToken);
         }
@@ -865,60 +865,6 @@ namespace Mirage
 
             logger(AREA, INFO, "Obtained Advanced Settings");
             Thread.Sleep(waitPeriod);
-
-            // TODO: might need to be removed since we're creating them from scratch for the most part
-            if(false)
-            { 
-                try
-                {
-                    try
-                    {
-                        mirFleet.issueGetRequests("missions");
-                        mirFleet.saveMissionsAsync().Wait();
-                    }
-                    catch (HttpRequestException exception)
-                    {
-                        // TODO: Handle more exceptions
-                        // TODO: Remove the task which is causing the exception
-                        logger(AREA, ERROR, "HTTP Request Error. Couln't connect to the MiR robots.");
-                        logger(AREA, ERROR, "Check your network, dns settings, robot is up, etc. Error: ", exception);
-                    }
-                }
-                catch (Exception exception)
-                {
-                    logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
-                }
-
-                for (int i = 0; i < sizeOfFleet; i++)
-                {
-                    logger(AREA, DEBUG, "Robot " + i + " has live status of " + robots[i].isLive.ToString());
-                }
-
-                Thread.Sleep(waitPeriod);
-
-                // Get Missions for the fleet
-                try
-                {
-                    try
-                    {
-                        issueGetRequest("missions", fleetID);
-                        mirFleet.saveMissionsFleet().Wait();
-                        //mirFleet.fleetManager.saveMissionsAsync().Wait();
-                    }
-                    catch (HttpRequestException exception)
-                    {
-                        // TODO: Handle more exceptions
-                        // TODO: Remove the task which is causing the exception
-                        logger(AREA, ERROR, "HTTP Request Error. Couln't connect to the MiR robots.");
-                        logger(AREA, ERROR, "Check your network, dns settings, robot is up, etc. Error: ", exception);
-                    }
-                }
-                catch (Exception exception)
-                {
-                    logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
-                }
-            
-            }
 
             for (int i = 0; i < sizeOfFleet; i++)
             {

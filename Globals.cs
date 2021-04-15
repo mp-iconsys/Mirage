@@ -611,7 +611,7 @@ public static class Globals
                     //mirFleet.group[i] = new Mirage.rest.RobotGroup();
                     HttpRequestMessage tempReq = temp.postRequest(name, desc, allow_all, created_by);
 
-                    mirFleet.fleetManager.sendRESTdata(tempReq);
+                    //mirFleet.fleetManager.sendRESTdata(tempReq);
                     Thread.Sleep(50);
                 }
             }

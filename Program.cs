@@ -230,7 +230,7 @@ class Program
 
             logger(AREA, DEBUG, "==== Loop " + i + " Finished ====");
 
-            Thread.Sleep(100); // Remove in live deployment
+            Thread.Sleep(50); // Remove in live deployment
         }
 
         gracefulTermination();

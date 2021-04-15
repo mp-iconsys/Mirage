@@ -124,50 +124,17 @@ public class Robot
     /// </summary>
     public void fetchConnectionDetails()
     {
-        string apiUsername, apiPassword;
+        // We're resuming an existing session so fetch the robot connection details from a database
+        string query = "SELECT IP, AUTH FROM robot WHERE ROBOT_ID =" + id;
+        var getRobotData = new MySqlCommand(query, db);
 
-        if (resumingSession)
+        using (MySqlDataReader reader = getRobotData.ExecuteReader())
         {
-            // We're resuming an existing session so fetch the robot connection details from a database
-            string query = "SELECT IP, AUTH FROM robot WHERE ROBOT_ID =" + id;
-            var getRobotData = new MySqlCommand(query, db);
-
-            using (MySqlDataReader reader = getRobotData.ExecuteReader())
+            while (reader.Read())
             {
-                while (reader.Read())
-                {
-                    ipAddress = reader.GetString("IP");
-                    authValue = new AuthenticationHeaderValue("Basic", reader.GetString("AUTH"));
-                }
+                ipAddress = reader.GetString("IP");
+                authValue = new AuthenticationHeaderValue("Basic", reader.GetString("AUTH"));
             }
-        }
-        else
-        {
-            // We've got a new session so input the details manually in the terminal
-            // Firstm fetch the details
-
-            Console.WriteLine("Please Enter The IP Address Of The Robot No " + id + ":");
-            ipAddress = Console.ReadLine();
-            // TODO: Check that the input is correct - length & type
-
-            Console.WriteLine("Enter API Username:");
-            apiUsername = Console.ReadLine();
-
-            Console.WriteLine("Enter API Password:");
-            apiPassword = Console.ReadLine();
-
-            // Basic Auth type for the API. Set up as follows: BASE64( username: sha256(pass) )
-            // So, first get sha256 of the pass, Concat to "username:" and then do base64 conversion
-            authValue = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes($"{apiUsername}:{ComputeSha256Hash(apiPassword)}")));
-
-            logger(AREA, DEBUG, authValue.ToString());
-
-            // Store the data in the DB
-            //string query = "REPLACE INTO robot (`ROBOT_ID`, `IP`, `AUTH`) VALUES ('" + id + "', '" + ipAddress + "', '" + Convert.ToBase64String(Encoding.UTF8.GetBytes($"{apiUsername}:{ComputeSha256Hash(apiPassword)}")) + "');";
-            //Globals.issueInsertQuery(query);
-
-            // Change the App.config setting so that we load an existing config next time
-            //Globals.AddUpdateAppSettings("resumingSession", "true");
         }
     }
 
