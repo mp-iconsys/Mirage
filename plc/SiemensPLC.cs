@@ -1083,50 +1083,6 @@ class SiemensPLC
 
             for (int robotID = 0; robotID < sizeOfFleet; robotID++)
             {
-                // Used to be: if (robots[robotID].getPLCTaskStatus() == TaskStatus.PlcIdle)
-                // Changed to: if (robots[robotID].getPLCTaskStatus() == TaskStatus.PlcIdle && robots[robotID].getTaskStatus() != TaskStatus.PlcIdle)
-                // This should only write to the PLC on the falling edge
-                // Can't be too smart as we need to make sure we overwrite the mission status to 0 when it completes the mission
-                if (robots[robotID].getPLCTaskStatus() == TaskStatus.PlcIdle && (robots[robotID].getTaskStatus() != TaskStatus.PlcIdle))
-                {
-                    logger(AREA, INFO, "Resetting Task And Mission Status To 0 (Idle) For Robot : " + robotID);
-
-                    // This should already be 0 from the read we did at the top
-                    mirFleet.robots[robotID].schedule.state_id = TaskStatus.Idle;
-                    robots[robotID].setTaskStatus(TaskStatus.Idle);
-
-                    // Added as new feature:
-                    mirFleet.robots[robotID].schedule.id = 0;
-
-                    // TODO: Uncommented for now - check if it needs to be uncommented on 06/04/2021
-                    // robotMemoryToPLC(robotID);
-                    // writeRobotBlock(robotID);
-                }
-                else if (robots[robotID].getPLCTaskStatus() == TaskStatus.PlcIdle && (mirFleet.robots[robotID].schedule.state_id == TaskStatus.CompletedNoErrors))
-                {
-                    mirFleet.robots[robotID].schedule.state_id = TaskStatus.Idle;
-                    robots[robotID].setTaskStatus(TaskStatus.Idle);
-                    //mirFleet.robots[robotID].schedule.state_id = TaskStatus.Idle;
-
-                    //updateTaskStatus(robotID, TaskStatus.Idle);
-
-                    // TODO: not needed since we write to PLC at the end anyway?
-                    robotMemoryToPLC(robotID);
-                    //writeRobotBlock(robotID);
-                }
-                else if (robots[robotID].getPLCTaskStatus() == TaskStatus.PlcIdle && mirFleet.robots[robotID].schedule.state_id == TaskStatus.CouldntProcessRequest)
-                {
-                    mirFleet.robots[robotID].schedule.state_id = TaskStatus.Idle;
-                    robots[robotID].setTaskStatus(TaskStatus.Idle);
-                    //mirFleet.robots[robotID].schedule.state_id = TaskStatus.Idle;
-
-                    //updateTaskStatus(robotID, TaskStatus.Idle);
-
-                    // TODO: not needed since we write to PLC at the end anyway?
-                    robotMemoryToPLC(robotID);
-                    //writeRobotBlock(robotID);
-                }
-
                 // If PLC is Idle AND:
                 // - Our Task Status is not idle
                 // - Or Our Mission Status is either complete or failed
@@ -1236,6 +1192,76 @@ class SiemensPLC
         logger(AREA, DEBUG, "Completed Reading PLC Alarms");
     }
 
+
+    public static void checkConveyors()
+    {
+        logger(AREA, DEBUG, "Reading Conveyor Status");
+        int conveyorBlockSize = plcAlarms.conveyorBlockSize;
+        int conveyorOffset = plcAlarms.conveyorOffset;
+
+        if (plcConnected)
+        {
+            int memoryres;
+            byte[] memoryBuffer = new byte[conveyorBlockSize];
+
+            try
+            {
+                taskControlDB = 19;
+
+                // readBytes(Area, Data Block Number (in PLC), Start Byte, Length, Byte Container)
+                memoryres = dc.readBytes(daveDB, taskControlDB, conveyorOffset, conveyorBlockSize, memoryBuffer);
+
+                //=========================================================|
+                //  Memoryres - return code from Libnodave:                |
+                //    0 - Obtained Data                                    |
+                //  < 0 - Error detected by Libnodave                      |
+                //  > 0 - Error from the PLC                               |
+                //=========================================================|
+                if (memoryres == 0)
+                {
+                    logger(AREA, DEBUG, BitConverter.ToString(memoryBuffer));
+
+                    int alarmPosition = 0;
+
+                    BitArray myBA = new BitArray(memoryBuffer);
+
+                    for (int a = 0; a < myBA.Count; a++)
+                    {
+                        logger(AREA, DEBUG, "Bit " + a + " Has Value: " + myBA[a].ToString());
+                        plcAlarms.conveyor_array[a].triggered = myBA[a];
+                    }
+
+                    plcAlarms.checkConveyorStatus();
+                }
+                else
+                {
+                    logger(AREA, ERROR, "Failed to Poll PLC For Alarms");
+                    logger(AREA, ERROR, daveStrerror(memoryres));
+                    restartConnection();
+                }
+            }
+            catch (NullReferenceException exception)
+            {
+                logger(AREA, WARNING, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
+                logger(AREA, WARNING, "Trying To Establish Connection Again");
+                restartConnection();
+            }
+            catch (Exception exception)
+            {
+                logger(AREA, ERROR, "PLC Polling Failed. Error : ", exception);
+                restartConnection();
+            }
+        }
+        else
+        {
+            logger(AREA, ERROR, "Cannot Read Alarms As the PLC is Not Connected");
+            restartConnection();
+        }
+
+        logger(AREA, DEBUG, "Completed Reading PLC Alarms");
+    }
+
+
     /// <summary>
     /// Tries to reconnect to a PLC if the connection drops. 
     /// If it does, and connectivity counter is below 15, it sends an email alert.
@@ -1291,6 +1317,7 @@ class SiemensPLC
     {
         logger(AREA, DEBUG, "Updating PLC Watchdog");
 
+        // TODO: pull these off of a DB and make configurable
         int memoryres = 1;
         int watchdogSize = 2;
         int watchdogMaxValue = 32767;

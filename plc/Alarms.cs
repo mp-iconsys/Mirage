@@ -15,9 +15,16 @@ namespace Mirage.plc
         //=========================================================|
         private static readonly Type AREA = typeof(Alarms);
 
+        //=========================================================|
+        // TODO: fetch these from the database                     |
+        //=========================================================|
         public int alarmOffset = 424;
         public int alarmBlockSize = 22;
         public Alarm[] alarm_array = new Alarm[176];
+
+        public int conveyorOffset = 460;
+        public int conveyorBlockSize = 1;
+        public Alarm[] conveyor_array = new Alarm[8];
 
         public Alarms()
         {
@@ -209,6 +216,9 @@ namespace Mirage.plc
 "14",
 "15" };
 
+
+            string[] conveyorName = { "UKL", "D7a", "HTR1", "HTR3", "MLA", "HTR4", "HTR7", "HTR9" };
+
             int x = 0;
 
             for (x = 0; x < 176; x++)
@@ -243,6 +253,15 @@ namespace Mirage.plc
                     alarm_array[i].area = "Sequence Errors";
                 }
             }
+       
+            for(int c = 0; c < 8; c++)
+            {
+                conveyor_array[c] = new Alarm();
+                conveyor_array[c].old_triggered = true;
+                conveyor_array[c].triggered = true;
+                conveyor_array[c].id = c;
+                conveyor_array[c].area = conveyorName[c];
+            }
         }
 
         public void printAllAlarms()
@@ -262,17 +281,43 @@ namespace Mirage.plc
                     if (alarm_array[i].triggered && !alarm_array[i].old_triggered)
                     {
                         // Rising Edge on the alarm
-                        logger(AREA, INFO, alarm_array[i].area + " -- " + alarm_array[i].name + " Rising Edge");
+                        logger(AREA, INFO, alarm_array[i].area + " - " + alarm_array[i].name + " Rising Edge");
                         alarm_array[i].old_triggered = true;
                         alarm_array[i].saveRisingEdgeToDB();
                     }
                     else if (!alarm_array[i].triggered && alarm_array[i].old_triggered)
                     {
                         // Falling Edge on the alarm
-                        logger(AREA, INFO, alarm_array[i].area + " -- " + alarm_array[i].name + " Falling Edge");
+                        logger(AREA, INFO, alarm_array[i].area + " - " + alarm_array[i].name + " Falling Edge");
                         alarm_array[i].old_triggered = false;
                         alarm_array[i].saveFallingEdgeToDB();
                         alarm_array[i].id = 0;
+                    }
+                }
+            }
+        }
+
+        public void checkConveyorStatus()
+        {
+            if (SiemensPLC.plcConnected)
+            {
+                for (int i = 0; i < conveyorBlockSize * 8; i++)
+                {
+                    if (conveyor_array[i].triggered && !conveyor_array[i].old_triggered)
+                    {
+                        // Conveyor has returned to health
+                        conveyor_array[i].name = "Conveyor Returned To Health";
+                        logger(AREA, INFO, conveyor_array[i].area + " - " + conveyor_array[i].name + " Rising Edge");
+                        conveyor_array[i].old_triggered = true;
+                        conveyor_array[i].updateConveyorStatus(1);
+                    }
+                    else if (!conveyor_array[i].triggered && conveyor_array[i].old_triggered)
+                    {
+                        // Conveyor has encountered a fault
+                        conveyor_array[i].name = "Conveyor Encountered A Fault";
+                        logger(AREA, INFO, conveyor_array[i].area + " - " + conveyor_array[i].name + " Falling Edge");
+                        conveyor_array[i].old_triggered = false;
+                        conveyor_array[i].updateConveyorStatus(0);
                     }
                 }
             }
@@ -350,6 +395,24 @@ namespace Mirage.plc
                 }
             }
 
+            public void updateConveyorStatus(int status)
+            {
+                MySqlCommand cmd = new MySqlCommand("update_conveyor_status");
+
+                try
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.Add(new MySqlParameter("ID", id));
+                    cmd.Parameters.Add(new MySqlParameter("NAME", area));
+                    cmd.Parameters.Add(new MySqlParameter("STATUS", status));
+                    issueQuery(cmd);
+                }
+                catch (Exception exception)
+                {
+                    cmd.Dispose();
+                    logger(AREA, ERROR, "MySQL Query Error: ", exception);
+                }
+            }
         }
     }
 }

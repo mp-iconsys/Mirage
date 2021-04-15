@@ -107,6 +107,8 @@ public static class Globals
     /// </summary>
     public static void readAllSettings()
     {
+        Console.WriteLine("Starting AMR Connect");
+
         // Begins logging to the console and file
         try
         {
