@@ -239,7 +239,18 @@ class Program
         gracefulTermination();
     }
 
+    /// <summary>
+    /// 
+    /// </summary>
+    private static void clearDB()
+    {
 
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="timer"></param>
     private static void checkRESTConnectivity(Stopwatch timer)
     {
         logger(AREA, DEBUG, "Checking REST Connections");
