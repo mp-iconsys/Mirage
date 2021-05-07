@@ -745,8 +745,17 @@ public static class Globals
 
         mirFleet.getFleetRobotIDs();
 
+        if (resumingSession == false)
+        {
+            string sql = "UPDATE app_config SET `Value` = 'false' WHERE ID = 4;";
+            using var cmd = new MySqlCommand(sql, db);
+            using MySqlDataReader rdr = cmd.ExecuteReader();
+        }
+
         logger(AREA, INFO, "Finished Fleet Initialization");
     }
+
+
 
     /// <summary>
     /// Copies the data from Mirage internal memory to PLC buffer

@@ -263,7 +263,7 @@ namespace Mirage.rest
             payload += "\"description\": \"" + description + "\", ";
             payload += "\"hidden:\": " + hidden + ", ";
             payload += "\"group_id\": \"" + group_id + "\", ";
-            payload += "\"session_id\": \"7198db1f - 0474 - 11ea - 84a7 - 0001298f8a0a\", ";
+            payload += "\"session_id\": \"d5f1a18c-5c9b-11eb-b046-0001297b48fe\", ";
             payload += "\"created_by\": \"" + created_by + "\"}";
 
             logger(AREA, DEBUG, payload);
@@ -291,7 +291,7 @@ namespace Mirage.rest
             payload += "\"description\": \"" + description + "\", ";
             payload += "\"hidden:\": " + hidden + ", ";
             payload += "\"group_id\": \"" + group_id + "\", ";
-            payload += "\"session_id\": \"7198db1f-0474-11ea-84a7-0001298f8a0a\", ";
+            payload += "\"session_id\": \"d8e00995-5cce-11eb-8114-0001297b4ab6\", ";
             payload += "\"created_by\": \"" + created_by_id + "\"}";
 
             logger(AREA, DEBUG, payload);
