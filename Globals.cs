@@ -39,7 +39,7 @@ public static class Globals
     //  Helper Variables                                       |
     //=========================================================|
     public const int fleetID = 666;
-    public const int PLCMissionOffset = 301;
+    public const int PLCMissionOffset = 1;
 
     //=========================================================|
     //  Used For Logging & Debugging                           |     
