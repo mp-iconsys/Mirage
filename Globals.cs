@@ -121,11 +121,11 @@ public static class Globals
             Console.WriteLine(exception);
         }
 
-        Console.WriteLine("Config File Loaded");
+/*        Console.WriteLine("Config File Loaded");
         Console.WriteLine("Waiting 10 secs For MySQL Server to start");
 
         Thread.Sleep(10000);
-
+*/
         try
         {
             connectToDB();

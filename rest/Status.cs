@@ -38,6 +38,10 @@ namespace Mirage.rest
         public string state_text { get; set; }
         public string unloaded_map_changes { get; set; }
 
+        public int code { get; set; }
+        public string description { get; set; }
+        public string module { get; set; }
+
 
         public List<string> allowed_methods { get; set; }
         public Position position { get; set; }
@@ -76,6 +80,10 @@ namespace Mirage.rest
             session_id = "0";
             state_text = "0";
             unloaded_map_changes = "0";
+
+            code = 0;
+            description = "0";
+            module = "0";
 
             position = new Position();
             velocity = new Velocity();
@@ -161,7 +169,7 @@ namespace Mirage.rest
                 cmd.Parameters.Add(new MySqlParameter("VELOCITY_LIN", velocity.linear));
                 cmd.Parameters.Add(new MySqlParameter("VELOCITY_ANG", velocity.angular));
 
-                if (errors.Count > 0)
+                if(code != 0)
                 {
                     cmd.Parameters.Add(new MySqlParameter("ERROR_CODE", errors[0].code));
                     cmd.Parameters.Add(new MySqlParameter("ERROR_DESCRIPTION", errors[0].description));
@@ -173,6 +181,19 @@ namespace Mirage.rest
                     cmd.Parameters.Add(new MySqlParameter("ERROR_DESCRIPTION", DBNull.Value));
                     cmd.Parameters.Add(new MySqlParameter("ERROR_MODULE", DBNull.Value));
                 }
+
+/*                if (errors.Count > 0)
+                {
+                    cmd.Parameters.Add(new MySqlParameter("ERROR_CODE", errors[0].code));
+                    cmd.Parameters.Add(new MySqlParameter("ERROR_DESCRIPTION", errors[0].description));
+                    cmd.Parameters.Add(new MySqlParameter("ERROR_MODULE", errors[0].module));
+                }
+                else
+                {
+                    cmd.Parameters.Add(new MySqlParameter("ERROR_CODE", DBNull.Value));
+                    cmd.Parameters.Add(new MySqlParameter("ERROR_DESCRIPTION", DBNull.Value));
+                    cmd.Parameters.Add(new MySqlParameter("ERROR_MODULE", DBNull.Value));
+                }*/
 
                 cmd.Parameters.Add(new MySqlParameter("MAP_GUID", map_id));
                 cmd.Parameters.Add(new MySqlParameter("MODE_ID", mode_id));

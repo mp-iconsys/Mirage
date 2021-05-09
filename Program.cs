@@ -179,7 +179,8 @@ class Program
                 //====================================================|
                 for (int k = 0; k < sizeOfFleet; k++)
                 {
-                    getRobotStatus(k);
+                    // Removed cause connection is unreliable 2021-05-07
+                    //getRobotStatus(k);
 
                     getRobotStatusFromFleet(k);
 
@@ -575,13 +576,15 @@ class Program
                     }
                     else if (mirFleet.robots[r].schedule.state == "Done")
                     {
+                        mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.CompletedNoErrors;
+                        mirFleet.robots[r].schedule.id = 0;
+                        mirFleet.robots[r].currentJob.finishMission();
+
                         // Used to be else if (mirFleet.robots[r].schedule.state == "Done")
                         // Potentially remove this condition as the dock prox checks are now done inside MiRs
-                        if ((int)(mirFleet.robots[r].Registers[2].value) == 1)
+/*                        if ((int)(mirFleet.robots[r].Registers[2].value) == 1)
                         {
-                            mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.CompletedNoErrors;
-                            mirFleet.robots[r].schedule.id = 0;
-                            mirFleet.robots[r].currentJob.finishMission();
+
                         }
                         else if(robots[r].getTaskParameter() == 353)
                         {
@@ -591,10 +594,10 @@ class Program
                         }
                         else
                         {
-                            mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.CouldntProcessRequest;
+                            mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.CompletedNoErrors;
                             mirFleet.robots[r].schedule.id = 0;
                             mirFleet.robots[r].currentJob.finishMission();
-                        }
+                        }*/
                     }
                     else
                     {
