@@ -25,8 +25,34 @@ class Program
 
         logger(AREA, INFO, "==== Starting Main Loop ====");
 
-        long i = 0;
+        var t = new Thread(PLCWatchdog);
+        t.Name = "PLC Watchdog";
+        t.Priority = ThreadPriority.BelowNormal;
+        t.Start();
 
+        var thread2 = new Thread(Main_Loop);
+        thread2.Name = "Main";
+        thread2.Priority = ThreadPriority.AboveNormal;
+        thread2.Start();
+
+        //====================================================|
+        //  M A I N      L O O P                              |
+        //====================================================|
+
+
+        //gracefulTermination();
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    private static void clearDB()
+    {
+
+    }
+
+    public static void Main_Loop()
+    {
         // Used for saving data into DB
         Stopwatch timer = new Stopwatch();
         timer.Start();
@@ -38,12 +64,11 @@ class Program
         // Timer to check robot downtime
         Stopwatch robotDowntimeTimer = new Stopwatch();
 
-        //====================================================|
-        //  M A I N      L O O P                              |
-        //====================================================|
+        long i = 0;
+
         while (keepRunning)
         {
-            logger(AREA, DEBUG, "==== Loop " + ++i + " Starting ====");
+            logger(AREA, INFO, "==== Loop " + ++i + " Starting ====");
 
             if (plcConnected)
             {
@@ -232,11 +257,29 @@ class Program
 
             Thread.Sleep(50); // Remove in live deployment
         }
-
-        gracefulTermination();
     }
 
+    private static void PLCWatchdog()
+    {
+        while (keepRunning)
+        {
+            updateWatchdog2();
+            Thread.Sleep(100);
+        }
+    }
 
+    /// <summary>
+    /// 
+    /// </summary>
+    private static void clearDB()
+    {
+
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="timer"></param>
     private static void checkRESTConnectivity(Stopwatch timer)
     {
         logger(AREA, DEBUG, "Checking REST Connections");

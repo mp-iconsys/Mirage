@@ -29,6 +29,7 @@ public static class Globals
     public static int sizeOfFleet;
     public static MySqlConnection db;
     public static MySqlConnection log_db;
+    public static MySqlConnection wtchdg_db;
     public static HttpClient comms;
     public static AuthenticationHeaderValue fleetManagerAuthToken;
     public static string fleetManagerIP;
@@ -180,6 +181,9 @@ public static class Globals
             log_db = new MySqlConnection(ConfigurationManager.ConnectionStrings["master"].ConnectionString);
             log_db.Open();
 
+            wtchdg_db = new MySqlConnection(ConfigurationManager.ConnectionStrings["master"].ConnectionString);
+            wtchdg_db.Open();
+
             logger(AREA, INFO, "Starting Mirage v0.18");
             logger(AREA, INFO, "Obtaining Settings");
             logger(AREA, INFO, "Connected To Master DB");
@@ -196,6 +200,9 @@ public static class Globals
 
                 log_db = new MySqlConnection(ConfigurationManager.ConnectionStrings["slave"].ConnectionString);
                 log_db.Open();
+
+                wtchdg_db = new MySqlConnection(ConfigurationManager.ConnectionStrings["master"].ConnectionString);
+                wtchdg_db.Open();
 
                 logger(AREA, INFO, "Connected To Slave DB");
                 sendSMS("Failed to connect to master database.");

@@ -26,6 +26,10 @@ class SiemensPLC
     private static daveInterface di;
     private static daveConnection dc;
 
+    private static daveOSserialType fds_watchdog;
+    private static daveInterface di_watchdog;
+    private static daveConnection dc_watchdog;
+
     //=========================================================|
     //  For S7-1200 and 1500, use rack = 0, slot = 1           |
     //  IP and port are fetched at initialization, from config |
@@ -393,6 +397,9 @@ class SiemensPLC
         {
             fds.rfd = openSocket(port, IP);
             fds.wfd = fds.rfd;
+
+            fds_watchdog.rfd = openSocket(port, IP);
+            fds_watchdog.wfd = fds_watchdog.rfd;
         }
         catch (Exception e)
         {
@@ -424,6 +431,21 @@ class SiemensPLC
                     plcConnectionErrors++;
                     plcConnected = false;
                 }
+
+                if (0 == dc_watchdog.connectPLC())
+                {
+                    logger(AREA, INFO, "Connected To The PLC");
+                    plcConnected = true;
+                    plcConnectionErrors = 0; // Reset counter on successfull connection
+                }
+                else
+                {
+                    logger(AREA, ERROR, "Failed To Connect. Trying again, with result " + dc_watchdog.connectPLC());
+                    logger(AREA, ERROR, daveStrerror(dc_watchdog.connectPLC()));
+
+                    plcConnectionErrors++;
+                    plcConnected = false;
+                }
             }
             catch (Exception e)
             {
@@ -438,6 +460,48 @@ class SiemensPLC
 
             plcConnectionErrors++;
             plcConnected = false;
+        }
+
+        if (fds_watchdog.rfd != IntPtr.Zero)
+        {
+            logger(AREA, DEBUG, "Socket Opened Successfully");
+
+            try
+            {
+                di_watchdog = new daveInterface(fds_watchdog, "IF1", 0, daveProtoISOTCP, daveSpeed187k);
+                di_watchdog.setTimeout(1000000);
+                dc_watchdog = new daveConnection(di_watchdog, 0, rack, slot);
+
+                if (0 == dc_watchdog.connectPLC())
+                {
+                    logger(AREA, INFO, "Connected To The PLC Via Watchdog Supervisor");
+                }
+                else
+                {
+                    logger(AREA, ERROR, "Failed To Connect To Watchdog Supervisor. Trying again, with result " + dc_watchdog.connectPLC());
+                    logger(AREA, ERROR, daveStrerror(dc_watchdog.connectPLC()));
+                }
+
+                if (0 == dc_watchdog.connectPLC())
+                {
+                    logger(AREA, INFO, "Connected To The PLC");
+                }
+                else
+                {
+                    logger(AREA, ERROR, "Failed To Connect. Trying again, with result " + dc_watchdog.connectPLC());
+                    logger(AREA, ERROR, daveStrerror(dc_watchdog.connectPLC()));
+                }
+            }
+            catch (Exception e)
+            {
+                logger(AREA, ERROR, "Failed To Connect To The PLC");
+                logger(AREA, ERROR, "Exception: ", e);
+            }
+        }
+        else
+        {
+            logger(AREA, ERROR, "Socket Failed To Open. DaveOSserialType is initialized to " + fds_watchdog.rfd);
+            logger(AREA, ERROR, daveStrerror(fds_watchdog.rfd.ToInt32()));
         }
 
         logger(AREA, DEBUG, "==== Established A Connection ====");
@@ -1305,7 +1369,7 @@ class SiemensPLC
             logger(AREA, DEBUG, "Connected To The PLC");
         }
 
-        updateWatchdog();
+        //updateWatchdog();
 
         logger(AREA, DEBUG, "PLC Connectivity Checked");
     }
@@ -1313,9 +1377,9 @@ class SiemensPLC
     /// <summary>
     /// Scans the PLC watchdog, iterates the number by 1 and writes back.
     /// </summary>
-    private static void updateWatchdog()
+    public static void updateWatchdog()
     {
-        logger(AREA, DEBUG, "Updating PLC Watchdog");
+        logger(AREA, INFO, "Updating PLC Watchdog");
 
         // TODO: pull these off of a DB and make configurable
         int memoryres = 1;
@@ -1424,12 +1488,126 @@ class SiemensPLC
         }
     }
 
+    /// <summary>
+    /// Scans the PLC watchdog, iterates the number by 1 and writes back.
+    /// </summary>
+    public static void updateWatchdog2()
+    {
+        logger(AREA, DEBUG, "Updating PLC Watchdog");
+
+        // TODO: pull these off of a DB and make configurable
+        int memoryres = 1;
+        int watchdogSize = 2;
+        int watchdogMaxValue = 32767;
+        byte[] memoryBuffer = new byte[watchdogSize];
+
+        //==========================================================|
+        // First, get the PLC Watchdog integer                      |
+        //==========================================================|
+        if (plcConnected)
+        {
+            try
+            {
+                memoryres = dc_watchdog.readBytes(daveDB, taskControlDB, watchdogFromPLCOffset, watchdogSize, memoryBuffer);
+
+                if (memoryres == 0)
+                {
+                    logger(AREA, DEBUG, BitConverter.ToString(memoryBuffer));
+
+                    if (BitConverter.IsLittleEndian)
+                    {
+                        Array.Reverse(memoryBuffer);
+                    }
+
+                    watchdogFromPLC = BitConverter.ToInt16(memoryBuffer);
+
+                    if (watchdogFromPLC <= watchdogMaxValue)
+                    {
+                        watchdogToPLC = watchdogFromPLC;
+                    }
+                    else
+                    {
+                        logger(AREA, WARNING, "PLC Watchdig Exceeded Maximum Value For Signed Int16. Resetting To 0");
+                        watchdogToPLC = 0;
+                    }
+
+                    updateWatchdogInDB(watchdogFromPLC);
+                    //logger(AREA, INFO, "Watchdog: " + watchdogFromPLC);
+                }
+                else
+                {
+                    logger(AREA, WARNING, "Failed to read PLC in SiemensPLC.updateWatchdog");
+                    logger(AREA, WARNING, daveStrerror(memoryres));
+
+                    restartConnection();
+                }
+            }
+            catch (NullReferenceException exception)
+            {
+                logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
+                //plcConnectionErrors++;
+                restartConnection();
+            }
+            catch (Exception exception)
+            {
+                logger(AREA, ERROR, "Polling Failed. Error : ", exception);
+                //plcConnectionErrors++;
+                restartConnection();
+            }
+
+            if (plcConnected)
+            {
+                memoryBuffer = BitConverter.GetBytes((short)watchdogToPLC);
+
+                if (BitConverter.IsLittleEndian)
+                {
+                    Array.Reverse(memoryBuffer);
+                }
+
+                logger(AREA, DEBUG, "Return Watchdog Parameter: " + BitConverter.ToString(memoryBuffer));
+
+                try
+                {
+                    int result = 999;
+
+                    result = dc_watchdog.writeBytes(daveDB, taskControlDB, watchdogToPLCOffset, watchdogSize, memoryBuffer);
+
+                    if (result != 0)
+                    {
+                        logger(AREA, ERROR, "Failed To Update Watchdog");
+                        logger(AREA, ERROR, daveStrerror(result));
+                        restartConnection();
+                    }
+                    else
+                    {
+                        logger(AREA, DEBUG, "Task Status Updated To " + status);
+                    }
+                }
+                catch (NullReferenceException exception)
+                {
+                    logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
+                    restartConnection();
+                }
+                catch (Exception exception)
+                {
+                    logger(AREA, ERROR, "Failed To Write To PLC. Exception: ", exception);
+                    restartConnection();
+                }
+            }
+        }
+        else
+        {
+            logger(AREA, ERROR, "Cannot Update PLC Watchdog As the PLC is Not Connected");
+        }
+    }
+
+
     private static void updateWatchdogInDB(int newWatchdog)
     {
         try
         {
             MySqlCommand cmd = new MySqlCommand();
-            cmd.Connection = db;
+            cmd.Connection = wtchdg_db;
             cmd.CommandText = "store_plc_watchdog";
             cmd.CommandType = CommandType.StoredProcedure;
 
