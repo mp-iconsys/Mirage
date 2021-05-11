@@ -309,7 +309,7 @@ namespace Mirage
                     //_ = g.Root.fleet_state;
 
                     // Robot Group is offset by 2 from the fleet robot group
-                    robots[robotID].s.robot_group_id = g.robot_group_id - 2;
+                    robots[robotID].s.robot_group_id = g.robot_group_id - robot_group_offset;
 
                     //robots[robotID].saveStatusInMemory(fleetResponseTask.Result);
 

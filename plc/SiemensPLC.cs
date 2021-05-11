@@ -397,9 +397,6 @@ class SiemensPLC
         {
             fds.rfd = openSocket(port, IP);
             fds.wfd = fds.rfd;
-
-            fds_watchdog.rfd = openSocket(port, IP);
-            fds_watchdog.wfd = fds_watchdog.rfd;
         }
         catch (Exception e)
         {
@@ -432,20 +429,6 @@ class SiemensPLC
                     plcConnected = false;
                 }
 
-                if (0 == dc_watchdog.connectPLC())
-                {
-                    logger(AREA, INFO, "Connected To The PLC");
-                    plcConnected = true;
-                    plcConnectionErrors = 0; // Reset counter on successfull connection
-                }
-                else
-                {
-                    logger(AREA, ERROR, "Failed To Connect. Trying again, with result " + dc_watchdog.connectPLC());
-                    logger(AREA, ERROR, daveStrerror(dc_watchdog.connectPLC()));
-
-                    plcConnectionErrors++;
-                    plcConnected = false;
-                }
             }
             catch (Exception e)
             {
@@ -460,48 +443,6 @@ class SiemensPLC
 
             plcConnectionErrors++;
             plcConnected = false;
-        }
-
-        if (fds_watchdog.rfd != IntPtr.Zero)
-        {
-            logger(AREA, DEBUG, "Socket Opened Successfully");
-
-            try
-            {
-                di_watchdog = new daveInterface(fds_watchdog, "IF1", 0, daveProtoISOTCP, daveSpeed187k);
-                di_watchdog.setTimeout(1000000);
-                dc_watchdog = new daveConnection(di_watchdog, 0, rack, slot);
-
-                if (0 == dc_watchdog.connectPLC())
-                {
-                    logger(AREA, INFO, "Connected To The PLC Via Watchdog Supervisor");
-                }
-                else
-                {
-                    logger(AREA, ERROR, "Failed To Connect To Watchdog Supervisor. Trying again, with result " + dc_watchdog.connectPLC());
-                    logger(AREA, ERROR, daveStrerror(dc_watchdog.connectPLC()));
-                }
-
-                if (0 == dc_watchdog.connectPLC())
-                {
-                    logger(AREA, INFO, "Connected To The PLC");
-                }
-                else
-                {
-                    logger(AREA, ERROR, "Failed To Connect. Trying again, with result " + dc_watchdog.connectPLC());
-                    logger(AREA, ERROR, daveStrerror(dc_watchdog.connectPLC()));
-                }
-            }
-            catch (Exception e)
-            {
-                logger(AREA, ERROR, "Failed To Connect To The PLC");
-                logger(AREA, ERROR, "Exception: ", e);
-            }
-        }
-        else
-        {
-            logger(AREA, ERROR, "Socket Failed To Open. DaveOSserialType is initialized to " + fds_watchdog.rfd);
-            logger(AREA, ERROR, daveStrerror(fds_watchdog.rfd.ToInt32()));
         }
 
         logger(AREA, DEBUG, "==== Established A Connection ====");

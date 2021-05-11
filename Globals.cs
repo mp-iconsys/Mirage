@@ -40,7 +40,12 @@ public static class Globals
     //  Helper Variables                                       |
     //=========================================================|
     public const int fleetID = 666;
-    public const int PLCMissionOffset = 1;
+    public const int PLCMissionOffset = 0;
+
+    public const int busy_group = 6;
+    public const int available_group = 5;
+    public const int offline_group = 4;
+    public const int robot_group_offset = 4;
 
     //=========================================================|
     //  Used For Logging & Debugging                           |     
@@ -619,7 +624,6 @@ public static class Globals
                     HttpRequestMessage tempReq = temp.postRequest(name, desc, allow_all, created_by);
 
                     //mirFleet.fleetManager.sendRESTdata(tempReq);
-                    Thread.Sleep(50);
                 }
             }
             catch (Exception e)
@@ -676,8 +680,6 @@ public static class Globals
                     logger(AREA, DEBUG, request.Content.ToString());
 
                     mirFleet.fleetManager.sendRESTdata(request);
-
-                    Thread.Sleep(50);
                 }
             }
             catch (Exception e)
@@ -734,7 +736,6 @@ public static class Globals
                     mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Missions[i].postRequest(true));
                 }
 
-                Thread.Sleep(50);
                 i++;
             }
 
@@ -771,7 +772,7 @@ public static class Globals
 
             for (int robotID = 0; robotID < sizeOfFleet; robotID++)
             {
-                robotsCurrentGroup = mirFleet.robots[robotID].s.robot_group_id;
+                robotsCurrentGroup = mirFleet.robots[robotID].s.robot_group_id - robot_group_offset;
 
                 if (robotsCurrentGroup == group)
                 {

@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using static SiemensPLC;
 using static Globals;
 using static Globals.DebugLevel;
+using System.Management;
 
 class Program
 {
@@ -25,22 +26,13 @@ class Program
 
         logger(AREA, INFO, "==== Starting Main Loop ====");
 
-        var t = new Thread(PLCWatchdog);
-        t.Name = "PLC Watchdog";
-        t.Priority = ThreadPriority.BelowNormal;
-        t.Start();
-
-        var thread2 = new Thread(Main_Loop);
-        thread2.Name = "Main";
-        thread2.Priority = ThreadPriority.AboveNormal;
-        thread2.Start();
+        Main_Loop();
 
         //====================================================|
         //  M A I N      L O O P                              |
         //====================================================|
 
-
-        //gracefulTermination();
+        gracefulTermination();
     }
 
     /// <summary>
@@ -68,7 +60,7 @@ class Program
 
         while (keepRunning)
         {
-            logger(AREA, INFO, "==== Loop " + ++i + " Starting ====");
+            logger(AREA, DEBUG, "==== Loop " + ++i + " Starting ====");
 
             if (plcConnected)
             {
@@ -255,9 +247,33 @@ class Program
 
             logger(AREA, DEBUG, "==== Loop " + i + " Finished ====");
 
-            Thread.Sleep(50); // Remove in live deployment
+            Thread.Sleep(10); // Remove in live deployment
         }
     }
+
+
+
+    private void Shutdown()
+    {
+        ManagementBaseObject mboShutdown = null;
+        ManagementClass mcWin32 = new ManagementClass("Win32_OperatingSystem");
+        mcWin32.Get();
+
+        // You can't shutdown without security privileges
+        mcWin32.Scope.Options.EnablePrivileges = true;
+        ManagementBaseObject mboShutdownParams =
+                 mcWin32.GetMethodParameters("Win32Shutdown");
+
+        // Flag 1 means we want to shut down the system. Use "2" to reboot.
+        mboShutdownParams["Flags"] = "2";
+        mboShutdownParams["Reserved"] = "0";
+        foreach (ManagementObject manObj in mcWin32.GetInstances())
+        {
+            mboShutdown = manObj.InvokeMethod("Win32Shutdown",
+                                           mboShutdownParams, null);
+        }
+    }
+
 
     private static void PLCWatchdog()
     {
@@ -266,14 +282,6 @@ class Program
             updateWatchdog2();
             Thread.Sleep(100);
         }
-    }
-
-    /// <summary>
-    /// 
-    /// </summary>
-    private static void clearDB()
-    {
-
     }
 
     /// <summary>
@@ -321,12 +329,14 @@ class Program
         if (robotID == fleetID)
         {
             // Offset the missions if in a busy group
-            if (robotGroup == 1 && mission_number != 100 && mission_number < 51)
+            if (robotGroup == busy_group && mission_number < 51)
             {
                 mission_number = mission_number + 50;
             }
 
             logger(AREA, INFO, "Mission For Fleet: Any Robot In The Appropriate Group");
+            logger(AREA, INFO, "PLC Mission Number: " + plcMissionNumber);
+            logger(AREA, INFO, "AMR Connect Mission Number: " + mission_number);
             logger(AREA, INFO, "PLC Mission No:" + plcMissionNumber + " : " + mirFleet.fleetManager.Missions[mission_number].name);
             mirFleet.fleetManager.Missions[mission_number].print();
 
@@ -344,13 +354,13 @@ class Program
             int fleetRobotID = mirFleet.robots[robotID].fleetRobotID;
 
             // Offset the missions if in a busy group
-            if (robotGroup == 1 && mission_number != 100 && mission_number < 51)
+            if (robotGroup == busy_group && mission_number < 51)
             {
                 mission_number = mission_number + 50;
             }
 
             logger(AREA, INFO, "Sending Mission To " + mirFleet.robots[robotID].s.robot_name);
-            logger(AREA, INFO, "That's AMR-C Robot: " + robotID + ", Fleet Robot: " + fleetRobotID + ", PLC Robot: " + mirFleet.robots[robotID].plcRobotID);
+            logger(AREA, DEBUG, "That's AMR-C Robot: " + robotID + ", Fleet Robot: " + fleetRobotID + ", PLC Robot: " + mirFleet.robots[robotID].plcRobotID);
             logger(AREA, INFO, "PLC Mission No:" + plcMissionNumber + " : " + mirFleet.fleetManager.Missions[mission_number].name);
             mirFleet.fleetManager.Missions[mission_number].print();
 
@@ -702,7 +712,7 @@ class Program
         // it will go back to the idle state.                               |
         // This makes it process the change in charging group               |
         //==================================================================|
-        sendMissionToScheduler(Tasks.ReleaseRobot, 1, robotID);
+        sendMissionToScheduler(101, 1, robotID);
 
         //==================================================================|
         // Put the robot into the available group. This enables it to       |
@@ -714,7 +724,7 @@ class Program
         //==================================================================|
         try
         {
-            sendRobotGroup(fleetRobotID, 3);
+            sendRobotGroup(fleetRobotID, available_group);
         }
         catch (Exception e)
         {
@@ -788,7 +798,7 @@ class Program
         try
         {
             // Available group has group id 3
-            sendRobotGroup(fleetRobotID, 4);
+            sendRobotGroup(fleetRobotID, busy_group);
         }
         catch (Exception e)
         {

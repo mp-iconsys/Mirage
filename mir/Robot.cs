@@ -107,10 +107,10 @@ public class Robot
         Group = new RobotGroup();
         schedule = new Scheduler();
 
-        Missions = new List<Mission>(new Mission[80]);
+        Missions = new List<Mission>(new Mission[120]);
         currentJob = new Job();
 
-        for (int i = 0; i < 80; i++)
+        for (int i = 0; i < 120; i++)
         {
             Missions[i] = new Mission();
         }
