@@ -329,7 +329,7 @@ class Program
         if (robotID == fleetID)
         {
             // Offset the missions if in a busy group
-            if (robotGroup == busy_group && mission_number < 51)
+            if (robotGroup == plc_busy_group && mission_number < 51)
             {
                 mission_number = mission_number + 50;
             }
@@ -354,7 +354,7 @@ class Program
             int fleetRobotID = mirFleet.robots[robotID].fleetRobotID;
 
             // Offset the missions if in a busy group
-            if (robotGroup == busy_group && mission_number < 51)
+            if (robotGroup == plc_busy_group && mission_number < 51)
             {
                 mission_number = mission_number + 50;
             }

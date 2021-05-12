@@ -42,6 +42,8 @@ public static class Globals
     public const int fleetID = 666;
     public const int PLCMissionOffset = 0;
 
+    public const int plc_busy_group = 2;
+    public const int plc_available_group = 1;
     public const int busy_group = 6;
     public const int available_group = 5;
     public const int offline_group = 4;
