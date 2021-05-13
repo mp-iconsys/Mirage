@@ -377,17 +377,24 @@ public class Robot
 
     public void clearDeadRobotAlarm()
     {
-        MySqlCommand cmd = new MySqlCommand("falling_edge_alarm");
+        logger(AREA, INFO, s.robot_name + " Is Back Online. Clearing Alarm : " + alarm_id);
 
         try
         {
-            cmd.CommandType = CommandType.StoredProcedure;
-            cmd.Parameters.Add(new MySqlParameter("LID", alarm_id));
-            issueQuery(cmd);
+            try
+            {
+                string sql = "CALL falling_edge_alarm(" + alarm_id + ");";
+                using var cmd6 = new MySqlCommand(sql, clear_alarms_db);
+                using MySqlDataReader rdr = cmd6.ExecuteReader();
+                cmd6.Dispose();
+            }
+            catch (Exception exception)
+            {
+                logger(AREA, ERROR, "Failed To Clear Alarm: ", exception);
+            }
         }
         catch (Exception exception)
         {
-            cmd.Dispose();
             logger(AREA, ERROR, "MySQL Query Error: ", exception);
         }
 
@@ -470,7 +477,7 @@ public class Robot
         }
         else
         {
-            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Robot Groups");
+            logger(AREA, WARNING, s.robot_name + " Is Not Live, Couldn't Fetch Robot Groups");
         }
 
         return statusCode;
@@ -550,7 +557,7 @@ public class Robot
         }
         else
         {
-            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Robot Groups");
+            logger(AREA, WARNING, s.robot_name + " Is Not Live, Couldn't Fetch Robot Groups");
         }
 
         return statusCode;
@@ -588,7 +595,7 @@ public class Robot
         }
         else if(deadRobotAlarmNotTriggered)
         {
-            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Robot Groups");
+            logger(AREA, WARNING, s.robot_name + " Is Not Live, Couldn't Fetch Robot Groups");
         }
     }
 
@@ -619,7 +626,7 @@ public class Robot
         }
         else if(deadRobotAlarmNotTriggered)
         {
-            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Robot Groups");
+            logger(AREA, WARNING, s.robot_name + " Is Not Live, Couldn't Fetch Robot Groups");
         }
     }
 
@@ -663,7 +670,7 @@ public class Robot
         }
         else if (deadRobotAlarmNotTriggered)
         {
-            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Robot Groups");
+            logger(AREA, WARNING, s.robot_name + " Is Not Live, Couldn't Fetch Robot Groups");
         }
     }
 
@@ -698,7 +705,7 @@ public class Robot
         }
         else if (deadRobotAlarmNotTriggered)
         {
-            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Settings");
+            logger(AREA, WARNING, s.robot_name + " Is Not Live, Couldn't Fetch Settings");
         }
     }
 
@@ -730,7 +737,7 @@ public class Robot
         }
         else if (deadRobotAlarmNotTriggered)
         {
-            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Status");
+            logger(AREA, WARNING, s.robot_name + " Is Not Live, Couldn't Fetch Status");
         }
     }
 
@@ -767,7 +774,7 @@ public class Robot
         }
         else if (deadRobotAlarmNotTriggered)
         {
-            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Missions");
+            logger(AREA, WARNING, s.robot_name + " Is Not Live, Couldn't Fetch Missions");
         }
     }
 
@@ -794,7 +801,7 @@ public class Robot
         }
         else if (deadRobotAlarmNotTriggered)
         {
-            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Status");
+            logger(AREA, WARNING, s.robot_name + " Is Not Live, Couldn't Fetch Status");
         }
     }
 
@@ -824,7 +831,7 @@ public class Robot
         }
         else if (deadRobotAlarmNotTriggered)
         {
-            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Registers");
+            logger(AREA, WARNING, s.robot_name + " Is Not Live, Couldn't Fetch Registers");
         }
     }
 
@@ -881,7 +888,7 @@ public class Robot
         }
         else if (deadRobotAlarmNotTriggered)
         {
-            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Registers");
+            logger(AREA, WARNING, s.robot_name + " Is Not Live, Couldn't Fetch Registers");
         }
     }
 }

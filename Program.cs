@@ -110,7 +110,7 @@ class Program
                         
                         if (newMsgs[robotMessage])
                         {
-                            logger(AREA, INFO, "Task For Robot: " + robotID);
+                            logger(AREA, INFO, "Task For " + mirFleet.robots[robotID].s.robot_name);
                             logger(AREA, INFO, "Task Number: " + robots[robotID].getTaskNumber());
                             logger(AREA, INFO, "Task Parameter: " + robots[robotID].getTaskParameter());
 
@@ -207,7 +207,7 @@ class Program
 
                 checkRESTConnectivity(robotDowntimeTimer);
 
-                calculationsAndReporting();
+                //calculationsAndReporting();
                 timer.Restart();
                 mirFleet.pollRobots();
             }
@@ -233,8 +233,6 @@ class Program
             printNewMessageStatus();
 
             logger(AREA, DEBUG, "==== Loop " + i + " Finished ====");
-
-            Thread.Sleep(100); // Remove in live deployment
         }
 
         gracefulTermination();
@@ -265,7 +263,7 @@ class Program
         {
             if(!mirFleet.robots[robotID].isLive)
             {
-                logger(AREA, INFO, "Checking Connection For Robot " + robotID);
+                logger(AREA, INFO, "Checking " + mirFleet.robots[robotID].s.robot_name + " Connection");
 
                 mirFleet.robots[robotID].CheckConnection(timer);
             }
@@ -323,6 +321,7 @@ class Program
                 mission_number = mission_number + 53;
             }
 
+            logger(AREA, INFO, "Mission Sent " + mirFleet.robots[robotID].s.robot_name);
             logger(AREA, INFO, "Mission Sent Directly To AMR-C Robot: " + robotID + ", Fleet Robot: " + fleetRobotID + ", PLC Robot: " + mirFleet.robots[robotID].plcRobotID);
             logger(AREA, INFO, "PLC Mission No:" + plcMissionNumber + " : " + mirFleet.fleetManager.Missions[mission_number].name);
             mirFleet.fleetManager.Missions[mission_number].print();
@@ -400,9 +399,6 @@ class Program
     private static void getRobotGroups()
     {
         logger(AREA, DEBUG, "Saving Robot Groups In Fleet PLC Block");
-
-        // Comment out for now - we're relying on keeping track of the groups ourselves
-        //int restStatus = mirFleet.issueGetRequest("robots?whitelist=robot_group_id", SiemensPLC.fleetID);
 
         fleetMemoryToPLC();
         SiemensPLC.writeFleetBlock(SiemensPLC.fleetBlock.getTaskStatus());
@@ -666,7 +662,7 @@ class Program
         int fleetRobotID = mirFleet.robots[robotID].fleetRobotID;
         int waitTime = 50;
 
-        logger(AREA, INFO, "Releasing Robot " + robotID + " (Fleet ID: " + fleetRobotID + ") From The Busy Group");
+        logger(AREA, INFO, "Releasing " + mirFleet.robots[robotID].s.robot_name +  " From The Busy Group");
 
         //======================================================================|
         // In case the release robot command is driven by a sequence break:     |
@@ -743,7 +739,7 @@ class Program
         }
         catch(Exception e)
         {
-            logger(AREA, ERROR, "Failed To Put Robot Into Available Group");
+            logger(AREA, ERROR, "Failed To Put " + mirFleet.robots[robotID].s.robot_name + " Into Available Group");
             logger(AREA, ERROR, "Exception: ", e);
         }
 
@@ -764,7 +760,7 @@ class Program
         int taskStat;
         int fleetRobotID = mirFleet.robots[robotID].fleetRobotID;
 
-        logger(AREA, INFO, "Releasing Robot " + fleetRobotID + " (Fleet ID: " + fleetRobotID + ") From Busy Charging Group");
+        logger(AREA, INFO, "Occupying " + mirFleet.robots[robotID].s.robot_name + " -> Moving To Busy Group");
 
         // Sending a delete request
         restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.available.deleteRequest(fleetRobotID));

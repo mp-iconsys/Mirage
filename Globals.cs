@@ -29,6 +29,7 @@ public static class Globals
     public static int sizeOfFleet;
     public static MySqlConnection db;
     public static MySqlConnection log_db;
+    public static MySqlConnection clear_alarms_db;
     public static HttpClient comms;
     public static AuthenticationHeaderValue fleetManagerAuthToken;
     public static string fleetManagerIP;
@@ -121,11 +122,6 @@ public static class Globals
             Console.WriteLine(exception);
         }
 
-/*        Console.WriteLine("Config File Loaded");
-        Console.WriteLine("Waiting 10 secs For MySQL Server to start");
-
-        Thread.Sleep(10000);
-*/
         try
         {
             connectToDB();
@@ -167,6 +163,11 @@ public static class Globals
             mirFleet = new Fleet(sizeOfFleet);
         }
 
+        //=========================================================|
+        //  Clear Existing Alarms                                  |     
+        //=========================================================|
+        clearAlarms();
+
         logger(AREA, DEBUG, "Settings Obtained");
     }
 
@@ -185,6 +186,9 @@ public static class Globals
             log_db = new MySqlConnection(ConfigurationManager.ConnectionStrings["master"].ConnectionString);
             log_db.Open();
 
+            clear_alarms_db = new MySqlConnection(ConfigurationManager.ConnectionStrings["master"].ConnectionString);
+            clear_alarms_db.Open();
+
             logger(AREA, INFO, "Starting Mirage v0.18");
             logger(AREA, INFO, "Obtaining Settings");
             logger(AREA, INFO, "Connected To Master DB");
@@ -201,6 +205,9 @@ public static class Globals
 
                 log_db = new MySqlConnection(ConfigurationManager.ConnectionStrings["slave"].ConnectionString);
                 log_db.Open();
+
+                clear_alarms_db = new MySqlConnection(ConfigurationManager.ConnectionStrings["slave"].ConnectionString);
+                clear_alarms_db.Open();
 
                 logger(AREA, INFO, "Connected To Slave DB");
                 sendSMS("Failed to connect to master database.");
@@ -574,6 +581,22 @@ public static class Globals
         }
 
         logger(AREA, DEBUG, "==== SMS Alert Sent ====");
+    }
+
+    public static void clearAlarms()
+    {
+        try
+        {
+            string sql = "UPDATE alarms a SET END = NOW() WHERE END IS NULL;";
+            using var cmd = new MySqlCommand(sql, db);
+            using MySqlDataReader rdr = cmd.ExecuteReader();
+
+            logger(AREA, INFO, "Cleared Old Alarms");
+        }
+        catch (Exception exception)
+        {
+            logger(AREA, ERROR, "Failed To Clear Alarms: ", exception);
+        }
     }
 
     /// <summary>

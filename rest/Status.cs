@@ -42,7 +42,6 @@ namespace Mirage.rest
         public string description { get; set; }
         public string module { get; set; }
 
-
         public List<string> allowed_methods { get; set; }
         public Position position { get; set; }
         public List<ErrorsItem> errors { get; set; } // Try without a list
@@ -171,9 +170,9 @@ namespace Mirage.rest
 
                 if(code != 0)
                 {
-                    cmd.Parameters.Add(new MySqlParameter("ERROR_CODE", errors[0].code));
-                    cmd.Parameters.Add(new MySqlParameter("ERROR_DESCRIPTION", errors[0].description));
-                    cmd.Parameters.Add(new MySqlParameter("ERROR_MODULE", errors[0].module));
+                    cmd.Parameters.Add(new MySqlParameter("ERROR_CODE", code));
+                    cmd.Parameters.Add(new MySqlParameter("ERROR_DESCRIPTION", description));
+                    cmd.Parameters.Add(new MySqlParameter("ERROR_MODULE", module));
                 }
                 else
                 {
