@@ -1077,7 +1077,12 @@ class SiemensPLC
             {
                 logger(AREA, INFO, "Resetting Task Status And Fleet Return Parameter To 0 (Idle) From " + fleetBlock.getTaskStatus());
 
+                // New mods to enable proper flushing of the fleet control word
+                mirFleet.fleetManager.schedule.id = 0;
+                mirFleet.fleetManager.schedule.robot_id = 0;
                 mirFleet.returnParameter = 0;
+                mirFleet.fleetManager.schedule.working_response = false;
+                mirFleet.fleetManager.schedule.print_working_response = true;
                 updateTaskStatus(fleetID, TaskStatus.Idle);
             }
 

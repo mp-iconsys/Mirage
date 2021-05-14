@@ -154,8 +154,8 @@ namespace Mirage.rest
             string url = url_base + id + "/robots";
             Uri uri = new Uri(url);
 
-            logger(AREA, INFO, payload);
-            logger(AREA, INFO, url);
+            logger(AREA, DEBUG, payload);
+            logger(AREA, DEBUG, url);
 
             HttpRequestMessage request = new HttpRequestMessage
             {

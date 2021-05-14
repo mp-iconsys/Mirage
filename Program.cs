@@ -17,11 +17,7 @@ class Program
     {
         readAllSettings();
 
-        mirFleet.getFleetRobotIDs();
-
         initializeFleet();
-
-        mirFleet.getInitialFleetData();
 
         logger(AREA, INFO, "==== Starting Main Loop ====");
 
@@ -144,7 +140,6 @@ class Program
                             }
 
                             updateTaskStatus(robotID, taskStatus);
-                            //SiemensPLC.writeRobotBlock(j, taskStatus);
 
                             newMsgs[robotMessage] = false;
                         }
@@ -181,6 +176,10 @@ class Program
                 {
                     // Removed cause connection is unreliable 2021-05-07
                     //getRobotStatus(k);
+                    if(wifiScanEnabled)
+                    {
+                        // Take WiFi Network scans here
+                    }
 
                     getRobotStatusFromFleet(k);
 
@@ -226,6 +225,8 @@ class Program
             checkConfigChanges();
 
             checkPLCReset();
+
+            mirFleet.saveFleetRegistersAsync();
 
             //====================================================|
             // For Debug Purposes                                 |
@@ -301,7 +302,6 @@ class Program
 
             logger(AREA, INFO, "Mission For Fleet: Any Robot In The Available Group");
             logger(AREA, INFO, "PLC Mission No:" + plcMissionNumber + " : " + mirFleet.fleetManager.Missions[mission_number].name);
-            mirFleet.fleetManager.Missions[mission_number].print();
 
             //======================================================|
             // If successfull, this returns Schedule ID and         |
@@ -310,7 +310,9 @@ class Program
             // assignment to see what robot was assigned            |
             //======================================================|
             restStatus = mirFleet.fleetManager.sendScheduleRequest(mirFleet.fleetManager.Missions[mission_number].postRequest());
+
             mirFleet.fleetManager.schedule.mission_number = mission_number;
+            mirFleet.fleetManager.schedule.plc_mission_number = plcMissionNumber;
         }
         else
         {
@@ -321,10 +323,8 @@ class Program
                 mission_number = mission_number + 53;
             }
 
-            logger(AREA, INFO, "Mission Sent " + mirFleet.robots[robotID].s.robot_name);
-            logger(AREA, INFO, "Mission Sent Directly To AMR-C Robot: " + robotID + ", Fleet Robot: " + fleetRobotID + ", PLC Robot: " + mirFleet.robots[robotID].plcRobotID);
+            logger(AREA, INFO, "Mission Sent To " + mirFleet.robots[robotID].s.robot_name);
             logger(AREA, INFO, "PLC Mission No:" + plcMissionNumber + " : " + mirFleet.fleetManager.Missions[mission_number].name);
-            mirFleet.fleetManager.Missions[mission_number].print();
 
             if(mission_number == (Tasks.ReleaseRobot - PLCMissionOffset))
             {
@@ -335,8 +335,8 @@ class Program
                 restStatus = mirFleet.robots[robotID].sendScheduleRequest(mirFleet.fleetManager.Missions[mission_number].postRequest(fleetRobotID));
             }
 
-            //restStatus = mirFleet.robots[robotID].sendScheduleRequest(mirFleet.fleetManager.Missions[mission_number].postRequest(fleetRobotID));
             mirFleet.robots[robotID].schedule.mission_number = mission_number;
+            mirFleet.robots[robotID].schedule.plc_mission_number = plcMissionNumber;
 
             logger(AREA, INFO, "The Schedule ID IS: " + mirFleet.robots[robotID].schedule.id);
 
@@ -377,13 +377,29 @@ class Program
     /// </summary>
     private static int sendRobotGroup(int robotID, int robotGroupID)
     {
-        logger(AREA, INFO, "==== Send (Change) Robot Group To Scheduler ====");
+        string group_name = "";
 
-        //int robotID = 1;
-        //int robotGroupID = 2;
+        if(robotGroupID == mirFleet.fleet_available_group)
+        {
+            group_name = "Available Group (ID: " + robotGroupID + ")";
+        }
+        else if(robotGroupID == mirFleet.fleet_busy_group)
+        {
+            group_name = "Busy Group (ID: " + robotGroupID + ")";
+        }
+        else if(robotGroupID == mirFleet.fleet_offline_group)
+        {
+            group_name = "Offline Group (ID: " + robotGroupID + ")";
+        }
+        else
+        {
+            group_name = "Unknown Group With ID: " + robotGroupID;
+        }
 
-        // Need to add whether to turn alarm on/off and which alarm to affect from PLC
-        int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Group.putRequest(robotID, robotGroupID));
+        logger(AREA, INFO, mirFleet.robots[robotID].s.robot_name + " Is Changing Robot Group To -> " + group_name);
+
+        int fleetRobotID = mirFleet.robots[robotID].fleetRobotID;
+        int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Group.putRequest(fleetRobotID, robotGroupID));
 
         //SiemensPLC.updateTaskStatus(restStatus);
         logger(AREA, DEBUG, "Status: " + restStatus);
@@ -448,25 +464,29 @@ class Program
             int currentMissionRobot = 0;
             int restStatus = 0;
 
-            logger(AREA, INFO, "Current Scheduler Fleet Robot ID is: " + mirFleet.fleetManager.schedule.robot_id);
-            logger(AREA, INFO, "Current Mission Schedule ID is: " + mirFleet.fleetManager.schedule.id);
+            if(mirFleet.fleetManager.schedule.print_working_response)
+            { 
+                logger(AREA, INFO, "Waiting To Assign Robot For Mission " + mirFleet.fleetManager.schedule.plc_mission_number + " : " + mirFleet.fleetManager.Missions[mirFleet.fleetManager.schedule.mission_number].name);
+                mirFleet.fleetManager.schedule.print_working_response = false;
+            }
+            //logger(AREA, INFO, "Current Scheduler Fleet Robot ID is: " + mirFleet.fleetManager.schedule.robot_id);
+            //logger(AREA, INFO, "Current Mission Schedule ID is: " + mirFleet.fleetManager.schedule.id);
 
             restStatus = mirFleet.issueGetRequest("mission_scheduler/" + mirFleet.fleetManager.schedule.id, fleetID);
 
-            logger(AREA, DEBUG, "Mission Scheduler Robot ID After polling is: " + mirFleet.fleetManager.schedule.robot_id);
+            //logger(AREA, DEBUG, "Mission Scheduler Robot ID After polling is: " + mirFleet.fleetManager.schedule.robot_id);
 
             if (restStatus == Globals.TaskStatus.CompletedNoErrors && mirFleet.fleetManager.schedule.robot_id != 0)
             {
-                logger(AREA, INFO, "It Took Fleet " + robotAssignment.Elapsed.TotalSeconds + " Seconds To Find An Available Robot");
                 robotAssignment.Stop();
-
-                //currentMissionRobot = mirFleet.fleetManager.schedule.robot_id - 3; // TODO: This is as the robots are offset by one in fleet - change to be better
 
                 currentMissionRobot = mirFleet.getInternalRobotID(mirFleet.fleetManager.schedule.robot_id);
 
                 mirFleet.returnParameter = (short)(mirFleet.robots[currentMissionRobot].plcRobotID);
 
-                logger(AREA, INFO, "Mission " + mirFleet.fleetManager.schedule.id + " Has A New Robot (Mirage: " + currentMissionRobot + ", Fleet: " + mirFleet.fleetManager.schedule.robot_id + ")");
+                //logger(AREA, INFO, "Mission " + mirFleet.fleetManager.schedule.id + " Has A New Robot (Mirage: " + currentMissionRobot + ", Fleet: " + mirFleet.fleetManager.schedule.robot_id + ")");
+                logger(AREA, INFO, "Mission " + mirFleet.fleetManager.schedule.plc_mission_number + ": " + mirFleet.fleetManager.Missions[mirFleet.fleetManager.schedule.mission_number].name + " Was Assigned To " + mirFleet.robots[currentMissionRobot].s.robot_name);
+                logger(AREA, INFO, "It Took Fleet " + robotAssignment.Elapsed.TotalSeconds + " Seconds To Assign A Robot");
 
                 mirFleet.robots[currentMissionRobot].schedule.id = mirFleet.fleetManager.schedule.id;
 
@@ -479,11 +499,13 @@ class Program
                 mirFleet.robots[currentMissionRobot].currentJob.startJob(mission_number, mirFleet.fleetManager.Missions[mission_number].name);
 
                 mirFleet.fleetManager.schedule.working_response = false;
+                mirFleet.fleetManager.schedule.print_working_response = true;
             }
             else
             {
                 restStatus = Globals.TaskStatus.StartedProcessing;
                 mirFleet.fleetManager.schedule.working_response = true;
+                mirFleet.fleetManager.schedule.print_working_response = false;
             }
 
             SiemensPLC.writeFleetBlock(restStatus);
@@ -508,19 +530,21 @@ class Program
                 || fleetBlock.getPLCTaskStatus() != Globals.TaskStatus.Idle 
                 || mirFleet.robots[r].schedule.state_id != Globals.TaskStatus.Idle))
             {
+                
                 // Check the status of the mission assigned to robot r
-                logger(AREA, INFO, "==== Robot ID: " + r + " And Mission Scheduler Robot ID is: " + mirFleet.robots[r].fleetRobotID + " ====");
-                logger(AREA, INFO, "Mission Schedule ID is: " + mirFleet.robots[r].schedule.id);
+                //logger(AREA, INFO, "==== Robot ID: " + r + " And Mission Scheduler Robot ID is: " + mirFleet.robots[r].fleetRobotID + " ====");
+                //logger(AREA, INFO, "Mission Schedule ID is: " + mirFleet.robots[r].schedule.id);
 
                 restStatus = mirFleet.checkMissionSchedule("mission_scheduler/" + mirFleet.robots[r].schedule.id + "?whilelist=state", fleetID, r);
 
-                logger(AREA, INFO, "Mission Status For Robot: " + r + " is: " + mirFleet.robots[r].schedule.state);
-
-                if(robots[r].getTaskParameter() == 351 || robots[r].getTaskParameter() == 352)
+                if(mirFleet.robots[r].schedule.state != mirFleet.robots[r].schedule.old_state)
                 {
-                    logger(AREA, INFO, "Conveyor On/Off Register In MiR is: " + mirFleet.robots[r].Registers[1].value);
-                    logger(AREA, INFO, "Mission Status is: " + mirFleet.robots[r].schedule.state_id);
+                    logger(AREA, INFO, mirFleet.robots[r].s.robot_name + " Is In State: " + mirFleet.robots[r].schedule.old_state + " -> " + mirFleet.robots[r].schedule.state + " For Mission " + mirFleet.robots[r].schedule.plc_mission_number + " : " + mirFleet.fleetManager.Missions[mirFleet.robots[r].schedule.mission_number].name);
+                    mirFleet.robots[r].schedule.old_state = mirFleet.robots[r].schedule.state;
+                }
 
+                if (robots[r].getTaskParameter() == 351 || robots[r].getTaskParameter() == 352)
+                {
                     if (mirFleet.robots[r].schedule.state == "Pending")
                     {
                         mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.TaskReceivedFromPLC;
@@ -575,25 +599,6 @@ class Program
                         mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.CompletedNoErrors;
                         mirFleet.robots[r].schedule.id = 0;
                         mirFleet.robots[r].currentJob.finishMission();
-
-                        // Used to be else if (mirFleet.robots[r].schedule.state == "Done")
-                        // Potentially remove this condition as the dock prox checks are now done inside MiRs
-/*                        if ((int)(mirFleet.robots[r].Registers[2].value) == 1)
-                        {
-
-                        }
-                        else if(robots[r].getTaskParameter() == 353)
-                        {
-                            mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.CompletedNoErrors;
-                            mirFleet.robots[r].schedule.id = 0;
-                            mirFleet.robots[r].currentJob.finishMission();
-                        }
-                        else
-                        {
-                            mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.CompletedNoErrors;
-                            mirFleet.robots[r].schedule.id = 0;
-                            mirFleet.robots[r].currentJob.finishMission();
-                        }*/
                     }
                     else
                     {
@@ -735,7 +740,7 @@ class Program
         //==================================================================|
         try
         {
-            sendRobotGroup(fleetRobotID, 3);
+            sendRobotGroup(robotID, mirFleet.fleet_available_group);
         }
         catch(Exception e)
         {
@@ -809,7 +814,7 @@ class Program
         try
         {
             // Available group has group id 3
-            sendRobotGroup(fleetRobotID, 4);
+            sendRobotGroup(robotID, mirFleet.fleet_busy_group);
         }
         catch (Exception e)
         {

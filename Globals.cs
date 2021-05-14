@@ -25,6 +25,7 @@ public static class Globals
     //=========================================================|
     public static bool keepRunning = true;
     public static bool resumingSession = false;
+    public static bool wifiScanEnabled = false;
     public static int pollInterval;
     public static int sizeOfFleet;
     public static MySqlConnection db;
@@ -273,6 +274,10 @@ public static class Globals
                 else if (rdr.GetString(1) == "fleetManagerAuthToken")
                 {
                     fleetManagerAuthToken = new AuthenticationHeaderValue("Basic", rdr.GetString(2));
+                }
+                else if (rdr.GetString(1) == "wifiScanEnabled")
+                {
+                    wifiScanEnabled = Boolean.Parse(rdr.GetString(2));
                 }
             }
         }
@@ -774,6 +779,8 @@ public static class Globals
             using var cmd = new MySqlCommand(sql, db);
             using MySqlDataReader rdr = cmd.ExecuteReader();
         }
+
+        mirFleet.getInitialFleetData();
 
         logger(AREA, INFO, "Finished Fleet Initialization");
     }

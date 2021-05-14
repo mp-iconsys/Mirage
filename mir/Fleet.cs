@@ -28,6 +28,15 @@ namespace Mirage
 
         public short returnParameter = 0;
         public short[] groups = new short[8] { (short)sizeOfFleet, 0, 0, 0, 0, 0, 0, 0 };
+
+        public int available_group = 1;
+        public int busy_group = 2;
+        public int offline_group = 3;
+
+        public int fleet_available_group = 3;
+        public int fleet_busy_group = 4;
+        public int fleet_offline_group = 5;
+
         //public int[] robotMapping;
 
         //=========================================================|

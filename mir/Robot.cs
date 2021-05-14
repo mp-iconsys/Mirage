@@ -26,7 +26,7 @@ public class Robot
     //=========================================================|
     //  KPI, OEM & Statistics                                  |
     //=========================================================|
-    public int maxRegister = 13;
+    public int maxRegister = 41;
 
     //=========================================================|
     //  Data which makes up the robot                          |     
@@ -422,11 +422,11 @@ public class Robot
 
                 if (result.IsSuccessStatusCode)
                 {
-                    logger(AREA, INFO, "Status Code: ");
+                    //logger(AREA, INFO, "Status Code: ");
 
                     statusCode = (int)result.StatusCode;
 
-                    logger(AREA, INFO, "Status Code: ");
+                    //logger(AREA, INFO, "Status Code: ");
 
                     //schedule = JsonConvert.DeserializeObject<Scheduler>(result.Content.ReadAsStringAsync().Result);
                     //schedule.working_response = true;
@@ -507,10 +507,11 @@ public class Robot
                 {
                     statusCode = (int)result.StatusCode;
 
-                    logger(AREA, INFO, "REST Status Code: ");
+                    //logger(AREA, INFO, "REST Status Code: ");
 
                     schedule = JsonConvert.DeserializeObject<Scheduler>(result.Content.ReadAsStringAsync().Result);
                     schedule.working_response = true;
+                    schedule.print_working_response = true;
 
                     if (result.StatusCode.ToString() == "BadRequest")
                     {
@@ -548,6 +549,7 @@ public class Robot
                     logger(AREA, DEBUG, "Bad Request - Failed to process");
                     statusCode = Globals.TaskStatus.CouldntProcessRequest;
                     schedule.working_response = false;
+                    schedule.print_working_response = false;
                 }
             }
             catch (Exception exception)
@@ -861,7 +863,7 @@ public class Robot
             {
                 MySqlCommand cmd = new MySqlCommand();
                 cmd.Connection = db;
-                cmd.CommandText = "store_12_registers";
+                cmd.CommandText = "store_40_registers";
                 cmd.CommandType = CommandType.StoredProcedure;
 
                 cmd.Parameters.AddWithValue("@ROBOT_ID", id);
