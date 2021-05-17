@@ -46,15 +46,6 @@ class SiemensPLC
     private static int dataStorageDB;
 
     //=========================================================|
-    //  PLC Task Control Block                                 |
-    //=========================================================|
-    public static int serialNumber = -1; // So we don't risk accidently having the same serial number as in PLC on restart
-    public static int robotID;
-    public static int task;
-    public static int status;
-    public static int parameter;
-
-    //=========================================================|
     //  Contains the structure for the robots.                 |
     //  Both Task Control and Data are in the same DB.         |
     //=========================================================|
@@ -876,26 +867,6 @@ class SiemensPLC
         }
     }
 
-    /*
-        public static void readDataFromPLC()
-        {
-            PDU p;
-            resultSet rs;
-            DotNetSiemensPLCToolBoxLibrary.Communication.LibNoDave.libnodave.
-
-            davePrepareReadRequest64(dc, p*);
-
-
-
-            davePrepareReadRequest64(dc, &p);
-            daveAddVarToReadRequest(&p, daveInputs, 0, 0, 1);
-            daveAddVarToReadRequest(&p, daveFlags, 0, 0, 4);
-            daveAddVarToReadRequest(&p, daveDB, 6, 20, 2);
-            daveAddVarToReadRequest(&p, daveFlags, 0, 12, 2);
-            res = dc.daveExecReadRequest(dc, &p, &rs);
-        }*/
-
-
     /// <summary>
     /// Helper method that prints the message and task status.
     /// Only used for debugging - no functional purpose
@@ -1407,7 +1378,7 @@ class SiemensPLC
                     }
                     else
                     {
-                        logger(AREA, DEBUG, "Task Status Updated To " + status);
+                        logger(AREA, DEBUG, "Watchdog Updated");
                     }
                 }
                 catch (NullReferenceException exception)

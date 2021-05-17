@@ -310,8 +310,8 @@ public static class Globals
     }
 
     /// <summary>
-        /// Establishes default communications with the PLC and standard headers for HTTP REST traffic.
-        /// </summary>
+    /// Establishes default communications with the PLC and standard headers for HTTP REST traffic.
+    /// </summary>
     public static void setUpDefaultComms()
     {
         logger(AREA, DEBUG, "==== Setting Up Connection Details ====");

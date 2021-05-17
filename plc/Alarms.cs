@@ -24,7 +24,7 @@ namespace Mirage.plc
 
         public int conveyorOffset = 460;
         public int conveyorBlockSize = 1;
-        public Alarm[] conveyor_array = new Alarm[8];
+        public Alarm[] conveyor_array = new Alarm[9];
 
         public Alarms()
         {
@@ -217,7 +217,7 @@ namespace Mirage.plc
 "15" };
 
 
-            string[] conveyorName = { "UKL", "D7a", "HTR2", "HTR3", "MLA", "HTR4", "HTR7", "HTR9" };
+            string[] conveyorName = { "UKL", "D7a", "HTR2", "HTR3", "MLA", "HTR4", "HTR7", "HTR9", "A Sequence Is Inhibited" };
 
             int x = 0;
 
@@ -301,7 +301,7 @@ namespace Mirage.plc
         {
             if (SiemensPLC.plcConnected)
             {
-                for (int i = 0; i < conveyorBlockSize * 8; i++)
+                for (int i = 0; i < conveyorBlockSize * 9; i++)
                 {
                     if (conveyor_array[i].triggered && !conveyor_array[i].old_triggered)
                     {

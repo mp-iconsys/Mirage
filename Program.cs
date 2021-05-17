@@ -161,6 +161,8 @@ class Program
 
                 //====================================================|
                 // Fetch registers prior to checking mission status   |
+                // This is as we need current register values for     |
+                // Conveying on and off                               |
                 //====================================================|
                 mirFleet.getRegisters();
 
@@ -174,8 +176,6 @@ class Program
                 //====================================================|
                 for (int k = 0; k < sizeOfFleet; k++)
                 {
-                    // Removed cause connection is unreliable 2021-05-07
-                    //getRobotStatus(k);
                     if(wifiScanEnabled)
                     {
                         // Take WiFi Network scans here
@@ -225,8 +225,6 @@ class Program
             checkConfigChanges();
 
             checkPLCReset();
-
-            mirFleet.saveFleetRegistersAsync();
 
             //====================================================|
             // For Debug Purposes                                 |
@@ -285,7 +283,6 @@ class Program
         //======================================================|
         int mission_number = plcMissionNumber - PLCMissionOffset;
         int restStatus;
-        //int waitTimeForMissionAssignment = 10;
 
         logger(AREA, INFO, "==== Sending A New Mission To The Scheduler ====");
 
@@ -425,13 +422,15 @@ class Program
     /// </summary>
     private static int createMission()
     {
-        logger(AREA, INFO, "==== Create New Mission In Robot " + SiemensPLC.robotID + " ====");
+/*        logger(AREA, INFO, "==== Create New Mission In Robot " + SiemensPLC.robotID + " ====");
 
-        int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Missions[0].createMission(SiemensPLC.parameter));
+        int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Missions[0].createMission(SiemensPLC.parameter));*/
 
         logger(AREA, DEBUG, "==== Created New Mission ====");
 
-        return restStatus;
+        return 0;
+
+        //return restStatus;
     }
 
     /// <summary>
