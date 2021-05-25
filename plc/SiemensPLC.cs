@@ -620,7 +620,9 @@ class SiemensPLC
                                 //robots[r].Param[0].getValue() == 0
                                 if (BitConverter.ToInt16(tempBytesForConversion, 0) == 10 && robots[r].getTaskStatus() == 0)
                                 {
-                                    logger(AREA, INFO, "NEW MESSAGE FOR ROBOT : " + r);
+                                    //logger(AREA, INFO, "NEW MESSAGE FOR ROBOT : " + r);
+
+                                    logger(AREA, INFO, "New Message For " + mirFleet.robots[r].s.robot_name);
 
                                     newMsg = true;
                                     newMsgs[r + 1] = true;
@@ -1067,14 +1069,20 @@ class SiemensPLC
                   || mirFleet.robots[robotID].schedule.state_id == TaskStatus.CompletedNoErrors
                   || mirFleet.robots[robotID].schedule.state_id == TaskStatus.CouldntProcessRequest))
                 {
-                    logger(AREA, INFO, "Resetting Task And Mission Status To 0 (Idle) For Robot : " + robotID);
+                    logger(AREA, INFO, "Resetting Task And Mission Status To 0 (Idle) For " + mirFleet.robots[robotID].s.robot_name + " From " + robots[robotID].getTaskStatus());
 
                     // This should already be 0 from the read we did at the top
                     mirFleet.robots[robotID].schedule.state_id = TaskStatus.Idle;
+                    mirFleet.robots[robotID].schedule.id = 0;
+
+                    // 2021-05-24 - New addition 
+                    mirFleet.robots[robotID].schedule.plc_mission_number = 0;
+                    mirFleet.robots[robotID].schedule.mission_number = 0;
+                    mirFleet.robots[robotID].schedule.state = " ";
+
                     robots[robotID].setTaskStatus(TaskStatus.Idle);
 
                     // Added as new feature:
-                    mirFleet.robots[robotID].schedule.id = 0;
                     robotMemoryToPLC(robotID);
                 }
             }
@@ -1211,7 +1219,7 @@ class SiemensPLC
                 }
                 else
                 {
-                    logger(AREA, ERROR, "Failed to Poll PLC For Alarms");
+                    logger(AREA, ERROR, "Failed to Poll PLC For Conveyor Status");
                     logger(AREA, ERROR, daveStrerror(memoryres));
                     restartConnection();
                 }

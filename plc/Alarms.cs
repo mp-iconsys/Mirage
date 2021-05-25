@@ -23,11 +23,14 @@ namespace Mirage.plc
         public Alarm[] alarm_array = new Alarm[176];
 
         public int conveyorOffset = 460;
-        public int conveyorBlockSize = 1;
-        public Alarm[] conveyor_array = new Alarm[9];
+        public int conveyorBlockSize = 3;
+        public static int convBlockSize = 3;
+
+        public Alarm[] conveyor_array = new Alarm[convBlockSize * 8];
 
         public Alarms()
         {
+
             string[] alarm_names = { 
 "AV010 North", 
 "AV010 South",
@@ -217,7 +220,7 @@ namespace Mirage.plc
 "15" };
 
 
-            string[] conveyorName = { "UKL", "D7a", "HTR2", "HTR3", "MLA", "HTR4", "HTR7", "HTR9", "A Sequence Is Inhibited" };
+            string[] conveyorName = { "UKL", "D7a", "HTR2", "HTR3", "MLA", "HTR4", "HTR7", "HTR9", "A Sequence Is Inhibited", "Spare 1", "Spare 2", "Spare 3", "Spare 4", "Spare 5", "Spare 6", "Spare 7", "UKL Space Available", "D7a Available", "HTR2 Available", "HTR3 Available", "MLA AVailable", "HTR4 Available", "HTR7 Available", "HTR9 Available"};
 
             int x = 0;
 
@@ -254,7 +257,7 @@ namespace Mirage.plc
                 }
             }
        
-            for(int c = 0; c < 8; c++)
+            for(int c = 0; c < conveyor_array.Length; c++)
             {
                 conveyor_array[c] = new Alarm();
                 conveyor_array[c].old_triggered = true;
@@ -301,7 +304,7 @@ namespace Mirage.plc
         {
             if (SiemensPLC.plcConnected)
             {
-                for (int i = 0; i < conveyorBlockSize * 9; i++)
+                for (int i = 0; i < conveyorBlockSize * 8; i++)
                 {
                     if (conveyor_array[i].triggered && !conveyor_array[i].old_triggered)
                     {

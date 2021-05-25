@@ -777,7 +777,7 @@ namespace Mirage
             {
                 try
                 {
-                    mirFleet.issueGetRequests("registers/2");
+                    mirFleet.issueGetRequests("registers");
 
                     for (int i = 0; i < sizeOfFleet; i++)
                     {

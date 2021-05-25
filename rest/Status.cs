@@ -357,6 +357,33 @@ namespace Mirage.rest
         }
 
         /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        public HttpRequestMessage putPauseRequest(string base_uri)
+        {
+            // TODO: change the session ID to be dynamic
+            string payload;
+            payload = "{\"state_id\": 4 }";
+
+            logger(AREA, DEBUG, payload);
+
+            Uri uri = new Uri(base_uri + "status");
+
+            HttpRequestMessage request = new HttpRequestMessage
+            {
+                Content = new StringContent(payload, Encoding.UTF8, "application/json"),
+                Method = HttpMethod.Put,
+                RequestUri = uri
+            };
+
+            logger(AREA, DEBUG, "Request Created");
+
+            return request;
+        }
+
+
+        /// <summary>
         /// Nested class, used to contain position data.
         /// </summary>
         public class Position

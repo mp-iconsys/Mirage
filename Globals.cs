@@ -26,6 +26,8 @@ public static class Globals
     public static bool keepRunning = true;
     public static bool resumingSession = false;
     public static bool wifiScanEnabled = false;
+    public static int chargingThreshold = 20;
+    public static int releaseThreshold = 40;
     public static int pollInterval;
     public static int sizeOfFleet;
     public static MySqlConnection db;
@@ -278,6 +280,14 @@ public static class Globals
                 else if (rdr.GetString(1) == "wifiScanEnabled")
                 {
                     wifiScanEnabled = Boolean.Parse(rdr.GetString(2));
+                }
+                else if (rdr.GetString(1) == "chargingThreshold")
+                {
+                    chargingThreshold = Int32.Parse(rdr.GetString(2));
+                }
+                else if (rdr.GetString(1) == "releaseThreshold")
+                {
+                    releaseThreshold = Int32.Parse(rdr.GetString(2));
                 }
             }
         }

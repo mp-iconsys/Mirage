@@ -21,8 +21,6 @@ class Program
 
         logger(AREA, INFO, "==== Starting Main Loop ====");
 
-        long i = 0;
-
         // Used for saving data into DB
         Stopwatch timer = new Stopwatch();
                   timer.Start();
@@ -39,8 +37,6 @@ class Program
         //====================================================|
         while (keepRunning)
         {
-            logger(AREA, DEBUG, "==== Loop " + ++i + " Starting ====");
-
             if (plcConnected)
             {
                 //====================================================|
@@ -186,6 +182,8 @@ class Program
                     writeRobotBlock(k);
                 }
 
+                checkAvailableRobotsForBattery();
+
                 //====================================================|
                 // TODO: Check if we need to write to fleet at        |
                 // the end of every loop (might not be needed)        |
@@ -230,8 +228,6 @@ class Program
             // For Debug Purposes                                 |
             //====================================================|
             printNewMessageStatus();
-
-            logger(AREA, DEBUG, "==== Loop " + i + " Finished ====");
         }
 
         gracefulTermination();
@@ -268,6 +264,29 @@ class Program
             }
         }
     }
+
+    /// <summary>
+    /// Go through the robots in the fleet
+    /// </summary>
+    private static void checkAvailableRobotsForBattery()
+    {
+        for(int robotID = 0; robotID < sizeOfFleet; robotID++)
+        {
+            // If the robot is in available group and the battery is below the threshold, put into a charging group
+            if(mirFleet.robots[robotID].s.battery_percentage < chargingThreshold && mirFleet.robots[robotID].s.robot_group_id == mirFleet.available_group)
+            {
+                sendRobotGroup(robotID, mirFleet.fleet_offline_group);
+            }
+
+            // Check the robots in a charging group, if they're  
+            // If the robot is in available group and the battery is below the threshold, put into a charging group
+            if (mirFleet.robots[robotID].s.battery_percentage >= releaseThreshold && mirFleet.robots[robotID].s.robot_group_id == mirFleet.offline_group)
+            {
+                sendRobotGroup(robotID, mirFleet.fleet_available_group);
+            }
+        }
+    }
+
 
     /// <summary>
     /// Sends a mission to Fleet Scheduler. If the robotID is the fleet ID, it sends a mision to fleet and checks which robot got assigned after a delay.
@@ -330,12 +349,12 @@ class Program
             else
             {
                 restStatus = mirFleet.robots[robotID].sendScheduleRequest(mirFleet.fleetManager.Missions[mission_number].postRequest(fleetRobotID));
+
+                mirFleet.robots[robotID].schedule.mission_number = mission_number;
+                mirFleet.robots[robotID].schedule.plc_mission_number = plcMissionNumber;
+
+                logger(AREA, INFO, "The Schedule ID IS: " + mirFleet.robots[robotID].schedule.id);
             }
-
-            mirFleet.robots[robotID].schedule.mission_number = mission_number;
-            mirFleet.robots[robotID].schedule.plc_mission_number = plcMissionNumber;
-
-            logger(AREA, INFO, "The Schedule ID IS: " + mirFleet.robots[robotID].schedule.id);
 
             // Add a record to the robot's job ledger - this is a new mission added on top of the existing mission stack
             if(plcMissionNumber != Tasks.ReleaseRobot)
@@ -401,6 +420,9 @@ class Program
         //SiemensPLC.updateTaskStatus(restStatus);
         logger(AREA, DEBUG, "Status: " + restStatus);
         logger(AREA, DEBUG, "==== Robot Group Changed ====");
+
+        mirFleet.robots[robotID].sendRESTdata(mirFleet.robots[robotID].s.putPauseRequest(mirFleet.robots[robotID].getBaseURI()));
+        mirFleet.robots[robotID].sendRESTdata(mirFleet.robots[robotID].s.putReadyRequest(mirFleet.robots[robotID].getBaseURI()));
 
         return restStatus;
     }
@@ -488,6 +510,12 @@ class Program
                 logger(AREA, INFO, "It Took Fleet " + robotAssignment.Elapsed.TotalSeconds + " Seconds To Assign A Robot");
 
                 mirFleet.robots[currentMissionRobot].schedule.id = mirFleet.fleetManager.schedule.id;
+                mirFleet.robots[currentMissionRobot].schedule.plc_mission_number = mirFleet.fleetManager.schedule.plc_mission_number;
+                mirFleet.robots[currentMissionRobot].schedule.mission_number = mirFleet.fleetManager.schedule.mission_number;
+                mirFleet.robots[currentMissionRobot].schedule.state_id = Globals.TaskStatus.StartedProcessing;
+                mirFleet.robots[currentMissionRobot].schedule.state = " ";
+
+                logger(AREA, INFO, "The Scheduler ID is: " + mirFleet.robots[currentMissionRobot].schedule.id);
 
                 occupyRobot(currentMissionRobot);
 
@@ -605,7 +633,7 @@ class Program
                     }
                 }
 
-                logger(AREA, DEBUG, "Mission Status For Robot: " + r + " State ID is: " + mirFleet.robots[r].schedule.state_id);
+                logger(AREA, DEBUG, "Mission Status For " + mirFleet.robots[r].s.robot_name  + " State ID is: " + mirFleet.robots[r].schedule.state_id);
             }
         }
     }
@@ -664,93 +692,115 @@ class Program
         int restStatus;
         int taskStat;
         int fleetRobotID = mirFleet.robots[robotID].fleetRobotID;
-        int waitTime = 50;
+        int waitTime = 0;
 
         logger(AREA, INFO, "Releasing " + mirFleet.robots[robotID].s.robot_name +  " From The Busy Group");
+        logger(AREA, INFO, "Battery % is: " + mirFleet.robots[robotID].s.battery_percentage);
 
-        //======================================================================|
-        // In case the release robot command is driven by a sequence break:     |
-        // - Clear any errors from the robot.                                   |
-        // - Upnause (put into ready state)                                     |
-        //======================================================================|
-        mirFleet.robots[robotID].sendRESTdata(mirFleet.robots[robotID].s.putRequest(mirFleet.robots[robotID].getBaseURI()));
-        mirFleet.robots[robotID].sendRESTdata(mirFleet.robots[robotID].s.putReadyRequest(mirFleet.robots[robotID].getBaseURI()));
+        // We've got two situations:
+        // - either the robot's battery is above twenty 20 atfer the job, in which case put it into a charge group until 40% 
+        // - or the robot's battery is above 20 after the job, in which case do the usual release robot
 
-        //======================================================================|
-        // Delete from the busy group                                           |
-        // This request might not succeed, depending on what happened           |
-        //======================================================================|
-        restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.busy.deleteRequest(fleetRobotID));
 
-        if(restStatus == Globals.TaskStatus.CompletedNoErrors)
-        {
-            logger(AREA, INFO, mirFleet.robots[robotID].s.robot_name + " Was Released From Empty Charge Group");
+            //======================================================================|
+            // In case the release robot command is driven by a sequence break:     |
+            // - Clear any errors from the robot.                                   |
+            // - Upnause (put into ready state)                                     |
+            //======================================================================|
+            mirFleet.robots[robotID].sendRESTdata(mirFleet.robots[robotID].s.putRequest(mirFleet.robots[robotID].getBaseURI()));
+            mirFleet.robots[robotID].sendRESTdata(mirFleet.robots[robotID].s.putReadyRequest(mirFleet.robots[robotID].getBaseURI()));
 
-            // We succeeded at deleting the robot from the old charging group
-            // Wait for a bit and assign the empty/available charging group
-            Thread.Sleep(waitTime);
-            restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.available.postRequest(fleetRobotID));
+            //======================================================================|
+            // Delete from the busy group                                           |
+            // This request might not succeed, depending on what happened           |
+            //======================================================================|
+            restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.busy.deleteRequest(fleetRobotID));
 
             if(restStatus == Globals.TaskStatus.CompletedNoErrors)
             {
-                taskStat = Globals.TaskStatus.CompletedNoErrors;
+                logger(AREA, INFO, mirFleet.robots[robotID].s.robot_name + " Was Released From Empty Charge Group");
+
+                // We succeeded at deleting the robot from the old charging group
+                // Wait for a bit and assign the empty/available charging group
+                Thread.Sleep(waitTime);
+                restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.available.postRequest(fleetRobotID));
+
+                if(restStatus == Globals.TaskStatus.CompletedNoErrors)
+                {
+                    taskStat = Globals.TaskStatus.CompletedNoErrors;
+                }
+                else
+                {
+                    taskStat = Globals.TaskStatus.FatalError;
+                    logger(AREA, WARNING, "Failed To Assign " + mirFleet.robots[robotID].s.robot_name + " To Full Charge Group");
+                }
             }
             else
             {
-                taskStat = Globals.TaskStatus.FatalError;
-                logger(AREA, WARNING, "Failed To Assign " + mirFleet.robots[robotID].s.robot_name + " To Full Charge Group");
+                logger(AREA, INFO, "Failed To Remove " + mirFleet.robots[robotID].s.robot_name + " From Empty Charge Group.");
+
+                // We failed to delete the robot from an old charging group
+                // If we failed because the robot wasn't in the group, just put it in the charging group
+                Thread.Sleep(waitTime);
+                restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.available.postRequest(fleetRobotID));
+
+                if (restStatus == Globals.TaskStatus.CompletedNoErrors)
+                {
+                    taskStat = Globals.TaskStatus.CompletedNoErrors;
+                }
+                else
+                {
+                    taskStat = Globals.TaskStatus.FatalError;
+                    logger(AREA, WARNING, "Failed To Assign " + mirFleet.robots[robotID].s.robot_name + " To Full Charge Group");
+                }
             }
-        }
-        else
-        {
-            logger(AREA, INFO, "Failed To Remove " + mirFleet.robots[robotID].s.robot_name + " From Empty Charge Group.");
 
-            // We failed to delete the robot from an old charging group
-            // If we failed because the robot wasn't in the group, just put it in the charging group
-            Thread.Sleep(waitTime);
-            restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.available.postRequest(fleetRobotID));
+            //==================================================================|
+            // Need to send a dummy mission so as to prompt the robot           |
+            // The robot will enter an "Executing State" and at the end         |
+            // it will go back to the idle state.                               |
+            // This makes it process the change in charging group               |
+            //==================================================================|
+            sendMissionToScheduler(Tasks.ReleaseRobot, robotID);
 
-            if (restStatus == Globals.TaskStatus.CompletedNoErrors)
+            Thread.Sleep(250);
+
+            //==================================================================|
+            // Put the robot into the available group. This enables it to       |
+            // go charge and also start new jobs - otherwise it's going         |
+            // to stick to its current tasks                                    |
+            // Available Group ID : 3                                           |
+            // TODO: Add a better way to handle this - response from fleet?     |
+            // Preferably, fetch the group info at the very begining            |
+            //==================================================================|
+            try
             {
-                taskStat = Globals.TaskStatus.CompletedNoErrors;
+                if (mirFleet.robots[robotID].s.battery_percentage > chargingThreshold)
+                {
+                    sendRobotGroup(robotID, mirFleet.fleet_available_group);
+                }
+                else
+                {
+                    sendRobotGroup(robotID, mirFleet.fleet_offline_group);
+                }
             }
-            else
+            catch(Exception e)
             {
-                taskStat = Globals.TaskStatus.FatalError;
-                logger(AREA, WARNING, "Failed To Assign " + mirFleet.robots[robotID].s.robot_name + " To Full Charge Group");
+                logger(AREA, ERROR, "Failed To Put " + mirFleet.robots[robotID].s.robot_name + " Into Available Group");
+                logger(AREA, ERROR, "Exception: ", e);
             }
-        }
 
-        //==================================================================|
-        // Need to send a dummy mission so as to prompt the robot           |
-        // The robot will enter an "Executing State" and at the end         |
-        // it will go back to the idle state.                               |
-        // This makes it process the change in charging group               |
-        //==================================================================|
-        sendMissionToScheduler(Tasks.ReleaseRobot, robotID);
+            //==================================================================|
+            // This is to actualize the robot and charging group changes.       |
+            // We're pausing and unpausing the robot                            |
+            //==================================================================|
+            mirFleet.robots[robotID].sendRESTdata(mirFleet.robots[robotID].s.putPauseRequest(mirFleet.robots[robotID].getBaseURI()));
+            mirFleet.robots[robotID].sendRESTdata(mirFleet.robots[robotID].s.putReadyRequest(mirFleet.robots[robotID].getBaseURI()));
 
-        //==================================================================|
-        // Put the robot into the available group. This enables it to       |
-        // go charge and also start new jobs - otherwise it's going         |
-        // to stick to its current tasks                                    |
-        // Available Group ID : 3                                           |
-        // TODO: Add a better way to handle this - response from fleet?     |
-        // Preferably, fetch the group info at the very begining            |
-        //==================================================================|
-        try
-        {
-            sendRobotGroup(robotID, mirFleet.fleet_available_group);
-        }
-        catch(Exception e)
-        {
-            logger(AREA, ERROR, "Failed To Put " + mirFleet.robots[robotID].s.robot_name + " Into Available Group");
-            logger(AREA, ERROR, "Exception: ", e);
-        }
+            // Complete the job, save to DB and clear the job ledger
+            mirFleet.robots[robotID].currentJob.finishJob(robotID, false);
 
-        // Complete the job, save to DB and clear the job ledger
-        mirFleet.robots[robotID].currentJob.finishJob(robotID, false);
-
-        return taskStat;
+            return taskStat;
     }
 
     /// <summary>
@@ -771,7 +821,7 @@ class Program
 
         if (restStatus == Globals.TaskStatus.CompletedNoErrors)
         {
-            logger(AREA, INFO, "Robot " + fleetRobotID + " Put Into Empty Charge Group");
+            logger(AREA, INFO, "Robot " + mirFleet.robots[robotID].s.robot_name + " Put Into Empty Charge Group");
 
             // We succeeded at deleting the robot from the old charging group
             // Wait for a bit and assign the empty/available charging group
