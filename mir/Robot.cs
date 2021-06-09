@@ -48,6 +48,9 @@ public class Robot
     public bool deadRobotAlarmNotTriggered = true;
     private CancellationTokenSource _cts = new CancellationTokenSource();
 
+    // To keep track of how long missions take to dispatch
+    public int missionDespatchID { get; set; }
+
     //=========================================================|
     //  Used For Logging & Debugging                           |     
     //=========================================================|
@@ -70,6 +73,7 @@ public class Robot
         currentJob = new Job();
         isLive = true;
         deadRobotAlarmNotTriggered = true;
+        missionDespatchID = 0;
     }
 
     /// <summary>
@@ -89,6 +93,7 @@ public class Robot
         currentJob = new Job();
         isLive = true;
         deadRobotAlarmNotTriggered = true;
+        missionDespatchID = 0;
     }
 
     /// <summary>
@@ -117,6 +122,7 @@ public class Robot
 
         isLive = true;
         deadRobotAlarmNotTriggered = true;
+        missionDespatchID = 0;
     }
 
     /// <summary>
@@ -306,7 +312,6 @@ public class Robot
             if (result.IsSuccessStatusCode)
             {
                 isLive = true;
-                // clear the alarm
                 clearDeadRobotAlarm();
                 timer.Reset();
             }
@@ -345,7 +350,7 @@ public class Robot
         isLive = false;
 
         string area = "MiR/Fleet Connection";
-        string name = "Robot " + s.robot_name + ", Serial Number: " + s.serial_number + ", ID: " + id + " Lost Connection To AMR-Connect";
+        string name = s.robot_name + " Lost Connection To AMR-Connect";
 
         try
         {
@@ -383,10 +388,20 @@ public class Robot
         {
             try
             {
-                string sql = "CALL falling_edge_alarm(" + alarm_id + ");";
-                using var cmd6 = new MySqlCommand(sql, clear_alarms_db);
-                using MySqlDataReader rdr = cmd6.ExecuteReader();
+                MySqlCommand cmd6 = new MySqlCommand();
+                cmd6.Connection = clear_alarms_db;
+                cmd6.CommandText = "falling_edge_alarm";
+                cmd6.CommandType = CommandType.StoredProcedure;
+
+                cmd6.Parameters.AddWithValue("@LID", alarm_id);
+                cmd6.Parameters["@LID"].Direction = ParameterDirection.Input;
+                cmd6.ExecuteNonQuery();
+
                 cmd6.Dispose();
+                /*                string sql = "CALL falling_edge_alarm(" + alarm_id + ");";
+                                using var cmd6 = new MySqlCommand(sql, clear_alarms_db);
+                                using MySqlDataReader rdr8 = cmd6.ExecuteReader();
+                                cmd6.Dispose();*/
             }
             catch (Exception exception)
             {

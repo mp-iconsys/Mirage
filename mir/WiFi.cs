@@ -21,27 +21,50 @@ namespace Mirage.mir
         //=========================================================|
         // WiFi Connection Details                                 |
         //=========================================================|
-        public string uuid;
-        public string bssid;
-        public string url;
-        public string mac;
-        public string name;
-        bool connected;
+        public string uuid { get; set; }
+        public string bssid { get; set; }
+        public string url { get; set; }
+        public string mac { get; set; }
+        public string name { get; set; }
+        bool connected { get; set; }
 
         //=========================================================|
         // WiFi Network Scan                                       |
-        // This required a GUID                                    |
+        // This requires a GUID                                    |
         //=========================================================|
-        public int strength;
-        public int channel;
-        public string ssid;
-        public string frequency;
-        public string guid;
+        public int strength { get; set; }
+        public int channel { get; set; }
+        public string ssid { get; set; }
+        public string frequency { get; set; }
+        public string guid { get; set; }
 
         //=========================================================|
         // REST Data Containers                                    |
         //=========================================================|
         public Network wifiNetworkDetails;
+
+        //===============================================================================|
+        // First, you need to fetch the network guid using GET /wifi/networks            |
+        // Then, you can fetch the strength using GET /wifi/networks/{guid}              |
+        // This data needs to be married together with the X and Y positions             |
+        // And then recorded in a database and mapped                                    |
+        //===============================================================================|
+        public WiFi()
+        {
+            uuid = "";
+            bssid = "";
+            url = "";
+            mac = "";
+            name = "";
+            connected = false;
+
+            strength = 0;
+            channel = 0;
+            ssid = "";
+            frequency = "";
+            guid = "";
+        }
+
 
     }
 }

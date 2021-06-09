@@ -5,6 +5,8 @@ using System.Threading.Tasks;
 using static SiemensPLC;
 using static Globals;
 using static Globals.DebugLevel;
+using MySql.Data.MySqlClient;
+using System.Data;
 
 class Program
 {
@@ -44,6 +46,14 @@ class Program
                 //====================================================|
                 poll();
 
+                for(int i = 0; i < sizeOfFleet+1; i++)
+                {
+                    if(newMsgs[i])
+                    {
+                        newMsg = true;
+                    }
+                }
+
                 //====================================================|
                 //  Perform tasks if there's a new message            |
                 //  See Globals.Tasks for definitions                 |
@@ -57,13 +67,33 @@ class Program
                     //====================================================|
                     if (newMsgs[0])
                     {
-                        logger(AREA, INFO, "Task For Fleet");
-                        logger(AREA, INFO, "Task Number: " + fleetBlock.getTaskNumber());
-                        logger(AREA, INFO, "Task Parameter: " + fleetBlock.getTaskParameter());
+                        logger(AREA, INFO, "PLC Task For Fleet");
+                        logger(AREA, INFO, "PLC Task Number: " + fleetBlock.getTaskNumber());
+                        logger(AREA, INFO, "PLC Task Parameter: " + fleetBlock.getTaskParameter());
 
                         updateTaskStatus(fleetID, Globals.TaskStatus.StartedProcessing);
 
                         int restStatus = Globals.TaskStatus.StartedProcessing;
+
+                        logger(AREA, INFO, "Mission Despatch For Fleet, Despatch ID: " + mirFleet.fleetManager.missionDespatchID + " Mission No: " + fleetBlock.getTaskNumber());
+
+                        try
+                        {
+                            MySqlCommand cmd10 = new MySqlCommand();
+                            cmd10.Connection = db;
+                            cmd10.CommandText = "mission_despatch_end";
+                            cmd10.CommandType = CommandType.StoredProcedure;
+                            cmd10.Parameters.Add(new MySqlParameter("LASTID", mirFleet.fleetManager.missionDespatchID));
+
+                            cmd10.CommandType = CommandType.StoredProcedure;
+                            cmd10.Parameters.Add(new MySqlParameter("MISSION_NO", fleetBlock.getTaskNumber()));
+
+                            issueQuery(cmd10);
+                        }
+                        catch (Exception exception)
+                        {
+                            logger(AREA, ERROR, "MySQL Query Error: ", exception);
+                        }
 
                         switch (fleetBlock.getTaskNumber())
                         {
@@ -102,14 +132,36 @@ class Program
                         
                         if (newMsgs[robotMessage])
                         {
-                            logger(AREA, INFO, "Task For " + mirFleet.robots[robotID].s.robot_name);
-                            logger(AREA, INFO, "Task Number: " + robots[robotID].getTaskNumber());
-                            logger(AREA, INFO, "Task Parameter: " + robots[robotID].getTaskParameter());
+                            logger(AREA, INFO, "PLC Task For " + mirFleet.robots[robotID].s.robot_name);
+                            logger(AREA, INFO, "PLC Task Number: " + robots[robotID].getTaskNumber());
+                            logger(AREA, INFO, "PLC Task Parameter: " + robots[robotID].getTaskParameter());
 
                             //New Mission, so set Mission Status to Idle
                             mirFleet.robots[robotID].schedule.state_id = Globals.TaskStatus.Idle;
 
                             updateTaskStatus(robotID, Globals.TaskStatus.StartedProcessing);
+
+                            logger(AREA, INFO, "Mission Despatch For Fleet, Despatch ID: " + mirFleet.robots[robotID].missionDespatchID + " Mission No: " + robots[robotID].getTaskNumber());
+
+                            try
+                            {
+                                logger(AREA, INFO, "Despatch ID Is: " + mirFleet.robots[robotID].missionDespatchID);
+
+                                MySqlCommand cmd10 = new MySqlCommand();
+                                cmd10.Connection = db;
+                                cmd10.CommandText = "mission_despatch_end";
+                                cmd10.CommandType = CommandType.StoredProcedure;
+                                cmd10.Parameters.Add(new MySqlParameter("LASTID", mirFleet.robots[robotID].missionDespatchID));
+
+                                cmd10.CommandType = CommandType.StoredProcedure;
+                                cmd10.Parameters.Add(new MySqlParameter("MISSION_NO", robots[robotID].getTaskNumber()));
+
+                                issueQuery(cmd10);
+                            }
+                            catch (Exception exception)
+                            {
+                                logger(AREA, ERROR, "MySQL Query Error: ", exception);
+                            }
 
                             int taskStatus = Globals.TaskStatus.StartedProcessing;
 
@@ -228,6 +280,8 @@ class Program
             // For Debug Purposes                                 |
             //====================================================|
             printNewMessageStatus();
+
+            saveCurrentStatusToDB();
         }
 
         gracefulTermination();
@@ -352,7 +406,6 @@ class Program
 
                 mirFleet.robots[robotID].schedule.mission_number = mission_number;
                 mirFleet.robots[robotID].schedule.plc_mission_number = plcMissionNumber;
-
                 logger(AREA, INFO, "The Schedule ID IS: " + mirFleet.robots[robotID].schedule.id);
             }
 
@@ -567,6 +620,7 @@ class Program
                 if(mirFleet.robots[r].schedule.state != mirFleet.robots[r].schedule.old_state)
                 {
                     logger(AREA, INFO, mirFleet.robots[r].s.robot_name + " Is In State: " + mirFleet.robots[r].schedule.old_state + " -> " + mirFleet.robots[r].schedule.state + " For Mission " + mirFleet.robots[r].schedule.plc_mission_number + " : " + mirFleet.fleetManager.Missions[mirFleet.robots[r].schedule.mission_number].name);
+                    //logger(AREA, INFO, "The Scheduler ID is: " + mirFleet.robots[r].schedule.id);
                     mirFleet.robots[r].schedule.old_state = mirFleet.robots[r].schedule.state;
                 }
 
@@ -620,11 +674,13 @@ class Program
                         //mirFleet.robots[r].currentJob.finishMission();
                         mirFleet.robots[r].currentJob.finishJob(r, true);
                         mirFleet.robots[r].schedule.id = 0;
+                        logger(AREA, INFO, "Setting Scheduler ID to 0 (Idle) for " + mirFleet.robots[r].s.robot_name);
                     }
                     else if (mirFleet.robots[r].schedule.state == "Done")
                     {
                         mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.CompletedNoErrors;
                         mirFleet.robots[r].schedule.id = 0;
+                        logger(AREA, INFO, "Setting Scheduler ID to 0 (Idle) for " + mirFleet.robots[r].s.robot_name);
                         mirFleet.robots[r].currentJob.finishMission();
                     }
                     else
@@ -696,19 +752,22 @@ class Program
 
         logger(AREA, INFO, "Releasing " + mirFleet.robots[robotID].s.robot_name +  " From The Busy Group");
         logger(AREA, INFO, "Battery % is: " + mirFleet.robots[robotID].s.battery_percentage);
+        
+        Thread.Sleep(50);
+
+        zeroRobotTasks(robotID);
 
         // We've got two situations:
         // - either the robot's battery is above twenty 20 atfer the job, in which case put it into a charge group until 40% 
         // - or the robot's battery is above 20 after the job, in which case do the usual release robot
 
-
-            //======================================================================|
-            // In case the release robot command is driven by a sequence break:     |
-            // - Clear any errors from the robot.                                   |
-            // - Upnause (put into ready state)                                     |
-            //======================================================================|
-            mirFleet.robots[robotID].sendRESTdata(mirFleet.robots[robotID].s.putRequest(mirFleet.robots[robotID].getBaseURI()));
-            mirFleet.robots[robotID].sendRESTdata(mirFleet.robots[robotID].s.putReadyRequest(mirFleet.robots[robotID].getBaseURI()));
+        //======================================================================|
+        // In case the release robot command is driven by a sequence break:     |
+        // - Clear any errors from the robot.                                   |
+        // - Upnause (put into ready state)                                     |
+        //======================================================================|
+        mirFleet.robots[robotID].sendRESTdata(mirFleet.robots[robotID].s.putRequest(mirFleet.robots[robotID].getBaseURI()));
+        mirFleet.robots[robotID].sendRESTdata(mirFleet.robots[robotID].s.putReadyRequest(mirFleet.robots[robotID].getBaseURI()));
 
             //======================================================================|
             // Delete from the busy group                                           |
@@ -763,17 +822,22 @@ class Program
             //==================================================================|
             sendMissionToScheduler(Tasks.ReleaseRobot, robotID);
 
-            Thread.Sleep(250);
+        Thread.Sleep(50);
 
-            //==================================================================|
-            // Put the robot into the available group. This enables it to       |
-            // go charge and also start new jobs - otherwise it's going         |
-            // to stick to its current tasks                                    |
-            // Available Group ID : 3                                           |
-            // TODO: Add a better way to handle this - response from fleet?     |
-            // Preferably, fetch the group info at the very begining            |
-            //==================================================================|
-            try
+        //Thread.Sleep(250);
+
+        // Complete the job, save to DB and clear the job ledger
+        mirFleet.robots[robotID].currentJob.finishJob(robotID, false);
+
+        //==================================================================|
+        // Put the robot into the available group. This enables it to       |
+        // go charge and also start new jobs - otherwise it's going         |
+        // to stick to its current tasks                                    |
+        // Available Group ID : 3                                           |
+        // TODO: Add a better way to handle this - response from fleet?     |
+        // Preferably, fetch the group info at the very begining            |
+        //==================================================================|
+        try
             {
                 if (mirFleet.robots[robotID].s.battery_percentage > chargingThreshold)
                 {
@@ -797,10 +861,10 @@ class Program
             mirFleet.robots[robotID].sendRESTdata(mirFleet.robots[robotID].s.putPauseRequest(mirFleet.robots[robotID].getBaseURI()));
             mirFleet.robots[robotID].sendRESTdata(mirFleet.robots[robotID].s.putReadyRequest(mirFleet.robots[robotID].getBaseURI()));
 
-            // Complete the job, save to DB and clear the job ledger
-            mirFleet.robots[robotID].currentJob.finishJob(robotID, false);
+        // Checking the PLC response
+        //checkPLCResponse();
 
-            return taskStat;
+        return taskStat;
     }
 
     /// <summary>

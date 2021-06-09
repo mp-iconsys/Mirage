@@ -490,8 +490,6 @@ class SiemensPLC
 
                         if (i == 0)
                         {
-                            //Used to be: fleetBlock.Param[0].getValue() == 0
-                            //Now is: fleetBlock.getTaskStatus()
                             // BitConverter.ToInt16(tempBytesForConversion, 0) == 10 && fleetBlock.getTaskStatus() == 0
                             if (BitConverter.ToInt16(tempBytesForConversion, 0) == 10 && fleetBlock.getTaskStatus() == 0)
                             {
@@ -503,15 +501,39 @@ class SiemensPLC
                                 }
 
                                 updateTaskStatus(fleetID, 10);
-                                newMsgs[0] = true;
 
-                                logger(AREA, INFO, "New Message Is: " + newMsgs[0].ToString());
+                                try
+                                {
+                                    MySqlCommand cmd = new MySqlCommand();
+                                    cmd.Connection = db;
+                                    cmd.CommandText = "mission_despatch_start";
+                                    cmd.CommandType = CommandType.StoredProcedure;
+
+                                    cmd.Parameters.AddWithValue("@ROBOT_ID", fleetID);
+                                    cmd.Parameters["@ROBOT_ID"].Direction = ParameterDirection.Input;
+
+                                    cmd.Parameters.Add("@LASTID", MySqlDbType.Int32);
+                                    cmd.Parameters["@LASTID"].Direction = ParameterDirection.Output;
+
+                                    cmd.ExecuteNonQuery();
+                                    mirFleet.fleetManager.missionDespatchID = (int)cmd.Parameters["@LASTID"].Value;
+                                    cmd.Dispose();
+
+                                    logger(AREA, INFO, "Mission Despatch For Fleet, Despatch ID: " + mirFleet.fleetManager.missionDespatchID);
+
+                                    //logger(AREA, DEBUG, "Mission Despatch Robot ID: " + fleetID + " Despatch ID: " + mirFleet.fleetManager.missionDespatchID);
+                                }
+                                catch (Exception exception)
+                                {
+                                    logger(AREA, ERROR, "MySQL Query Error: ", exception);
+                                }
+
+                                newMsgs[0] = true;
                                 newMsg = true;
                             }
                             else
                             {
                                 logger(AREA, DEBUG, "PLC Fleet Block Idle");
-                                //newMsgs[0] = false;
                             }
                         }
 
@@ -628,6 +650,30 @@ class SiemensPLC
                                     newMsgs[r + 1] = true;
 
                                     updateTaskStatus(r, TaskStatus.StartedProcessing);
+
+                                    try
+                                    {
+                                        MySqlCommand cmd = new MySqlCommand();
+                                        cmd.Connection = db;
+                                        cmd.CommandText = "mission_despatch_start";
+                                        cmd.CommandType = CommandType.StoredProcedure;
+
+                                        cmd.Parameters.AddWithValue("@ROBOT_ID", r);
+                                        cmd.Parameters["@ROBOT_ID"].Direction = ParameterDirection.Input;
+
+                                        cmd.Parameters.Add("@LASTID", MySqlDbType.Int32);
+                                        cmd.Parameters["@LASTID"].Direction = ParameterDirection.Output;
+
+                                        cmd.ExecuteNonQuery();
+                                        mirFleet.robots[r].missionDespatchID = (int)cmd.Parameters["@LASTID"].Value;
+                                        cmd.Dispose();
+
+                                        logger(AREA, INFO, "Mission Despatch For " + mirFleet.robots[r].s.robot_name + " Despatch ID: " + mirFleet.robots[r].missionDespatchID);
+                                    }
+                                    catch (Exception exception)
+                                    {
+                                        logger(AREA, ERROR, "MySQL Query Error: ", exception);
+                                    }
                                 }
                             }
 
@@ -1050,6 +1096,7 @@ class SiemensPLC
             {
                 logger(AREA, INFO, "Resetting Task Status And Fleet Return Parameter To 0 (Idle) From " + fleetBlock.getTaskStatus());
 
+                ///
                 // New mods to enable proper flushing of the fleet control word
                 mirFleet.fleetManager.schedule.id = 0;
                 mirFleet.fleetManager.schedule.robot_id = 0;
@@ -1095,6 +1142,160 @@ class SiemensPLC
 
         logger(AREA, DEBUG, "Response Check Completed");
     }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    public static void readRobot(int robotID)
+    {
+        logger(AREA, DEBUG, "==== Reading Robot Task Control ====");
+
+        if (plcConnected)
+        {
+            // TODO: Check the size of robotBlockSize buffer. 
+            // If bigger than 222, break down into robots?
+
+            int memoryres;
+            byte[] memoryBuffer = new byte[robotBlockControlParameters * noOfRobots * 2];
+
+            logger(AREA, DEBUG, "Initial Memory Buffer: ");
+            logger(AREA, DEBUG, BitConverter.ToString(memoryBuffer));
+
+            try
+            {
+                taskControlDB = 19;
+
+                logger(AREA, DEBUG, "DB: " + taskControlDB + "   Initial Offset: " + robots[0].Offset + "    Array Size: " + robotBlockControlParameters * noOfRobots);
+
+                //================================================================| 
+                // For each robot, go through the first (control) parameters.     |
+                // Read them and save the data in the robotBlock structure.       |
+                // If any TaskStatus is 10, that means we've got tasks to do.     |
+                //================================================================|
+                int r = robotID;
+
+                // readBytes(Area, Data Block Number (in PLC), Start Byte, Length, Byte Container)
+                memoryres = dc.readBytes(daveDB, taskControlDB, robots[r].Offset, robotBlockControlParameters * 2, memoryBuffer);
+
+                //=========================================================|
+                //  Memoryres - return code from Libnodave:                |
+                //    0 - Obtained Data                                    |
+                //  < 0 - Error detected by Libnodave                      |
+                //  > 0 - Error from the PLC                               |
+                //=========================================================|
+                if (memoryres == 0)
+                {
+
+                    logger(AREA, DEBUG, "Memory Buffer After Libnodave Read: ");
+                    logger(AREA, DEBUG, BitConverter.ToString(memoryBuffer));
+
+                    logger(AREA, DEBUG, "Going Through Robot : " + r);
+
+                    //int byteOffset = robots[r].Offset;
+                    // Robot Control Parameters, each is 2 bytes
+                    //int byteOffset = r * robotBlockControlParameters * 2;
+                    int byteOffset = 0;//
+
+                    for (int i = 0; i < robotBlockControlParameters; i++)
+                    {
+                        logger(AREA, DEBUG, "Going Through Parameter : " + i);
+
+                        int size = 2; // Can also be obtained from the parameters themselves
+                        int byte1 = byteOffset + (i * size);
+                        int byte2 = byteOffset + (i * size) + 1;
+
+                        byte[] tempBytesForConversion = new byte[2] { memoryBuffer[byte1], memoryBuffer[byte2] };
+
+                        // Need to reverse the bytes to get actual values
+                        if (BitConverter.IsLittleEndian)
+                        { Array.Reverse(tempBytesForConversion); }
+
+                        // Trigger a new message on rising edge
+                        if (i == 0)
+                        {
+                            //logger(AREA, INFO, "NEW PLC Task Status: " + BitConverter.ToInt16(tempBytesForConversion, 0) + " OLD PLC Task Status: " + robots[r].getTaskStatus());
+                            //robots[0].getPLCTaskStatus()
+                            //robots[r].Param[0].getValue() == 0
+                            if (BitConverter.ToInt16(tempBytesForConversion, 0) == 10 && robots[r].getTaskStatus() == 0)
+                            {
+                                //logger(AREA, INFO, "NEW MESSAGE FOR ROBOT : " + r);
+
+                                logger(AREA, INFO, "New Message For " + mirFleet.robots[r].s.robot_name);
+
+                                newMsg = true;
+                                newMsgs[r + 1] = true;
+
+                                updateTaskStatus(r, TaskStatus.StartedProcessing);
+                            }
+                        }
+
+                        robots[r].Param[i].setValue(BitConverter.ToInt16(tempBytesForConversion));
+                        robots[r].Param[i].print();
+                    }
+
+                    logger(AREA, DEBUG, "Task No Is: " + robots[r].getTaskNumber());
+                }
+                else
+                {
+                    logger(AREA, ERROR, "Failed to Poll in readRobots()");
+                    logger(AREA, ERROR, daveStrerror(memoryres));
+                    restartConnection();
+                }
+            }
+            catch (NullReferenceException exception)
+            {
+                logger(AREA, ERROR, "Dave Connection Has Not Been Instantiated. Exception: ", exception);
+                restartConnection();
+            }
+            catch (Exception exception)
+            {
+                logger(AREA, ERROR, "Polling Failed. Error : ", exception);
+                restartConnection();
+            }
+        }
+        else
+        {
+            logger(AREA, ERROR, "Not Connected To The PLC During Robot Header Read. Trying to re-establish connection");
+            restartConnection();
+        }
+
+        logger(AREA, DEBUG, "==== Completed Robot Task Control ====");
+    }
+
+
+
+    public static void zeroRobotTasks(int robotID)
+    {
+        logger(AREA, INFO, "Zeroing Task Control And Schedule From Release Robot zeroRobotTasks");
+
+        if (plcConnected)
+        {
+            readRobot(robotID);
+
+            logger(AREA, INFO, "Resetting Task And Mission Status To 0 (Idle) For " + mirFleet.robots[robotID].s.robot_name + " From " + robots[robotID].getTaskStatus() + " Without Handshaking With The PLC");
+
+            // This should already be 0 from the read we did at the top
+            mirFleet.robots[robotID].schedule.state_id = TaskStatus.Idle;
+            mirFleet.robots[robotID].schedule.id = 0;
+
+            // 2021-05-24 - New addition 
+            mirFleet.robots[robotID].schedule.plc_mission_number = 0;
+            mirFleet.robots[robotID].schedule.mission_number = 0;
+            mirFleet.robots[robotID].schedule.state = " ";
+            robots[robotID].setTaskStatus(TaskStatus.Idle);
+
+            // Added as new feature:
+            robotMemoryToPLC(robotID);
+        }
+        else
+        {
+            logger(AREA, ERROR, "Cannot Check PLC Idle/Sending/Processing As the PLC is Not Connected");
+            establishConnection();
+        }
+
+        logger(AREA, DEBUG, "Response Check Completed");
+    }
+
 
     /// <summary>
     /// Reads the PLC Alarms block and checks if any are triggered. 
