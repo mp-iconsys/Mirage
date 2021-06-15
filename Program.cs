@@ -46,13 +46,13 @@ class Program
                 //====================================================|
                 poll();
 
-                for(int i = 0; i < sizeOfFleet+1; i++)
+/*                for(int i = 0; i < sizeOfFleet+1; i++)
                 {
                     if(newMsgs[i])
                     {
                         newMsg = true;
                     }
-                }
+                }*/
 
                 //====================================================|
                 //  Perform tasks if there's a new message            |
@@ -74,26 +74,6 @@ class Program
                         updateTaskStatus(fleetID, Globals.TaskStatus.StartedProcessing);
 
                         int restStatus = Globals.TaskStatus.StartedProcessing;
-
-                        logger(AREA, INFO, "Mission Despatch For Fleet, Despatch ID: " + mirFleet.fleetManager.missionDespatchID + " Mission No: " + fleetBlock.getTaskNumber());
-
-                        try
-                        {
-                            MySqlCommand cmd10 = new MySqlCommand();
-                            cmd10.Connection = db;
-                            cmd10.CommandText = "mission_despatch_end";
-                            cmd10.CommandType = CommandType.StoredProcedure;
-                            cmd10.Parameters.Add(new MySqlParameter("LASTID", mirFleet.fleetManager.missionDespatchID));
-
-                            cmd10.CommandType = CommandType.StoredProcedure;
-                            cmd10.Parameters.Add(new MySqlParameter("MISSION_NO", fleetBlock.getTaskNumber()));
-
-                            issueQuery(cmd10);
-                        }
-                        catch (Exception exception)
-                        {
-                            logger(AREA, ERROR, "MySQL Query Error: ", exception);
-                        }
 
                         switch (fleetBlock.getTaskNumber())
                         {
@@ -140,28 +120,6 @@ class Program
                             mirFleet.robots[robotID].schedule.state_id = Globals.TaskStatus.Idle;
 
                             updateTaskStatus(robotID, Globals.TaskStatus.StartedProcessing);
-
-                            logger(AREA, INFO, "Mission Despatch For Fleet, Despatch ID: " + mirFleet.robots[robotID].missionDespatchID + " Mission No: " + robots[robotID].getTaskNumber());
-
-                            try
-                            {
-                                logger(AREA, INFO, "Despatch ID Is: " + mirFleet.robots[robotID].missionDespatchID);
-
-                                MySqlCommand cmd10 = new MySqlCommand();
-                                cmd10.Connection = db;
-                                cmd10.CommandText = "mission_despatch_end";
-                                cmd10.CommandType = CommandType.StoredProcedure;
-                                cmd10.Parameters.Add(new MySqlParameter("LASTID", mirFleet.robots[robotID].missionDespatchID));
-
-                                cmd10.CommandType = CommandType.StoredProcedure;
-                                cmd10.Parameters.Add(new MySqlParameter("MISSION_NO", robots[robotID].getTaskNumber()));
-
-                                issueQuery(cmd10);
-                            }
-                            catch (Exception exception)
-                            {
-                                logger(AREA, ERROR, "MySQL Query Error: ", exception);
-                            }
 
                             int taskStatus = Globals.TaskStatus.StartedProcessing;
 
@@ -632,6 +590,11 @@ class Program
                     }
                     else if (mirFleet.robots[r].schedule.state == "Executing" && (int)(mirFleet.robots[r].Registers[1].value) == 1)
                     {
+                        if(mirFleet.robots[r].conveyingInPrint)
+                        { 
+                            logger(AREA, INFO, mirFleet.robots[r].s.robot_name + "Started Conveying In");
+                            mirFleet.robots[r].conveyingInPrint = false;
+                        }
                         mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.StartedProcessing;
                     }
                     else if (mirFleet.robots[r].schedule.state == "Outbound")
@@ -643,6 +606,7 @@ class Program
                         mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.CouldntProcessRequest;
                         mirFleet.robots[r].schedule.id = 0;
                         updateTaskStatus(r, Globals.TaskStatus.CouldntProcessRequest);
+                        mirFleet.robots[r].conveyingInPrint = true;
                         //mirFleet.robots[r].currentJob.finishMission();
                         mirFleet.robots[r].currentJob.finishJob(r, true);
                     }
@@ -650,6 +614,7 @@ class Program
                     {
                         mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.CompletedNoErrors;
                         mirFleet.robots[r].schedule.id = 0;
+                        mirFleet.robots[r].conveyingInPrint = true;
                         mirFleet.robots[r].currentJob.finishMission();
                     }
                 }
@@ -674,6 +639,7 @@ class Program
                         //mirFleet.robots[r].currentJob.finishMission();
                         mirFleet.robots[r].currentJob.finishJob(r, true);
                         mirFleet.robots[r].schedule.id = 0;
+                        logger(AREA, INFO, "Mission Failed");
                         logger(AREA, INFO, "Setting Scheduler ID to 0 (Idle) for " + mirFleet.robots[r].s.robot_name);
                     }
                     else if (mirFleet.robots[r].schedule.state == "Done")

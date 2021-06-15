@@ -48,6 +48,8 @@ public class Robot
     public bool deadRobotAlarmNotTriggered = true;
     private CancellationTokenSource _cts = new CancellationTokenSource();
 
+    public bool conveyingInPrint = true;
+
     // To keep track of how long missions take to dispatch
     public int missionDespatchID { get; set; }
 

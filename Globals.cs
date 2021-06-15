@@ -337,11 +337,14 @@ public static class Globals
         try
         {
             comms = new HttpClient();
+            comms.Timeout = TimeSpan.FromMilliseconds(50);
             comms.DefaultRequestVersion = HttpVersion.Version11;
             comms.DefaultRequestHeaders.Accept.Clear();
             comms.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             comms.DefaultRequestHeaders.Add("Accept-Language", "en_US");
-            comms.Timeout = TimeSpan.FromMinutes(10);
+            comms.Timeout = TimeSpan.FromMilliseconds(50);
+            //comms.Timeout = TimeSpan.FromMinutes(10);
+            // Changed timeout
 
             logger(AREA, INFO, "MiR HTTP Header Created");
         }
