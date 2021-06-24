@@ -71,7 +71,7 @@ In the “Protection” tab, select “Full access” and Check “Permit access
 
 
 
-## AMR Connect Configuration
+# AMR Connect Configuration
 
 The following details are necessary to set up communications on AMR Connect:
 
