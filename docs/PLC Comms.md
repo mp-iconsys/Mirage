@@ -69,7 +69,7 @@ In the “Protection” tab, select “Full access” and Check “Permit access
 
 ![alt text](https://github.com/mp-iconsys/Mirage/blob/master/docs/Full%20Accesspng.png "Full Access")
 
-
+<br />
 
 # AMR Connect Configuration
 
