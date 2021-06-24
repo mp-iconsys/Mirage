@@ -91,37 +91,21 @@ All the data is read on start-up and cannot be configured during runtime. It’s
 <?xml version="1.0" encoding="utf-8" ?>
 
 <configuration>
-
-<configSections>
-
-<section name="plc" type="siemens.plc" />
-
-</configSections>
-
-<plc>
-
-<connectionString>
-
-<ip>192.168.0.1</ip>
-
-<port>102</port>
-
-<rack>0</rack>
-
-<slot>1</slot>
-
-</connectionString>
-
-<data>
-
-<taskControlDB>5</taskControlDB>
-
-<dataStorageDB>6</dataStorageDB>
-
-</data>
-
-</plc>
-
+  <configSections>
+    <section name="plc" type="siemens.plc" />
+  </configSections>
+  <plc>
+    <connectionString>
+      <ip>192.168.0.1</ip>
+      <port>102</port>
+      <rack>0</rack>
+      <slot>1</slot>
+    </connectionString>
+    <data>
+      <taskControlDB>5</taskControlDB>
+      <dataStorageDB>6</dataStorageDB>
+    </data>
+  </plc>
 </configuration>
 ```
 
