@@ -52,27 +52,22 @@ Before starting work, the PLC needs to be configured so the driver can access th
 
 3. The access level must be “full” and the “connection mechanism” must allow GET/PUT.
 
-1) This is self-explanatory
+**1) This is self-explanatory**
 
-2) Changing the optimized block access
+**2) Changing the optimized block access**
 
 Select the DB in the left pane under “Program blocks” and press Alt-Enter (or in the contextual menu select “Properties…”).
-
 Go to the “Attributes” tab.
-
 Uncheck Optimized block access - it’s checked by default.
 
 ![alt text](https://github.com/mp-iconsys/Mirage/blob/master/docs/Optimized%20Block%20Access.png "Optimized Block Access")
 
-3) Changing the access level
+**3) Changing the access level**
 
 Select the CPU project in the left pane and press Alt-Enter (or in the contextual menu select “Properties…”)
-
 In the “Protection” tab, select “Full access” and Check “Permit access with PUT/GET ….” as in the picture.
 
-Required Details
-
-The following details are necessary to set up communi
+![alt text](https://github.com/mp-iconsys/Mirage/blob/master/docs/Full%20Accesspng.png "Full Access")
 
 ## AMR Connect Configuration
 
@@ -91,7 +86,6 @@ In addition, the number of the data blocks as they appear in the PLC needs to be
 All the data is read on start-up and cannot be configured during runtime. It’s accessed through a configuration file in the /config directory or from the database if it's been configured via the web browser. An example is given below:
 ```xml
 <?xml version="1.0" encoding="utf-8" ?>
-
 <configuration>
   <configSections>
     <section name="plc" type="siemens.plc" />
