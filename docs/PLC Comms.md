@@ -70,6 +70,7 @@ In the “Protection” tab, select “Full access” and Check “Permit access
 ![alt text](https://github.com/mp-iconsys/Mirage/blob/master/docs/Full%20Accesspng.png "Full Access")
 
 
+
 ## AMR Connect Configuration
 
 The following details are necessary to set up communications on AMR Connect:
