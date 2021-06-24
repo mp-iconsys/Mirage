@@ -40,7 +40,7 @@ The PLC will have two data blocks: the Task Control block, used for issuing task
 
 Task Control is scanned every loop, roughly once every 10ms.
 
-The Visio document for more details. Particularly sections “PLC Data Blocks” and “PLC w/comments”. Additional tasks, storage areas and codes can be added as required with minimum difficulty.
+See the Visio document for more details. Particularly sections “PLC Data Blocks” and “PLC w/comments”. Additional tasks, storage areas and codes can be added as required with minimum difficulty.
 
 ## PLC Configuration (In Detail)
 
@@ -87,7 +87,7 @@ The following details are necessary to set up communications on AMR Connect:
 In addition, the number of the data blocks as they appear in the PLC needs to be configured. This is only for the blocks that AMR Connect will read so Task Control and Data Storage blocks. If Task Control was DB5 in the PLC, 5 would be its number in AMR Connect.
 
 All the data is read on start-up and cannot be configured during runtime. It’s accessed through a configuration file in the /config directory or from the database if it's been configured via the web browser. An example is given below:
-```
+```xml
 <?xml version="1.0" encoding="utf-8" ?>
 
 <configuration>
