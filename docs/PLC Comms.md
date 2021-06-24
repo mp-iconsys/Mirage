@@ -10,8 +10,6 @@ Beyond the configuration, the devices need to be on the same network, with TCP/I
 
 # Implementation
 
-## General
-
 PLC communication is implemented via libnodave C# library which uses GET/PUT S7 Communication. For more information about GET/PUT, see Siemens documentation [here](https://cache.industry.siemens.com/dl/files/115/82212115/att_108330/v2/82212115_s7_communication_s7-1500_en.pdf). This is a well established method of data transfer often used between separate Siemens PLCs. 
 
 The following instructions are available in S7 Communication:
@@ -86,10 +84,10 @@ The following details are necessary to set up communications on AMR Connect:
 
 · Slot (only required for older PLCs, for newer it’s set to 1)
 
-In addition, the number of the data blocks as they appear in the PLC needs to be configured. This is only for the blocks that AMR Connect will read so Task Control and Data Storage blocks. If Task Control was DB5 in PLC, 5 would be its number in Mirage.
+In addition, the number of the data blocks as they appear in the PLC needs to be configured. This is only for the blocks that AMR Connect will read so Task Control and Data Storage blocks. If Task Control was DB5 in the PLC, 5 would be its number in AMR Connect.
 
-All the data is read on start-up and cannot be configured during runtime. It’s accessed through a configuration file in the /config directory. An example is given below:
-
+All the data is read on start-up and cannot be configured during runtime. It’s accessed through a configuration file in the /config directory or from the database if it's been configured via the web browser. An example is given below:
+```
 <?xml version="1.0" encoding="utf-8" ?>
 
 <configuration>
@@ -125,5 +123,6 @@ All the data is read on start-up and cannot be configured during runtime. It’s
 </plc>
 
 </configuration>
+```
 
 In addition, if a block is used that’s not strictly dedicated to communicating with Mirage a data offset will need to be provided (set to 0 if a block is only used for comms).Required Details
