@@ -62,6 +62,8 @@ Go to the “Attributes” tab.
 
 Uncheck Optimized block access - it’s checked by default.
 
+![alt text](https://github.com/mp-iconsys/Mirage/blob/master/docs/Optimized%20Block%20Access.png "Optimized Block Access")
+
 3) Changing the access level
 
 Select the CPU project in the left pane and press Alt-Enter (or in the contextual menu select “Properties…”)
