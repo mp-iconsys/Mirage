@@ -28,6 +28,17 @@ namespace Mirage
 
         public short returnParameter = 0;
         public short[] groups = new short[8] { (short)sizeOfFleet, 0, 0, 0, 0, 0, 0, 0 };
+
+        public int available_group = 1;
+        public int busy_group = 2;
+        public int offline_group = 3;
+
+        public int fleet_available_group = 3;
+        public int fleet_busy_group = 4;
+        public int fleet_offline_group = 5;
+
+        public bool scanRegisters = false;
+
         //public int[] robotMapping;
 
         //=========================================================|
@@ -303,13 +314,56 @@ namespace Mirage
                     g = new Robots();
                     g = JsonConvert.DeserializeObject<Robots>(fleetResponseTask.Result.Content.ReadAsStringAsync().Result);
 
+                    robots[robotID].s.robot_group_id = g.robot_group_id - 2;
+                    robots[robotID].s.mode_id = g.status.mode_id;
+                    robots[robotID].s.state_id = g.status.state_id;
+                    robots[robotID].s.uptime = g.status.uptime;
+                    robots[robotID].s.battery_time_remaining = g.status.battery_time_remaining;
+                    robots[robotID].s.battery_percentage = g.status.battery_percentage;
+                    robots[robotID].s.distance_to_next_target = g.status.distance_to_next_target;
+                    robots[robotID].s.moved = (float)g.status.moved;
+                    robots[robotID].s.footprint = g.status.footprint;
+                    robots[robotID].s.joystick_low_speed_mode_enabled = g.status.joystick_low_speed_mode_enabled;
+                    robots[robotID].s.joystick_web_session_id = g.status.joystick_web_session_id;
+                    robots[robotID].s.map_id = g.status.map_id;
+                    robots[robotID].s.mission_queue_id = g.status.mission_queue_id.ToString();
+                    robots[robotID].s.mission_text = g.status.mission_text;
+                    robots[robotID].s.mode_key_state = g.status.mode_key_state;
+                    robots[robotID].s.mode_text = g.status.mode_text;
+                    robots[robotID].s.robot_name = g.status.robot_name;
+                    robots[robotID].s.safety_system_muted = g.status.safety_system_muted;
+                    robots[robotID].s.session_id = g.status.session_id;
+                    robots[robotID].s.state_text = g.status.state_text;
+                    robots[robotID].s.unloaded_map_changes = g.status.unloaded_map_changes;
+
+                    robots[robotID].s.position.x = g.status.position.x;
+                    robots[robotID].s.position.y = g.status.position.y;
+                    robots[robotID].s.position.orientation = g.status.position.orientation;
+
+                    robots[robotID].s.velocity.linear = g.status.velocity.linear;
+                    robots[robotID].s.velocity.angular = g.status.velocity.angular;
+                    robots[robotID].s.position.x = g.status.position.x;
+
+                    if(g.status.errors.Count > 0)
+                    { 
+                        robots[robotID].s.code = g.status.errors[0].code;
+                        robots[robotID].s.description = g.status.errors[0].description;
+                        robots[robotID].s.module = g.status.errors[0].module;
+                    }
+                    else
+                    {
+                        robots[robotID].s.code = 0;
+                        robots[robotID].s.description = "0";
+                        robots[robotID].s.module = "0";
+                    }
+
                     //int a = 
                     //= new rest.Robots();
                     //g = JsonConvert.DeserializeObject<rest.Robots>(fleetResponseTask.Result.Content.ReadAsStringAsync().Result);
                     //_ = g.Root.fleet_state;
 
                     // Robot Group is offset by 2 from the fleet robot group
-                    robots[robotID].s.robot_group_id = g.robot_group_id - 2;
+                    //robots[robotID].s.robot_group_id = g.robot_group_id - 2;
 
                     //robots[robotID].saveStatusInMemory(fleetResponseTask.Result);
 
@@ -721,31 +775,48 @@ namespace Mirage
 
         public async void getRegisters()
         {
-            try
+            for (int robotID = 0; robotID < sizeOfFleet; robotID++)
             {
-                try
+                if (mirFleet.robots[robotID].schedule.mission_number == 50 || mirFleet.robots[robotID].schedule.mission_number == 51)
                 {
-                    mirFleet.issueGetRequests("registers");
+                    //logger(AREA, INFO, "Scanning the Registers For (doing tote in/out) " + mirFleet.robots[robotID].s.robot_name);
 
-                    for (int i = 0; i < sizeOfFleet; i++)
+                    if (robots[robotID].isLive)
                     {
-                        if (robots[i].isLive)
+                        try
                         {
-                            robots[i].saveRegistersWithoutDB(httpResponseTasks[i].Result);
+                            try
+                            {
+                                httpResponseTasks[robotID] = robots[robotID].sendGetRequest("registers");
+
+                                if(robots[robotID].isLive)
+                                { 
+                                    robots[robotID].saveRegistersWithoutDB(httpResponseTasks[robotID].Result);
+                                }
+                            }
+                            catch (HttpRequestException exception)
+                            {
+                                // TODO: Remove the task which is causing the exception
+                                logger(AREA, ERROR, "HTTP Request Error. Couln't connect to the MiR robots.");
+                                logger(AREA, ERROR, "Check your network, dns settings, robot is up, etc. Error: ", exception);
+                                robots[robotID].deadRobotAlarm();
+                            }
+                        }
+                        catch (System.Net.WebException exception)
+                        {
+                            logger(AREA, ERROR, "HTTP WebException Connection Error In Fleet.isueGetRequests: ", exception);
+                            robots[robotID].deadRobotAlarm();
                         }
                     }
+                    else if (robots[robotID].deadRobotAlarmNotTriggered)
+                    {
+                        logger(AREA, WARNING, "Robot " + robotID + " Is Not Live");
+                    }
                 }
-                catch (HttpRequestException exception)
+                else
                 {
-                    // TODO: Handle more exceptions
-                    // TODO: Remove the task which is causing the exception
-                    logger(AREA, ERROR, "HTTP Request Error. Couln't connect to the MiR robots.");
-                    logger(AREA, ERROR, "Check your network, dns settings, robot is up, etc. Error: ", exception);
+                    scanRegisters = false;
                 }
-            }
-            catch (Exception exception)
-            {
-                logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
             }
         }
 
@@ -925,6 +996,10 @@ namespace Mirage
                 logger(AREA, DEBUG, "Robot " + i + " has live status of " + robots[i].isLive.ToString());
             }
 
+            logger(AREA, INFO, "Getting Initial Registers");
+
+            mirFleet.getRegisters();
+
             // Get Initial Robot Statuses
             for (int robotID = 0; robotID < sizeOfFleet; robotID++)
             {
@@ -939,6 +1014,8 @@ namespace Mirage
             {
                 mirFleet.robots[robotID].currentJob.getLatestJob(robotID);
             }
+
+
         }
     }
 }

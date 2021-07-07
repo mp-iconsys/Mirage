@@ -24,11 +24,17 @@ public static class Globals
     //  Global Variables                                       |     
     //=========================================================|
     public static bool keepRunning = true;
+    public static bool db_connection;
     public static bool resumingSession = false;
+    public static bool wifiScanEnabled = false;
+    public static int chargingThreshold = 20;
+    public static int releaseThreshold = 40;
     public static int pollInterval;
     public static int sizeOfFleet;
     public static MySqlConnection db;
     public static MySqlConnection log_db;
+    public static MySqlConnection current_status_db;
+    public static MySqlConnection clear_alarms_db;
     public static HttpClient comms;
     public static AuthenticationHeaderValue fleetManagerAuthToken;
     public static string fleetManagerIP;
@@ -162,6 +168,11 @@ public static class Globals
             mirFleet = new Fleet(sizeOfFleet);
         }
 
+        //=========================================================|
+        //  Clear Existing Alarms                                  |     
+        //=========================================================|
+        clearAlarms();
+
         logger(AREA, DEBUG, "Settings Obtained");
     }
 
@@ -180,8 +191,14 @@ public static class Globals
             log_db = new MySqlConnection(ConfigurationManager.ConnectionStrings["master"].ConnectionString);
             log_db.Open();
 
-            logger(AREA, INFO, "Starting Mirage v0.18");
-            logger(AREA, INFO, "Obtaining Settings");
+            clear_alarms_db = new MySqlConnection(ConfigurationManager.ConnectionStrings["master"].ConnectionString);
+            clear_alarms_db.Open();
+
+            current_status_db = new MySqlConnection(ConfigurationManager.ConnectionStrings["master"].ConnectionString);
+            current_status_db.Open();
+
+            //logger(AREA, INFO, "Starting Mirage v0.18");
+            //logger(AREA, INFO, "Obtaining Settings");
             logger(AREA, INFO, "Connected To Master DB");
         }
         catch (MySqlException exception)
@@ -196,6 +213,12 @@ public static class Globals
 
                 log_db = new MySqlConnection(ConfigurationManager.ConnectionStrings["slave"].ConnectionString);
                 log_db.Open();
+
+                clear_alarms_db = new MySqlConnection(ConfigurationManager.ConnectionStrings["slave"].ConnectionString);
+                clear_alarms_db.Open();
+
+                current_status_db = new MySqlConnection(ConfigurationManager.ConnectionStrings["master"].ConnectionString);
+                current_status_db.Open();
 
                 logger(AREA, INFO, "Connected To Slave DB");
                 sendSMS("Failed to connect to master database.");
@@ -262,6 +285,18 @@ public static class Globals
                 {
                     fleetManagerAuthToken = new AuthenticationHeaderValue("Basic", rdr.GetString(2));
                 }
+                else if (rdr.GetString(1) == "wifiScanEnabled")
+                {
+                    wifiScanEnabled = Boolean.Parse(rdr.GetString(2));
+                }
+                else if (rdr.GetString(1) == "chargingThreshold")
+                {
+                    chargingThreshold = Int32.Parse(rdr.GetString(2));
+                }
+                else if (rdr.GetString(1) == "releaseThreshold")
+                {
+                    releaseThreshold = Int32.Parse(rdr.GetString(2));
+                }
             }
         }
         catch
@@ -293,8 +328,8 @@ public static class Globals
     }
 
     /// <summary>
-        /// Establishes default communications with the PLC and standard headers for HTTP REST traffic.
-        /// </summary>
+    /// Establishes default communications with the PLC and standard headers for HTTP REST traffic.
+    /// </summary>
     public static void setUpDefaultComms()
     {
         logger(AREA, DEBUG, "==== Setting Up Connection Details ====");
@@ -302,11 +337,14 @@ public static class Globals
         try
         {
             comms = new HttpClient();
+            comms.Timeout = TimeSpan.FromMilliseconds(50);
             comms.DefaultRequestVersion = HttpVersion.Version11;
             comms.DefaultRequestHeaders.Accept.Clear();
             comms.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             comms.DefaultRequestHeaders.Add("Accept-Language", "en_US");
-            comms.Timeout = TimeSpan.FromMinutes(10);
+            comms.Timeout = TimeSpan.FromSeconds(30);
+            //comms.Timeout = TimeSpan.FromMinutes(10);
+            // Changed timeout
 
             logger(AREA, INFO, "MiR HTTP Header Created");
         }
@@ -318,6 +356,48 @@ public static class Globals
         SiemensPLC.establishConnection();
 
         logger(AREA, DEBUG, "==== Connections Established ====");
+    }
+
+    public static void gracefulStartUp()
+    {
+        try
+        {
+            string sql = "SELECT * FROM current_status ORDER BY ROBOT_ID asc;";
+            using var cmd = new MySqlCommand(sql, db);
+            using MySqlDataReader rdr = cmd.ExecuteReader();
+
+            int robotID = 0;
+
+            while (rdr.Read())
+            {
+                if(robotID != fleetID)
+                { 
+                    logger(AREA, INFO, "Reading Status Data For " + mirFleet.robots[robotID].s.robot_name + "");
+
+                    //mirFleet.robots[robotID].currentJob.job = rdr.GetInt32(3);
+                    mirFleet.robots[robotID].schedule.id = rdr.GetInt32(4);
+                    mirFleet.robots[robotID].schedule.state_id = rdr.GetInt32(5);
+                    mirFleet.robots[robotID].schedule.mission_number = rdr.GetInt32(6);
+                    SiemensPLC.robots[robotID].setTaskStatus(rdr.GetInt32(7));
+
+                    robotID++;
+                }
+                else if(robotID == fleetID)
+                {
+                    logger(AREA, INFO, "Reading Status Data For Fleet Manager");
+
+                    mirFleet.fleetManager.schedule.id = rdr.GetInt32(4);
+                    mirFleet.fleetManager.schedule.state_id = rdr.GetInt32(5);
+                    mirFleet.fleetManager.schedule.mission_number = rdr.GetInt32(6);
+                    SiemensPLC.robots[robotID].setTaskStatus(rdr.GetInt32(7));
+                    mirFleet.returnParameter = (short)rdr.GetInt32(11);
+                }
+            }
+        }
+        catch
+        {
+            connectToDB();
+        }
     }
 
     /// <summary>
@@ -571,12 +651,30 @@ public static class Globals
         logger(AREA, DEBUG, "==== SMS Alert Sent ====");
     }
 
+    public static void clearAlarms()
+    {
+        try
+        {
+            string sql = "UPDATE alarms a SET END = NOW() WHERE END IS NULL;";
+            using var cmd = new MySqlCommand(sql, db);
+            using MySqlDataReader rdr = cmd.ExecuteReader();
+
+            logger(AREA, INFO, "Cleared Old Alarms");
+        }
+        catch (Exception exception)
+        {
+            logger(AREA, ERROR, "Failed To Clear Alarms: ", exception);
+        }
+    }
+
     /// <summary>
     /// Sends various parameters on start-up so that fleet is correct
     /// </summary>
     public static void initializeFleet()
     {
         logger(AREA, INFO, "Initializing Fleet Data: Robot, Mission and Charging Groups + Missions");
+
+        int waitTimer = 0;
 
         if(resumingSession)
         {
@@ -612,7 +710,7 @@ public static class Globals
                     HttpRequestMessage tempReq = temp.postRequest(name, desc, allow_all, created_by);
 
                     mirFleet.fleetManager.sendRESTdata(tempReq);
-                    Thread.Sleep(50);
+                    Thread.Sleep(waitTimer);
                 }
             }
             catch (Exception e)
@@ -670,7 +768,7 @@ public static class Globals
 
                     mirFleet.fleetManager.sendRESTdata(request);
 
-                    Thread.Sleep(50);
+                    Thread.Sleep(waitTimer);
                 }
             }
             catch (Exception e)
@@ -727,7 +825,7 @@ public static class Globals
                     mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Missions[i].postRequest(true));
                 }
 
-                Thread.Sleep(50);
+                Thread.Sleep(waitTimer);
                 i++;
             }
 
@@ -740,8 +838,21 @@ public static class Globals
 
         mirFleet.getFleetRobotIDs();
 
+        if (resumingSession == false)
+        {
+            string sql = "UPDATE app_config SET `Value` = 'false' WHERE ID = 4;";
+            using var cmd = new MySqlCommand(sql, db);
+            using MySqlDataReader rdr = cmd.ExecuteReader();
+        }
+
+        mirFleet.getInitialFleetData();
+
+        gracefulStartUp();
+
         logger(AREA, INFO, "Finished Fleet Initialization");
     }
+
+
 
     /// <summary>
     /// Copies the data from Mirage internal memory to PLC buffer
@@ -856,6 +967,104 @@ public static class Globals
         }
     }
 
+
+    /// <summary>
+    /// Store current robot and fleet data in a database, for graceful start-up
+    /// </summary>
+    public static void saveCurrentStatusToDB()
+    {
+        // Store current ID for each of the robots
+        for(int robotID = 0; robotID < sizeOfFleet; robotID++)
+        {
+            MySqlCommand cmd8 = new MySqlCommand("update_current_status");
+
+            try
+            {
+                cmd8.CommandType = CommandType.StoredProcedure;
+                cmd8.Parameters.Add(new MySqlParameter("ROBOT_ID", robotID));
+                cmd8.Parameters.Add(new MySqlParameter("ROBOT_GROUP", mirFleet.robots[robotID].s.robot_group_id));
+                cmd8.Parameters.Add(new MySqlParameter("CURRENT_JOB", mirFleet.robots[robotID].currentJob.job));
+                cmd8.Parameters.Add(new MySqlParameter("SCHEDULE_ID", mirFleet.robots[robotID].schedule.id));
+                cmd8.Parameters.Add(new MySqlParameter("SCHEDULE_STATE_ID", mirFleet.robots[robotID].schedule.state_id));
+                cmd8.Parameters.Add(new MySqlParameter("MISSION_NUMBER", mirFleet.robots[robotID].schedule.mission_number));
+
+                cmd8.Parameters.Add(new MySqlParameter("OUTGOING_TASK_CONTROL", SiemensPLC.robots[robotID].getTaskStatus()));
+                cmd8.Parameters.Add(new MySqlParameter("INCOMING_TASK_CONTROL", SiemensPLC.robots[robotID].getPLCTaskStatus()));
+                cmd8.Parameters.Add(new MySqlParameter("RETURN_PARAMETER", 0)); // In fleet, it's mirFleet.returnParameter
+                cmd8.Parameters.Add(new MySqlParameter("BATTERY_PERCENTAGE", mirFleet.robots[robotID].s.battery_percentage));
+                cmd8.Parameters.Add(new MySqlParameter("ROBOT_STATE_ID", mirFleet.robots[robotID].s.state_id));
+                cmd8.Parameters.Add(new MySqlParameter("MISSION_TEXT", mirFleet.robots[robotID].s.mission_text));
+                cmd8.Parameters.Add(new MySqlParameter("DISTANCE_TO_NEXT_TARGET", mirFleet.robots[robotID].s.distance_to_next_target));
+
+                try
+                {
+                    cmd8.Connection = current_status_db;
+                    cmd8.Prepare();
+                    int rowsAffected = cmd8.ExecuteNonQuery();
+                    cmd8.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    cmd8.Dispose();
+                    current_status_db.Close();
+                    logger(AREA, ERROR, "MySQL Query In Globals.saveCurrentStatusToDB Failed with error: ", exception);
+                    connectToDB();
+                }
+            }
+            catch (Exception exception)
+            {
+                cmd8.Dispose();
+                current_status_db.Close();
+                logger(AREA, ERROR, "MySQL Query Error In Globals.saveCurrentStatusToDB: ", exception);
+                connectToDB();
+            }
+        }
+
+        // Do Fleet Now
+        try
+        {
+            MySqlCommand cmd9 = new MySqlCommand("update_current_status");
+
+            cmd9.CommandType = CommandType.StoredProcedure;
+            cmd9.Parameters.Add(new MySqlParameter("ROBOT_ID", fleetID));
+            cmd9.Parameters.Add(new MySqlParameter("ROBOT_GROUP", 0));
+            cmd9.Parameters.Add(new MySqlParameter("CURRENT_JOB", 0));
+            cmd9.Parameters.Add(new MySqlParameter("SCHEDULE_ID", mirFleet.fleetManager.schedule.id));
+            cmd9.Parameters.Add(new MySqlParameter("SCHEDULE_STATE_ID", mirFleet.fleetManager.schedule.state_id));
+            cmd9.Parameters.Add(new MySqlParameter("MISSION_NUMBER", mirFleet.fleetManager.schedule.mission_number));
+
+            cmd9.Parameters.Add(new MySqlParameter("OUTGOING_TASK_CONTROL", SiemensPLC.fleetBlock.getTaskStatus()));
+            cmd9.Parameters.Add(new MySqlParameter("INCOMING_TASK_CONTROL", SiemensPLC.fleetBlock.getPLCTaskStatus()));
+            cmd9.Parameters.Add(new MySqlParameter("RETURN_PARAMETER", mirFleet.returnParameter));
+            cmd9.Parameters.Add(new MySqlParameter("BATTERY_PERCENTAGE", 0));
+            cmd9.Parameters.Add(new MySqlParameter("ROBOT_STATE_ID", 0));
+            cmd9.Parameters.Add(new MySqlParameter("MISSION_TEXT", ""));
+            cmd9.Parameters.Add(new MySqlParameter("DISTANCE_TO_NEXT_TARGET", 0.0));
+            //cmd.Parameters.Add(new MySqlParameter("BATTERY_PERCENTAGE", 0));
+
+            try
+            {
+                cmd9.Connection = current_status_db;
+                cmd9.Prepare();
+                int rowsAffected = cmd9.ExecuteNonQuery();
+                cmd9.Dispose();
+            }
+            catch (Exception exception)
+            {
+                cmd9.Dispose();
+                current_status_db.Close();
+                logger(AREA, ERROR, "MySQL Query In Globals.saveCurrentStatusToDB Failed with error: ", exception);
+                connectToDB();
+            }
+        }
+        catch (Exception exception)
+        {
+            current_status_db.Close();
+            logger(AREA, ERROR, "MySQL Query Error In Globals.saveCurrentStatusToDB: ", exception);
+            connectToDB();
+        }
+    }
+
     public static void saveLogToDB(Type type, DebugLevel debug, string message)
     {
         MySqlCommand cmd = new MySqlCommand("store_app_log");
@@ -877,12 +1086,25 @@ public static class Globals
             catch (Exception exception)
             {
                 cmd.Dispose();
+                log_db.Dispose();
+                db.Dispose();
+                current_status_db.Dispose();
+                clear_alarms_db.Dispose() ;
+                connectToDB();
+
                 logger(AREA, ERROR, "MySQL Query In Globals.saveLogToDB Failed with error: ", exception);
             }
         }
         catch (Exception exception)
         {
             cmd.Dispose();
+
+            log_db.Dispose();
+            db.Dispose();
+            current_status_db.Dispose();
+            clear_alarms_db.Dispose();
+            connectToDB();
+
             logger(AREA, ERROR, "MySQL Query Error In Globals.saveLogToDB: ", exception);
         }
     }

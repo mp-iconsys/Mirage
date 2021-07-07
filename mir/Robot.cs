@@ -26,7 +26,7 @@ public class Robot
     //=========================================================|
     //  KPI, OEM & Statistics                                  |
     //=========================================================|
-    public int maxRegister = 13;
+    public int maxRegister = 41;
 
     //=========================================================|
     //  Data which makes up the robot                          |     
@@ -47,6 +47,11 @@ public class Robot
     public int alarm_id;
     public bool deadRobotAlarmNotTriggered = true;
     private CancellationTokenSource _cts = new CancellationTokenSource();
+
+    public bool conveyingInPrint = true;
+
+    // To keep track of how long missions take to dispatch
+    public int missionDespatchID { get; set; }
 
     //=========================================================|
     //  Used For Logging & Debugging                           |     
@@ -70,6 +75,7 @@ public class Robot
         currentJob = new Job();
         isLive = true;
         deadRobotAlarmNotTriggered = true;
+        missionDespatchID = 0;
     }
 
     /// <summary>
@@ -89,6 +95,7 @@ public class Robot
         currentJob = new Job();
         isLive = true;
         deadRobotAlarmNotTriggered = true;
+        missionDespatchID = 0;
     }
 
     /// <summary>
@@ -117,6 +124,7 @@ public class Robot
 
         isLive = true;
         deadRobotAlarmNotTriggered = true;
+        missionDespatchID = 0;
     }
 
     /// <summary>
@@ -306,7 +314,6 @@ public class Robot
             if (result.IsSuccessStatusCode)
             {
                 isLive = true;
-                // clear the alarm
                 clearDeadRobotAlarm();
                 timer.Reset();
             }
@@ -345,7 +352,7 @@ public class Robot
         isLive = false;
 
         string area = "MiR/Fleet Connection";
-        string name = "Robot " + s.robot_name + ", Serial Number: " + s.serial_number + ", ID: " + id + " Lost Connection To AMR-Connect";
+        string name = s.robot_name + " Lost Connection To AMR-Connect";
 
         try
         {
@@ -377,17 +384,34 @@ public class Robot
 
     public void clearDeadRobotAlarm()
     {
-        MySqlCommand cmd = new MySqlCommand("falling_edge_alarm");
+        logger(AREA, INFO, s.robot_name + " Is Back Online. Clearing Alarm : " + alarm_id);
 
         try
         {
-            cmd.CommandType = CommandType.StoredProcedure;
-            cmd.Parameters.Add(new MySqlParameter("LID", alarm_id));
-            issueQuery(cmd);
+            try
+            {
+                MySqlCommand cmd6 = new MySqlCommand();
+                cmd6.Connection = clear_alarms_db;
+                cmd6.CommandText = "falling_edge_alarm";
+                cmd6.CommandType = CommandType.StoredProcedure;
+
+                cmd6.Parameters.AddWithValue("@LID", alarm_id);
+                cmd6.Parameters["@LID"].Direction = ParameterDirection.Input;
+                cmd6.ExecuteNonQuery();
+
+                cmd6.Dispose();
+                /*                string sql = "CALL falling_edge_alarm(" + alarm_id + ");";
+                                using var cmd6 = new MySqlCommand(sql, clear_alarms_db);
+                                using MySqlDataReader rdr8 = cmd6.ExecuteReader();
+                                cmd6.Dispose();*/
+            }
+            catch (Exception exception)
+            {
+                logger(AREA, ERROR, "Failed To Clear Alarm: ", exception);
+            }
         }
         catch (Exception exception)
         {
-            cmd.Dispose();
             logger(AREA, ERROR, "MySQL Query Error: ", exception);
         }
 
@@ -415,11 +439,11 @@ public class Robot
 
                 if (result.IsSuccessStatusCode)
                 {
-                    logger(AREA, INFO, "Status Code: ");
+                    //logger(AREA, INFO, "Status Code: ");
 
                     statusCode = (int)result.StatusCode;
 
-                    logger(AREA, INFO, "Status Code: ");
+                    //logger(AREA, INFO, "Status Code: ");
 
                     //schedule = JsonConvert.DeserializeObject<Scheduler>(result.Content.ReadAsStringAsync().Result);
                     //schedule.working_response = true;
@@ -470,7 +494,7 @@ public class Robot
         }
         else
         {
-            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Robot Groups");
+            logger(AREA, WARNING, s.robot_name + " Is Not Live, Couldn't Fetch Robot Groups");
         }
 
         return statusCode;
@@ -500,10 +524,11 @@ public class Robot
                 {
                     statusCode = (int)result.StatusCode;
 
-                    logger(AREA, INFO, "REST Status Code: ");
+                    //logger(AREA, INFO, "REST Status Code: ");
 
                     schedule = JsonConvert.DeserializeObject<Scheduler>(result.Content.ReadAsStringAsync().Result);
                     schedule.working_response = true;
+                    schedule.print_working_response = true;
 
                     if (result.StatusCode.ToString() == "BadRequest")
                     {
@@ -541,6 +566,7 @@ public class Robot
                     logger(AREA, DEBUG, "Bad Request - Failed to process");
                     statusCode = Globals.TaskStatus.CouldntProcessRequest;
                     schedule.working_response = false;
+                    schedule.print_working_response = false;
                 }
             }
             catch (Exception exception)
@@ -550,7 +576,7 @@ public class Robot
         }
         else
         {
-            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Robot Groups");
+            logger(AREA, WARNING, s.robot_name + " Is Not Live, Couldn't Fetch Robot Groups");
         }
 
         return statusCode;
@@ -588,7 +614,7 @@ public class Robot
         }
         else if(deadRobotAlarmNotTriggered)
         {
-            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Robot Groups");
+            logger(AREA, WARNING, s.robot_name + " Is Not Live, Couldn't Fetch Robot Groups");
         }
     }
 
@@ -619,7 +645,7 @@ public class Robot
         }
         else if(deadRobotAlarmNotTriggered)
         {
-            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Robot Groups");
+            logger(AREA, WARNING, s.robot_name + " Is Not Live, Couldn't Fetch Robot Groups");
         }
     }
 
@@ -663,7 +689,7 @@ public class Robot
         }
         else if (deadRobotAlarmNotTriggered)
         {
-            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Robot Groups");
+            logger(AREA, WARNING, s.robot_name + " Is Not Live, Couldn't Fetch Robot Groups");
         }
     }
 
@@ -698,7 +724,7 @@ public class Robot
         }
         else if (deadRobotAlarmNotTriggered)
         {
-            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Settings");
+            logger(AREA, WARNING, s.robot_name + " Is Not Live, Couldn't Fetch Settings");
         }
     }
 
@@ -730,7 +756,7 @@ public class Robot
         }
         else if (deadRobotAlarmNotTriggered)
         {
-            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Status");
+            logger(AREA, WARNING, s.robot_name + " Is Not Live, Couldn't Fetch Status");
         }
     }
 
@@ -767,7 +793,7 @@ public class Robot
         }
         else if (deadRobotAlarmNotTriggered)
         {
-            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Missions");
+            logger(AREA, WARNING, s.robot_name + " Is Not Live, Couldn't Fetch Missions");
         }
     }
 
@@ -794,7 +820,7 @@ public class Robot
         }
         else if (deadRobotAlarmNotTriggered)
         {
-            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Status");
+            logger(AREA, WARNING, s.robot_name + " Is Not Live, Couldn't Fetch Status");
         }
     }
 
@@ -824,7 +850,7 @@ public class Robot
         }
         else if (deadRobotAlarmNotTriggered)
         {
-            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Registers");
+            logger(AREA, WARNING, s.robot_name + " Is Not Live, Couldn't Fetch Registers");
         }
     }
 
@@ -854,7 +880,7 @@ public class Robot
             {
                 MySqlCommand cmd = new MySqlCommand();
                 cmd.Connection = db;
-                cmd.CommandText = "store_12_registers";
+                cmd.CommandText = "store_40_registers";
                 cmd.CommandType = CommandType.StoredProcedure;
 
                 cmd.Parameters.AddWithValue("@ROBOT_ID", id);
@@ -881,7 +907,7 @@ public class Robot
         }
         else if (deadRobotAlarmNotTriggered)
         {
-            logger(AREA, WARNING, "Robot " + id + " Is Not Live, Couldn't Fetch Registers");
+            logger(AREA, WARNING, s.robot_name + " Is Not Live, Couldn't Fetch Registers");
         }
     }
 }

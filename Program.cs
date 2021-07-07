@@ -5,6 +5,8 @@ using System.Threading.Tasks;
 using static SiemensPLC;
 using static Globals;
 using static Globals.DebugLevel;
+using MySql.Data.MySqlClient;
+using System.Data;
 
 class Program
 {
@@ -17,15 +19,9 @@ class Program
     {
         readAllSettings();
 
-        mirFleet.getFleetRobotIDs();
-
         initializeFleet();
 
-        mirFleet.getInitialFleetData();
-
         logger(AREA, INFO, "==== Starting Main Loop ====");
-
-        long i = 0;
 
         // Used for saving data into DB
         Stopwatch timer = new Stopwatch();
@@ -43,14 +39,20 @@ class Program
         //====================================================|
         while (keepRunning)
         {
-            logger(AREA, DEBUG, "==== Loop " + ++i + " Starting ====");
-
             if (plcConnected)
             {
                 //====================================================|
                 //  Poll the PLC for new tasks                        |
                 //====================================================|
                 poll();
+
+                for(int i = 0; i < sizeOfFleet+1; i++)
+                {
+                    if(newMsgs[i])
+                    {
+                        newMsg = true;
+                    }
+                }
 
                 //====================================================|
                 //  Perform tasks if there's a new message            |
@@ -65,9 +67,9 @@ class Program
                     //====================================================|
                     if (newMsgs[0])
                     {
-                        logger(AREA, INFO, "Task For Fleet");
-                        logger(AREA, INFO, "Task Number: " + fleetBlock.getTaskNumber());
-                        logger(AREA, INFO, "Task Parameter: " + fleetBlock.getTaskParameter());
+                        logger(AREA, INFO, "PLC Task For Fleet");
+                        logger(AREA, INFO, "PLC Task Number: " + fleetBlock.getTaskNumber());
+                        logger(AREA, INFO, "PLC Task Parameter: " + fleetBlock.getTaskParameter());
 
                         updateTaskStatus(fleetID, Globals.TaskStatus.StartedProcessing);
 
@@ -110,9 +112,9 @@ class Program
                         
                         if (newMsgs[robotMessage])
                         {
-                            logger(AREA, INFO, "Task For Robot: " + robotID);
-                            logger(AREA, INFO, "Task Number: " + robots[robotID].getTaskNumber());
-                            logger(AREA, INFO, "Task Parameter: " + robots[robotID].getTaskParameter());
+                            logger(AREA, INFO, "PLC Task For " + mirFleet.robots[robotID].s.robot_name);
+                            logger(AREA, INFO, "PLC Task Number: " + robots[robotID].getTaskNumber());
+                            logger(AREA, INFO, "PLC Task Parameter: " + robots[robotID].getTaskParameter());
 
                             //New Mission, so set Mission Status to Idle
                             mirFleet.robots[robotID].schedule.state_id = Globals.TaskStatus.Idle;
@@ -144,7 +146,6 @@ class Program
                             }
 
                             updateTaskStatus(robotID, taskStatus);
-                            //SiemensPLC.writeRobotBlock(j, taskStatus);
 
                             newMsgs[robotMessage] = false;
                         }
@@ -166,6 +167,8 @@ class Program
 
                 //====================================================|
                 // Fetch registers prior to checking mission status   |
+                // This is as we need current register values for     |
+                // Conveying on and off                               |
                 //====================================================|
                 mirFleet.getRegisters();
 
@@ -179,12 +182,17 @@ class Program
                 //====================================================|
                 for (int k = 0; k < sizeOfFleet; k++)
                 {
-                    getRobotStatus(k);
+                    if(wifiScanEnabled)
+                    {
+                        // Take WiFi Network scans here
+                    }
 
                     getRobotStatusFromFleet(k);
 
                     writeRobotBlock(k);
                 }
+
+                checkAvailableRobotsForBattery();
 
                 //====================================================|
                 // TODO: Check if we need to write to fleet at        |
@@ -206,7 +214,7 @@ class Program
 
                 checkRESTConnectivity(robotDowntimeTimer);
 
-                calculationsAndReporting();
+                //calculationsAndReporting();
                 timer.Restart();
                 mirFleet.pollRobots();
             }
@@ -231,15 +239,24 @@ class Program
             //====================================================|
             printNewMessageStatus();
 
-            logger(AREA, DEBUG, "==== Loop " + i + " Finished ====");
-
-            Thread.Sleep(100); // Remove in live deployment
+            saveCurrentStatusToDB();
         }
 
         gracefulTermination();
     }
 
+    /// <summary>
+    /// 
+    /// </summary>
+    private static void clearDB()
+    {
 
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="timer"></param>
     private static void checkRESTConnectivity(Stopwatch timer)
     {
         logger(AREA, DEBUG, "Checking REST Connections");
@@ -253,12 +270,93 @@ class Program
         {
             if(!mirFleet.robots[robotID].isLive)
             {
-                logger(AREA, INFO, "Checking Connection For Robot " + robotID);
+                logger(AREA, INFO, "Checking " + mirFleet.robots[robotID].s.robot_name + " Connection");
 
                 mirFleet.robots[robotID].CheckConnection(timer);
             }
         }
     }
+
+    /// <summary>
+    /// Go through the robots in the fleet
+    /// </summary>
+    private static void checkAvailableRobotsForBattery()
+    {
+        for(int robotID = 0; robotID < sizeOfFleet; robotID++)
+        {
+            // If the robot is in available group and the battery is below the threshold, put into a charging group
+            if(mirFleet.robots[robotID].s.battery_percentage < chargingThreshold && mirFleet.robots[robotID].s.robot_group_id == mirFleet.available_group)
+            {
+                int restStatus;
+                int taskStat;
+                int waitTime = 50;
+                int fleetRobotID = mirFleet.robots[robotID].fleetRobotID;
+
+                //======================================================================|
+                // In case the release robot command is driven by a sequence break:     |
+                // - Clear any errors from the robot.                                   |
+                // - Upnause (put into ready state)                                     |
+                //======================================================================|
+                mirFleet.robots[robotID].sendRESTdata(mirFleet.robots[robotID].s.putRequest(mirFleet.robots[robotID].getBaseURI()));
+                mirFleet.robots[robotID].sendRESTdata(mirFleet.robots[robotID].s.putReadyRequest(mirFleet.robots[robotID].getBaseURI()));
+
+                //======================================================================|
+                // Delete from the busy group                                           |
+                // This request might not succeed, depending on what happened           |
+                //======================================================================|
+                restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.busy.deleteRequest(fleetRobotID));
+
+                if (restStatus == Globals.TaskStatus.CompletedNoErrors)
+                {
+                    logger(AREA, INFO, mirFleet.robots[robotID].s.robot_name + " Was Released From Empty Charge Group");
+
+                    // We succeeded at deleting the robot from the old charging group
+                    // Wait for a bit and assign the empty/available charging group
+                    Thread.Sleep(waitTime);
+                    restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.available.postRequest(fleetRobotID));
+
+                    if (restStatus == Globals.TaskStatus.CompletedNoErrors)
+                    {
+                        taskStat = Globals.TaskStatus.CompletedNoErrors;
+                    }
+                    else
+                    {
+                        taskStat = Globals.TaskStatus.FatalError;
+                        logger(AREA, WARNING, "Failed To Assign " + mirFleet.robots[robotID].s.robot_name + " To Full Charge Group");
+                    }
+                }
+                else
+                {
+                    logger(AREA, INFO, "Failed To Remove " + mirFleet.robots[robotID].s.robot_name + " From Empty Charge Group.");
+
+                    // We failed to delete the robot from an old charging group
+                    // If we failed because the robot wasn't in the group, just put it in the charging group
+                    Thread.Sleep(waitTime);
+                    restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.available.postRequest(fleetRobotID));
+
+                    if (restStatus == Globals.TaskStatus.CompletedNoErrors)
+                    {
+                        taskStat = Globals.TaskStatus.CompletedNoErrors;
+                    }
+                    else
+                    {
+                        taskStat = Globals.TaskStatus.FatalError;
+                        logger(AREA, WARNING, "Failed To Assign " + mirFleet.robots[robotID].s.robot_name + " To Full Charge Group");
+                    }
+                }
+
+                sendRobotGroup(robotID, mirFleet.fleet_offline_group);
+            }
+
+            // Check the robots in a charging group, if they're  
+            // If the robot is in available group and the battery is below the threshold, put into a charging group
+            if (mirFleet.robots[robotID].s.battery_percentage >= releaseThreshold && mirFleet.robots[robotID].s.robot_group_id == mirFleet.offline_group)
+            {
+                sendRobotGroup(robotID, mirFleet.fleet_available_group);
+            }
+        }
+    }
+
 
     /// <summary>
     /// Sends a mission to Fleet Scheduler. If the robotID is the fleet ID, it sends a mision to fleet and checks which robot got assigned after a delay.
@@ -274,7 +372,6 @@ class Program
         //======================================================|
         int mission_number = plcMissionNumber - PLCMissionOffset;
         int restStatus;
-        //int waitTimeForMissionAssignment = 10;
 
         logger(AREA, INFO, "==== Sending A New Mission To The Scheduler ====");
 
@@ -291,7 +388,6 @@ class Program
 
             logger(AREA, INFO, "Mission For Fleet: Any Robot In The Available Group");
             logger(AREA, INFO, "PLC Mission No:" + plcMissionNumber + " : " + mirFleet.fleetManager.Missions[mission_number].name);
-            mirFleet.fleetManager.Missions[mission_number].print();
 
             //======================================================|
             // If successfull, this returns Schedule ID and         |
@@ -300,7 +396,9 @@ class Program
             // assignment to see what robot was assigned            |
             //======================================================|
             restStatus = mirFleet.fleetManager.sendScheduleRequest(mirFleet.fleetManager.Missions[mission_number].postRequest());
+
             mirFleet.fleetManager.schedule.mission_number = mission_number;
+            mirFleet.fleetManager.schedule.plc_mission_number = plcMissionNumber;
         }
         else
         {
@@ -311,9 +409,8 @@ class Program
                 mission_number = mission_number + 53;
             }
 
-            logger(AREA, INFO, "Mission Sent Directly To AMR-C Robot: " + robotID + ", Fleet Robot: " + fleetRobotID + ", PLC Robot: " + mirFleet.robots[robotID].plcRobotID);
+            logger(AREA, INFO, "Mission Sent To " + mirFleet.robots[robotID].s.robot_name);
             logger(AREA, INFO, "PLC Mission No:" + plcMissionNumber + " : " + mirFleet.fleetManager.Missions[mission_number].name);
-            mirFleet.fleetManager.Missions[mission_number].print();
 
             if(mission_number == (Tasks.ReleaseRobot - PLCMissionOffset))
             {
@@ -322,12 +419,11 @@ class Program
             else
             {
                 restStatus = mirFleet.robots[robotID].sendScheduleRequest(mirFleet.fleetManager.Missions[mission_number].postRequest(fleetRobotID));
+
+                mirFleet.robots[robotID].schedule.mission_number = mission_number;
+                mirFleet.robots[robotID].schedule.plc_mission_number = plcMissionNumber;
+                logger(AREA, INFO, "The Schedule ID IS: " + mirFleet.robots[robotID].schedule.id);
             }
-
-            //restStatus = mirFleet.robots[robotID].sendScheduleRequest(mirFleet.fleetManager.Missions[mission_number].postRequest(fleetRobotID));
-            mirFleet.robots[robotID].schedule.mission_number = mission_number;
-
-            logger(AREA, INFO, "The Schedule ID IS: " + mirFleet.robots[robotID].schedule.id);
 
             // Add a record to the robot's job ledger - this is a new mission added on top of the existing mission stack
             if(plcMissionNumber != Tasks.ReleaseRobot)
@@ -366,17 +462,36 @@ class Program
     /// </summary>
     private static int sendRobotGroup(int robotID, int robotGroupID)
     {
-        logger(AREA, INFO, "==== Send (Change) Robot Group To Scheduler ====");
+        string group_name = "";
 
-        //int robotID = 1;
-        //int robotGroupID = 2;
+        if(robotGroupID == mirFleet.fleet_available_group)
+        {
+            group_name = "Available Group (ID: " + robotGroupID + ")";
+        }
+        else if(robotGroupID == mirFleet.fleet_busy_group)
+        {
+            group_name = "Busy Group (ID: " + robotGroupID + ")";
+        }
+        else if(robotGroupID == mirFleet.fleet_offline_group)
+        {
+            group_name = "Offline Group (ID: " + robotGroupID + ")";
+        }
+        else
+        {
+            group_name = "Unknown Group With ID: " + robotGroupID;
+        }
 
-        // Need to add whether to turn alarm on/off and which alarm to affect from PLC
-        int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Group.putRequest(robotID, robotGroupID));
+        logger(AREA, INFO, mirFleet.robots[robotID].s.robot_name + " Is Changing Robot Group To -> " + group_name);
+
+        int fleetRobotID = mirFleet.robots[robotID].fleetRobotID;
+        int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Group.putRequest(fleetRobotID, robotGroupID));
 
         //SiemensPLC.updateTaskStatus(restStatus);
         logger(AREA, DEBUG, "Status: " + restStatus);
         logger(AREA, DEBUG, "==== Robot Group Changed ====");
+
+        mirFleet.robots[robotID].sendRESTdata(mirFleet.robots[robotID].s.putPauseRequest(mirFleet.robots[robotID].getBaseURI()));
+        mirFleet.robots[robotID].sendRESTdata(mirFleet.robots[robotID].s.putReadyRequest(mirFleet.robots[robotID].getBaseURI()));
 
         return restStatus;
     }
@@ -389,9 +504,6 @@ class Program
     {
         logger(AREA, DEBUG, "Saving Robot Groups In Fleet PLC Block");
 
-        // Comment out for now - we're relying on keeping track of the groups ourselves
-        //int restStatus = mirFleet.issueGetRequest("robots?whitelist=robot_group_id", SiemensPLC.fleetID);
-
         fleetMemoryToPLC();
         SiemensPLC.writeFleetBlock(SiemensPLC.fleetBlock.getTaskStatus());
     }
@@ -401,13 +513,15 @@ class Program
     /// </summary>
     private static int createMission()
     {
-        logger(AREA, INFO, "==== Create New Mission In Robot " + SiemensPLC.robotID + " ====");
+/*        logger(AREA, INFO, "==== Create New Mission In Robot " + SiemensPLC.robotID + " ====");
 
-        int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Missions[0].createMission(SiemensPLC.parameter));
+        int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.Missions[0].createMission(SiemensPLC.parameter));*/
 
         logger(AREA, DEBUG, "==== Created New Mission ====");
 
-        return restStatus;
+        return 0;
+
+        //return restStatus;
     }
 
     /// <summary>
@@ -440,27 +554,37 @@ class Program
             int currentMissionRobot = 0;
             int restStatus = 0;
 
-            logger(AREA, INFO, "Current Scheduler Fleet Robot ID is: " + mirFleet.fleetManager.schedule.robot_id);
-            logger(AREA, INFO, "Current Mission Schedule ID is: " + mirFleet.fleetManager.schedule.id);
+            if(mirFleet.fleetManager.schedule.print_working_response)
+            { 
+                logger(AREA, INFO, "Waiting To Assign Robot For Mission " + mirFleet.fleetManager.schedule.plc_mission_number + " : " + mirFleet.fleetManager.Missions[mirFleet.fleetManager.schedule.mission_number].name);
+                mirFleet.fleetManager.schedule.print_working_response = false;
+            }
+            //logger(AREA, INFO, "Current Scheduler Fleet Robot ID is: " + mirFleet.fleetManager.schedule.robot_id);
+            //logger(AREA, INFO, "Current Mission Schedule ID is: " + mirFleet.fleetManager.schedule.id);
 
             restStatus = mirFleet.issueGetRequest("mission_scheduler/" + mirFleet.fleetManager.schedule.id, fleetID);
 
-            logger(AREA, DEBUG, "Mission Scheduler Robot ID After polling is: " + mirFleet.fleetManager.schedule.robot_id);
+            //logger(AREA, DEBUG, "Mission Scheduler Robot ID After polling is: " + mirFleet.fleetManager.schedule.robot_id);
 
             if (restStatus == Globals.TaskStatus.CompletedNoErrors && mirFleet.fleetManager.schedule.robot_id != 0)
             {
-                logger(AREA, INFO, "It Took Fleet " + robotAssignment.Elapsed.TotalSeconds + " Seconds To Find An Available Robot");
                 robotAssignment.Stop();
-
-                //currentMissionRobot = mirFleet.fleetManager.schedule.robot_id - 3; // TODO: This is as the robots are offset by one in fleet - change to be better
 
                 currentMissionRobot = mirFleet.getInternalRobotID(mirFleet.fleetManager.schedule.robot_id);
 
                 mirFleet.returnParameter = (short)(mirFleet.robots[currentMissionRobot].plcRobotID);
 
-                logger(AREA, INFO, "Mission " + mirFleet.fleetManager.schedule.id + " Has A New Robot (Mirage: " + currentMissionRobot + ", Fleet: " + mirFleet.fleetManager.schedule.robot_id + ")");
+                //logger(AREA, INFO, "Mission " + mirFleet.fleetManager.schedule.id + " Has A New Robot (Mirage: " + currentMissionRobot + ", Fleet: " + mirFleet.fleetManager.schedule.robot_id + ")");
+                logger(AREA, INFO, "Mission " + mirFleet.fleetManager.schedule.plc_mission_number + ": " + mirFleet.fleetManager.Missions[mirFleet.fleetManager.schedule.mission_number].name + " Was Assigned To " + mirFleet.robots[currentMissionRobot].s.robot_name);
+                logger(AREA, INFO, "It Took Fleet " + robotAssignment.Elapsed.TotalSeconds + " Seconds To Assign A Robot");
 
                 mirFleet.robots[currentMissionRobot].schedule.id = mirFleet.fleetManager.schedule.id;
+                mirFleet.robots[currentMissionRobot].schedule.plc_mission_number = mirFleet.fleetManager.schedule.plc_mission_number;
+                mirFleet.robots[currentMissionRobot].schedule.mission_number = mirFleet.fleetManager.schedule.mission_number;
+                mirFleet.robots[currentMissionRobot].schedule.state_id = Globals.TaskStatus.StartedProcessing;
+                mirFleet.robots[currentMissionRobot].schedule.state = " ";
+
+                logger(AREA, INFO, "The Scheduler ID is: " + mirFleet.robots[currentMissionRobot].schedule.id);
 
                 occupyRobot(currentMissionRobot);
 
@@ -471,11 +595,13 @@ class Program
                 mirFleet.robots[currentMissionRobot].currentJob.startJob(mission_number, mirFleet.fleetManager.Missions[mission_number].name);
 
                 mirFleet.fleetManager.schedule.working_response = false;
+                mirFleet.fleetManager.schedule.print_working_response = true;
             }
             else
             {
                 restStatus = Globals.TaskStatus.StartedProcessing;
                 mirFleet.fleetManager.schedule.working_response = true;
+                mirFleet.fleetManager.schedule.print_working_response = false;
             }
 
             SiemensPLC.writeFleetBlock(restStatus);
@@ -500,26 +626,36 @@ class Program
                 || fleetBlock.getPLCTaskStatus() != Globals.TaskStatus.Idle 
                 || mirFleet.robots[r].schedule.state_id != Globals.TaskStatus.Idle))
             {
+                
                 // Check the status of the mission assigned to robot r
-                logger(AREA, INFO, "==== Robot ID: " + r + " And Mission Scheduler Robot ID is: " + mirFleet.robots[r].fleetRobotID + " ====");
-                logger(AREA, INFO, "Mission Schedule ID is: " + mirFleet.robots[r].schedule.id);
+                //logger(AREA, INFO, "==== Robot ID: " + r + " And Mission Scheduler Robot ID is: " + mirFleet.robots[r].fleetRobotID + " ====");
+                //logger(AREA, INFO, "Mission Schedule ID is: " + mirFleet.robots[r].schedule.id);
 
                 restStatus = mirFleet.checkMissionSchedule("mission_scheduler/" + mirFleet.robots[r].schedule.id + "?whilelist=state", fleetID, r);
 
-                logger(AREA, INFO, "Mission Status For Robot: " + r + " is: " + mirFleet.robots[r].schedule.state);
-
-                if(robots[r].getTaskParameter() == 351 || robots[r].getTaskParameter() == 352)
+                if(mirFleet.robots[r].schedule.state != mirFleet.robots[r].schedule.old_state)
                 {
-                    logger(AREA, INFO, "Conveyor On/Off Register In MiR is: " + mirFleet.robots[r].Registers[1].value);
-                    logger(AREA, INFO, "Mission Status is: " + mirFleet.robots[r].schedule.state_id);
+                    logger(AREA, INFO, mirFleet.robots[r].s.robot_name + " Is In State: " + mirFleet.robots[r].schedule.old_state + " -> " + mirFleet.robots[r].schedule.state + " For Mission " + mirFleet.robots[r].schedule.plc_mission_number + " : " + mirFleet.fleetManager.Missions[mirFleet.robots[r].schedule.mission_number].name);
+                    //logger(AREA, INFO, "The Scheduler ID is: " + mirFleet.robots[r].schedule.id);
+                    mirFleet.robots[r].schedule.old_state = mirFleet.robots[r].schedule.state;
+                }
 
+                if (robots[r].getTaskParameter() == 351 || robots[r].getTaskParameter() == 352)
+                {
                     if (mirFleet.robots[r].schedule.state == "Pending")
                     {
                         mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.TaskReceivedFromPLC;
                     }
                     else if (mirFleet.robots[r].schedule.state == "Executing" && (int)(mirFleet.robots[r].Registers[1].value) == 1)
                     {
+                        if (mirFleet.robots[r].conveyingInPrint)
+                        {
+                            logger(AREA, INFO, mirFleet.robots[r].s.robot_name + " Started Conveying In/Out");
+                            mirFleet.robots[r].conveyingInPrint = false;
+                        }
+
                         mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.StartedProcessing;
+                        updateTaskStatus(r, Globals.TaskStatus.StartedProcessing);
                     }
                     else if (mirFleet.robots[r].schedule.state == "Outbound")
                     {
@@ -530,6 +666,7 @@ class Program
                         mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.CouldntProcessRequest;
                         mirFleet.robots[r].schedule.id = 0;
                         updateTaskStatus(r, Globals.TaskStatus.CouldntProcessRequest);
+                        mirFleet.robots[r].conveyingInPrint = true;
                         //mirFleet.robots[r].currentJob.finishMission();
                         mirFleet.robots[r].currentJob.finishJob(r, true);
                     }
@@ -537,6 +674,7 @@ class Program
                     {
                         mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.CompletedNoErrors;
                         mirFleet.robots[r].schedule.id = 0;
+                        mirFleet.robots[r].conveyingInPrint = true;
                         mirFleet.robots[r].currentJob.finishMission();
                     }
                 }
@@ -561,29 +699,15 @@ class Program
                         //mirFleet.robots[r].currentJob.finishMission();
                         mirFleet.robots[r].currentJob.finishJob(r, true);
                         mirFleet.robots[r].schedule.id = 0;
+                        logger(AREA, INFO, "Mission Failed");
+                        logger(AREA, INFO, "Setting Scheduler ID to 0 (Idle) for " + mirFleet.robots[r].s.robot_name);
                     }
                     else if (mirFleet.robots[r].schedule.state == "Done")
                     {
-                        // Used to be else if (mirFleet.robots[r].schedule.state == "Done")
-                        // Potentially remove this condition as the dock prox checks are now done inside MiRs
-                        if ((int)(mirFleet.robots[r].Registers[2].value) == 1)
-                        {
-                            mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.CompletedNoErrors;
-                            mirFleet.robots[r].schedule.id = 0;
-                            mirFleet.robots[r].currentJob.finishMission();
-                        }
-                        else if(robots[r].getTaskParameter() == 353)
-                        {
-                            mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.CompletedNoErrors;
-                            mirFleet.robots[r].schedule.id = 0;
-                            mirFleet.robots[r].currentJob.finishMission();
-                        }
-                        else
-                        {
-                            mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.CouldntProcessRequest;
-                            mirFleet.robots[r].schedule.id = 0;
-                            mirFleet.robots[r].currentJob.finishMission();
-                        }
+                        mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.CompletedNoErrors;
+                        mirFleet.robots[r].schedule.id = 0;
+                        logger(AREA, INFO, "Setting Scheduler ID to 0 (Idle) for " + mirFleet.robots[r].s.robot_name);
+                        mirFleet.robots[r].currentJob.finishMission();
                     }
                     else
                     {
@@ -591,7 +715,7 @@ class Program
                     }
                 }
 
-                logger(AREA, DEBUG, "Mission Status For Robot: " + r + " State ID is: " + mirFleet.robots[r].schedule.state_id);
+                logger(AREA, DEBUG, "Mission Status For " + mirFleet.robots[r].s.robot_name  + " State ID is: " + mirFleet.robots[r].schedule.state_id);
             }
         }
     }
@@ -650,9 +774,18 @@ class Program
         int restStatus;
         int taskStat;
         int fleetRobotID = mirFleet.robots[robotID].fleetRobotID;
-        int waitTime = 50;
+        int waitTime = 0;
 
-        logger(AREA, INFO, "Releasing Robot " + robotID + " (Fleet ID: " + fleetRobotID + ") From The Busy Group");
+        logger(AREA, INFO, "Releasing " + mirFleet.robots[robotID].s.robot_name +  " From The Busy Group");
+        logger(AREA, INFO, "Battery % is: " + mirFleet.robots[robotID].s.battery_percentage);
+        
+        Thread.Sleep(50);
+
+        zeroRobotTasks(robotID);
+
+        // We've got two situations:
+        // - either the robot's battery is above twenty 20 atfer the job, in which case put it into a charge group until 40% 
+        // - or the robot's battery is above 20 after the job, in which case do the usual release robot
 
         //======================================================================|
         // In case the release robot command is driven by a sequence break:     |
@@ -662,58 +795,65 @@ class Program
         mirFleet.robots[robotID].sendRESTdata(mirFleet.robots[robotID].s.putRequest(mirFleet.robots[robotID].getBaseURI()));
         mirFleet.robots[robotID].sendRESTdata(mirFleet.robots[robotID].s.putReadyRequest(mirFleet.robots[robotID].getBaseURI()));
 
-        //======================================================================|
-        // Delete from the busy group                                           |
-        // This request might not succeed, depending on what happened           |
-        //======================================================================|
-        restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.busy.deleteRequest(fleetRobotID));
-
-        if(restStatus == Globals.TaskStatus.CompletedNoErrors)
-        {
-            logger(AREA, INFO, mirFleet.robots[robotID].s.robot_name + " Was Released From Empty Charge Group");
-
-            // We succeeded at deleting the robot from the old charging group
-            // Wait for a bit and assign the empty/available charging group
-            Thread.Sleep(waitTime);
-            restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.available.postRequest(fleetRobotID));
+            //======================================================================|
+            // Delete from the busy group                                           |
+            // This request might not succeed, depending on what happened           |
+            //======================================================================|
+            restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.busy.deleteRequest(fleetRobotID));
 
             if(restStatus == Globals.TaskStatus.CompletedNoErrors)
             {
-                taskStat = Globals.TaskStatus.CompletedNoErrors;
+                logger(AREA, INFO, mirFleet.robots[robotID].s.robot_name + " Was Released From Empty Charge Group");
+
+                // We succeeded at deleting the robot from the old charging group
+                // Wait for a bit and assign the empty/available charging group
+                Thread.Sleep(waitTime);
+                restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.available.postRequest(fleetRobotID));
+
+                if(restStatus == Globals.TaskStatus.CompletedNoErrors)
+                {
+                    taskStat = Globals.TaskStatus.CompletedNoErrors;
+                }
+                else
+                {
+                    taskStat = Globals.TaskStatus.FatalError;
+                    logger(AREA, WARNING, "Failed To Assign " + mirFleet.robots[robotID].s.robot_name + " To Full Charge Group");
+                }
             }
             else
             {
-                taskStat = Globals.TaskStatus.FatalError;
-                logger(AREA, WARNING, "Failed To Assign " + mirFleet.robots[robotID].s.robot_name + " To Full Charge Group");
-            }
-        }
-        else
-        {
-            logger(AREA, INFO, "Failed To Remove " + mirFleet.robots[robotID].s.robot_name + " From Empty Charge Group.");
+                logger(AREA, INFO, "Failed To Remove " + mirFleet.robots[robotID].s.robot_name + " From Empty Charge Group.");
 
-            // We failed to delete the robot from an old charging group
-            // If we failed because the robot wasn't in the group, just put it in the charging group
-            Thread.Sleep(waitTime);
-            restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.available.postRequest(fleetRobotID));
+                // We failed to delete the robot from an old charging group
+                // If we failed because the robot wasn't in the group, just put it in the charging group
+                Thread.Sleep(waitTime);
+                restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.available.postRequest(fleetRobotID));
 
-            if (restStatus == Globals.TaskStatus.CompletedNoErrors)
-            {
-                taskStat = Globals.TaskStatus.CompletedNoErrors;
+                if (restStatus == Globals.TaskStatus.CompletedNoErrors)
+                {
+                    taskStat = Globals.TaskStatus.CompletedNoErrors;
+                }
+                else
+                {
+                    taskStat = Globals.TaskStatus.FatalError;
+                    logger(AREA, WARNING, "Failed To Assign " + mirFleet.robots[robotID].s.robot_name + " To Full Charge Group");
+                }
             }
-            else
-            {
-                taskStat = Globals.TaskStatus.FatalError;
-                logger(AREA, WARNING, "Failed To Assign " + mirFleet.robots[robotID].s.robot_name + " To Full Charge Group");
-            }
-        }
 
-        //==================================================================|
-        // Need to send a dummy mission so as to prompt the robot           |
-        // The robot will enter an "Executing State" and at the end         |
-        // it will go back to the idle state.                               |
-        // This makes it process the change in charging group               |
-        //==================================================================|
-        sendMissionToScheduler(Tasks.ReleaseRobot, robotID);
+            //==================================================================|
+            // Need to send a dummy mission so as to prompt the robot           |
+            // The robot will enter an "Executing State" and at the end         |
+            // it will go back to the idle state.                               |
+            // This makes it process the change in charging group               |
+            //==================================================================|
+            sendMissionToScheduler(Tasks.ReleaseRobot, robotID);
+
+        Thread.Sleep(50);
+
+        //Thread.Sleep(250);
+
+        // Complete the job, save to DB and clear the job ledger
+        mirFleet.robots[robotID].currentJob.finishJob(robotID, false);
 
         //==================================================================|
         // Put the robot into the available group. This enables it to       |
@@ -724,17 +864,31 @@ class Program
         // Preferably, fetch the group info at the very begining            |
         //==================================================================|
         try
-        {
-            sendRobotGroup(fleetRobotID, 3);
-        }
-        catch(Exception e)
-        {
-            logger(AREA, ERROR, "Failed To Put Robot Into Available Group");
-            logger(AREA, ERROR, "Exception: ", e);
-        }
+            {
+                if (mirFleet.robots[robotID].s.battery_percentage > chargingThreshold)
+                {
+                    sendRobotGroup(robotID, mirFleet.fleet_available_group);
+                }
+                else
+                {
+                    sendRobotGroup(robotID, mirFleet.fleet_offline_group);
+                }
+            }
+            catch(Exception e)
+            {
+                logger(AREA, ERROR, "Failed To Put " + mirFleet.robots[robotID].s.robot_name + " Into Available Group");
+                logger(AREA, ERROR, "Exception: ", e);
+            }
 
-        // Complete the job, save to DB and clear the job ledger
-        mirFleet.robots[robotID].currentJob.finishJob(robotID, false);
+            //==================================================================|
+            // This is to actualize the robot and charging group changes.       |
+            // We're pausing and unpausing the robot                            |
+            //==================================================================|
+            mirFleet.robots[robotID].sendRESTdata(mirFleet.robots[robotID].s.putPauseRequest(mirFleet.robots[robotID].getBaseURI()));
+            mirFleet.robots[robotID].sendRESTdata(mirFleet.robots[robotID].s.putReadyRequest(mirFleet.robots[robotID].getBaseURI()));
+
+        // Checking the PLC response
+        //checkPLCResponse();
 
         return taskStat;
     }
@@ -750,14 +904,14 @@ class Program
         int taskStat;
         int fleetRobotID = mirFleet.robots[robotID].fleetRobotID;
 
-        logger(AREA, INFO, "Releasing Robot " + fleetRobotID + " (Fleet ID: " + fleetRobotID + ") From Busy Charging Group");
+        logger(AREA, INFO, "Occupying " + mirFleet.robots[robotID].s.robot_name + " -> Moving To Busy Group");
 
         // Sending a delete request
         restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.available.deleteRequest(fleetRobotID));
 
         if (restStatus == Globals.TaskStatus.CompletedNoErrors)
         {
-            logger(AREA, INFO, "Robot " + fleetRobotID + " Put Into Empty Charge Group");
+            logger(AREA, INFO, "Robot " + mirFleet.robots[robotID].s.robot_name + " Put Into Empty Charge Group");
 
             // We succeeded at deleting the robot from the old charging group
             // Wait for a bit and assign the empty/available charging group
@@ -799,7 +953,7 @@ class Program
         try
         {
             // Available group has group id 3
-            sendRobotGroup(fleetRobotID, 4);
+            sendRobotGroup(robotID, mirFleet.fleet_busy_group);
         }
         catch (Exception e)
         {
