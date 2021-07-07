@@ -23,11 +23,14 @@ namespace Mirage.plc
         public Alarm[] alarm_array = new Alarm[176];
 
         public int conveyorOffset = 460;
-        public int conveyorBlockSize = 1;
-        public Alarm[] conveyor_array = new Alarm[8];
+        public int conveyorBlockSize = 3;
+        public static int convBlockSize = 3;
+
+        public Alarm[] conveyor_array = new Alarm[convBlockSize * 8];
 
         public Alarms()
         {
+
             string[] alarm_names = { 
 "AV010 North", 
 "AV010 South",
@@ -48,7 +51,7 @@ namespace Mirage.plc
 
 "UKL South", 
 "D7a South",
-"HTR1 South",
+"HTR2 South",
 "HTR3 South",
 "MLA South",
 "HTR4 South",
@@ -65,7 +68,7 @@ namespace Mirage.plc
 
 "UKL East",
 "D7a East",
-"HTR1 East",
+"HTR2 East",
 "HTR3 East",
 "MLA East",
 "HTR4 East",
@@ -83,7 +86,7 @@ namespace Mirage.plc
 "AIV",
 "UKL",
 "D7a",
-"HTR1",
+"HTR2",
 "HTR3",
 "MLA a",
 "HTR4",
@@ -104,7 +107,7 @@ namespace Mirage.plc
 "AV050",
 "UKL",
 "D7a",
-"HTR1",
+"HTR2",
 "HTR3",
 "MLA a",
 "HTR4",
@@ -133,18 +136,18 @@ namespace Mirage.plc
 
 "UKL_In",
 "D7a_In",
-"HTR1_In",
+"HTR2_In",
 "HTR3_In",
-"MLA a_In",
-"MLA b_In",
+"MLA_In",
+"HTR4_In",
 "HTR7_In",
 "HTR9_In",
 "UKL_Out",
 "D7a_Out",
 "HTR1_Out",
 "HTR3_Out",
-"MLA a_Out",
-"MLA b_Out",
+"MLA_Out",
+"HTR4_Out",
 "HTR7_Out",
 "HTR9_Out",
 
@@ -184,7 +187,7 @@ namespace Mirage.plc
 
 "Delivery to UKL",
 "Delivery to D7a",
-"Delivery to HTR1",
+"Delivery to HTR2",
 "Delivery to HTR3",
 "Delivery to MLA",
 "Delivery to HTR4",
@@ -192,7 +195,7 @@ namespace Mirage.plc
 "Delivery to HTR9",
 "Collection From UKL",
 "Collection From D7a",
-"Collection From HTR1",
+"Collection From HTR2",
 "Collection From HTR3",
 "Collection From MLA",
 "Collection From HTR4",
@@ -217,7 +220,7 @@ namespace Mirage.plc
 "15" };
 
 
-            string[] conveyorName = { "UKL", "D7a", "HTR1", "HTR3", "MLA", "HTR4", "HTR7", "HTR9" };
+            string[] conveyorName = { "UKL", "D7a", "HTR2", "HTR3", "MLA", "HTR4", "HTR7", "HTR9", "A Sequence Is Inhibited", "Spare 1", "Spare 2", "Spare 3", "Spare 4", "Spare 5", "Spare 6", "Spare 7", "UKL Space Available", "D7a Available", "HTR2 Available", "HTR3 Available", "MLA AVailable", "HTR4 Available", "HTR7 Available", "HTR9 Available"};
 
             int x = 0;
 
@@ -254,7 +257,7 @@ namespace Mirage.plc
                 }
             }
        
-            for(int c = 0; c < 8; c++)
+            for(int c = 0; c < conveyor_array.Length; c++)
             {
                 conveyor_array[c] = new Alarm();
                 conveyor_array[c].old_triggered = true;

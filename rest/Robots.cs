@@ -70,6 +70,9 @@ namespace Mirage.rest
 
         public class ErrorsItem
         {
+            public int code { get; set; }
+            public string description { get; set; }
+            public string module { get; set; }
         }
 
         public class Trolley

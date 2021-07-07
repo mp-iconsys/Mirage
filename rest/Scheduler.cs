@@ -22,6 +22,11 @@ namespace Mirage.rest
         public int robot_id { get; set; }
 
         public bool working_response;
+        public bool print_working_response;
+        public int plc_mission_number { get; set; }
+        public string old_state { get; set; }
+        public int old_robot_id { get; set; }
+        public int old_conveyor_register { get; set; }
 
         //=========================================================|
         //  Used For Logging & Debugging                           |     
@@ -32,6 +37,11 @@ namespace Mirage.rest
         {
             id = 0;
             state_id = 0;
+            plc_mission_number = 0;
+            old_robot_id = -1;
+            old_state = "Initial";
+            print_working_response = true;
+            old_conveyor_register = -10;
         }
 
         /// <summary>
