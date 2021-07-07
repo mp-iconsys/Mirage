@@ -46,13 +46,13 @@ class Program
                 //====================================================|
                 poll();
 
-/*                for(int i = 0; i < sizeOfFleet+1; i++)
+                for(int i = 0; i < sizeOfFleet+1; i++)
                 {
                     if(newMsgs[i])
                     {
                         newMsg = true;
                     }
-                }*/
+                }
 
                 //====================================================|
                 //  Perform tasks if there's a new message            |
@@ -287,6 +287,64 @@ class Program
             // If the robot is in available group and the battery is below the threshold, put into a charging group
             if(mirFleet.robots[robotID].s.battery_percentage < chargingThreshold && mirFleet.robots[robotID].s.robot_group_id == mirFleet.available_group)
             {
+                int restStatus;
+                int taskStat;
+                int waitTime = 50;
+                int fleetRobotID = mirFleet.robots[robotID].fleetRobotID;
+
+                //======================================================================|
+                // In case the release robot command is driven by a sequence break:     |
+                // - Clear any errors from the robot.                                   |
+                // - Upnause (put into ready state)                                     |
+                //======================================================================|
+                mirFleet.robots[robotID].sendRESTdata(mirFleet.robots[robotID].s.putRequest(mirFleet.robots[robotID].getBaseURI()));
+                mirFleet.robots[robotID].sendRESTdata(mirFleet.robots[robotID].s.putReadyRequest(mirFleet.robots[robotID].getBaseURI()));
+
+                //======================================================================|
+                // Delete from the busy group                                           |
+                // This request might not succeed, depending on what happened           |
+                //======================================================================|
+                restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.busy.deleteRequest(fleetRobotID));
+
+                if (restStatus == Globals.TaskStatus.CompletedNoErrors)
+                {
+                    logger(AREA, INFO, mirFleet.robots[robotID].s.robot_name + " Was Released From Empty Charge Group");
+
+                    // We succeeded at deleting the robot from the old charging group
+                    // Wait for a bit and assign the empty/available charging group
+                    Thread.Sleep(waitTime);
+                    restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.available.postRequest(fleetRobotID));
+
+                    if (restStatus == Globals.TaskStatus.CompletedNoErrors)
+                    {
+                        taskStat = Globals.TaskStatus.CompletedNoErrors;
+                    }
+                    else
+                    {
+                        taskStat = Globals.TaskStatus.FatalError;
+                        logger(AREA, WARNING, "Failed To Assign " + mirFleet.robots[robotID].s.robot_name + " To Full Charge Group");
+                    }
+                }
+                else
+                {
+                    logger(AREA, INFO, "Failed To Remove " + mirFleet.robots[robotID].s.robot_name + " From Empty Charge Group.");
+
+                    // We failed to delete the robot from an old charging group
+                    // If we failed because the robot wasn't in the group, just put it in the charging group
+                    Thread.Sleep(waitTime);
+                    restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.available.postRequest(fleetRobotID));
+
+                    if (restStatus == Globals.TaskStatus.CompletedNoErrors)
+                    {
+                        taskStat = Globals.TaskStatus.CompletedNoErrors;
+                    }
+                    else
+                    {
+                        taskStat = Globals.TaskStatus.FatalError;
+                        logger(AREA, WARNING, "Failed To Assign " + mirFleet.robots[robotID].s.robot_name + " To Full Charge Group");
+                    }
+                }
+
                 sendRobotGroup(robotID, mirFleet.fleet_offline_group);
             }
 
@@ -590,12 +648,14 @@ class Program
                     }
                     else if (mirFleet.robots[r].schedule.state == "Executing" && (int)(mirFleet.robots[r].Registers[1].value) == 1)
                     {
-                        if(mirFleet.robots[r].conveyingInPrint)
-                        { 
-                            logger(AREA, INFO, mirFleet.robots[r].s.robot_name + "Started Conveying In");
+                        if (mirFleet.robots[r].conveyingInPrint)
+                        {
+                            logger(AREA, INFO, mirFleet.robots[r].s.robot_name + " Started Conveying In/Out");
                             mirFleet.robots[r].conveyingInPrint = false;
                         }
+
                         mirFleet.robots[r].schedule.state_id = Globals.TaskStatus.StartedProcessing;
+                        updateTaskStatus(r, Globals.TaskStatus.StartedProcessing);
                     }
                     else if (mirFleet.robots[r].schedule.state == "Outbound")
                     {

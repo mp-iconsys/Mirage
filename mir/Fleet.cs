@@ -37,6 +37,8 @@ namespace Mirage
         public int fleet_busy_group = 4;
         public int fleet_offline_group = 5;
 
+        public bool scanRegisters = false;
+
         //public int[] robotMapping;
 
         //=========================================================|
@@ -773,31 +775,48 @@ namespace Mirage
 
         public async void getRegisters()
         {
-            try
+            for (int robotID = 0; robotID < sizeOfFleet; robotID++)
             {
-                try
+                if (mirFleet.robots[robotID].schedule.mission_number == 50 || mirFleet.robots[robotID].schedule.mission_number == 51)
                 {
-                    mirFleet.issueGetRequests("registers");
+                    //logger(AREA, INFO, "Scanning the Registers For (doing tote in/out) " + mirFleet.robots[robotID].s.robot_name);
 
-                    for (int i = 0; i < sizeOfFleet; i++)
+                    if (robots[robotID].isLive)
                     {
-                        if (robots[i].isLive)
+                        try
                         {
-                            robots[i].saveRegistersWithoutDB(httpResponseTasks[i].Result);
+                            try
+                            {
+                                httpResponseTasks[robotID] = robots[robotID].sendGetRequest("registers");
+
+                                if(robots[robotID].isLive)
+                                { 
+                                    robots[robotID].saveRegistersWithoutDB(httpResponseTasks[robotID].Result);
+                                }
+                            }
+                            catch (HttpRequestException exception)
+                            {
+                                // TODO: Remove the task which is causing the exception
+                                logger(AREA, ERROR, "HTTP Request Error. Couln't connect to the MiR robots.");
+                                logger(AREA, ERROR, "Check your network, dns settings, robot is up, etc. Error: ", exception);
+                                robots[robotID].deadRobotAlarm();
+                            }
+                        }
+                        catch (System.Net.WebException exception)
+                        {
+                            logger(AREA, ERROR, "HTTP WebException Connection Error In Fleet.isueGetRequests: ", exception);
+                            robots[robotID].deadRobotAlarm();
                         }
                     }
+                    else if (robots[robotID].deadRobotAlarmNotTriggered)
+                    {
+                        logger(AREA, WARNING, "Robot " + robotID + " Is Not Live");
+                    }
                 }
-                catch (HttpRequestException exception)
+                else
                 {
-                    // TODO: Handle more exceptions
-                    // TODO: Remove the task which is causing the exception
-                    logger(AREA, ERROR, "HTTP Request Error. Couln't connect to the MiR robots.");
-                    logger(AREA, ERROR, "Check your network, dns settings, robot is up, etc. Error: ", exception);
+                    scanRegisters = false;
                 }
-            }
-            catch (Exception exception)
-            {
-                logger(AREA, ERROR, "HTTP WebException Connection Error: ", exception);
             }
         }
 
@@ -977,6 +996,10 @@ namespace Mirage
                 logger(AREA, DEBUG, "Robot " + i + " has live status of " + robots[i].isLive.ToString());
             }
 
+            logger(AREA, INFO, "Getting Initial Registers");
+
+            mirFleet.getRegisters();
+
             // Get Initial Robot Statuses
             for (int robotID = 0; robotID < sizeOfFleet; robotID++)
             {
@@ -991,6 +1014,8 @@ namespace Mirage
             {
                 mirFleet.robots[robotID].currentJob.getLatestJob(robotID);
             }
+
+
         }
     }
 }

@@ -197,8 +197,8 @@ public static class Globals
             current_status_db = new MySqlConnection(ConfigurationManager.ConnectionStrings["master"].ConnectionString);
             current_status_db.Open();
 
-            logger(AREA, INFO, "Starting Mirage v0.18");
-            logger(AREA, INFO, "Obtaining Settings");
+            //logger(AREA, INFO, "Starting Mirage v0.18");
+            //logger(AREA, INFO, "Obtaining Settings");
             logger(AREA, INFO, "Connected To Master DB");
         }
         catch (MySqlException exception)
@@ -342,7 +342,7 @@ public static class Globals
             comms.DefaultRequestHeaders.Accept.Clear();
             comms.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             comms.DefaultRequestHeaders.Add("Accept-Language", "en_US");
-            comms.Timeout = TimeSpan.FromMilliseconds(50);
+            comms.Timeout = TimeSpan.FromSeconds(30);
             //comms.Timeout = TimeSpan.FromMinutes(10);
             // Changed timeout
 
