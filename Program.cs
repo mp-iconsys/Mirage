@@ -39,8 +39,6 @@ class Program
         //====================================================|
         while (keepRunning)
         {
-            if (plcConnected)
-            {
                 //====================================================|
                 //  Poll the PLC for new tasks                        |
                 //====================================================|
@@ -60,16 +58,16 @@ class Program
                 //====================================================|           
                 if (newMsg)
                 {
-                    logger(AREA, INFO, "==== New Task(s) From The PLC ====");
+                    logger(AREA, INFO, "==== New Task(s) From The Database ====");
 
                     //====================================================|
                     //  Fleet Manager Tasks                               |
                     //====================================================|
                     if (newMsgs[0])
                     {
-                        logger(AREA, INFO, "PLC Task For Fleet");
-                        logger(AREA, INFO, "PLC Task Number: " + fleetBlock.getTaskNumber());
-                        logger(AREA, INFO, "PLC Task Parameter: " + fleetBlock.getTaskParameter());
+                        logger(AREA, INFO, "New Task For Fleet");
+                        logger(AREA, INFO, "Task Number: " + fleetBlock.getTaskNumber());
+                        logger(AREA, INFO, "Task Parameter: " + fleetBlock.getTaskParameter());
 
                         updateTaskStatus(fleetID, Globals.TaskStatus.StartedProcessing);
 
@@ -159,13 +157,6 @@ class Program
                 checkPLCResponse();
 
                 //====================================================|
-                //  Read Alarms And Flag If Triggered                 |
-                //====================================================|
-                readAlarms();
-
-                checkConveyors();
-
-                //====================================================|
                 // Fetch registers prior to checking mission status   |
                 // This is as we need current register values for     |
                 // Conveying on and off                               |
@@ -188,25 +179,14 @@ class Program
                     }
 
                     getRobotStatusFromFleet(k);
-
-                    writeRobotBlock(k);
                 }
 
                 checkAvailableRobotsForBattery();
-
-                //====================================================|
-                // TODO: Check if we need to write to fleet at        |
-                // the end of every loop (might not be needed)        |
-                //====================================================|
-                getRobotGroups();
             }
             else
             {
                 logger(AREA, ERROR, "AMR-Connect To PLC Comms Have Dropped");
             }
-
-            checkConnectivity();
-
             // Poll MiR Fleet - async operation that happens every pollInterval
             if (timer.Elapsed.Seconds >= pollInterval)
             {
@@ -231,8 +211,6 @@ class Program
             }
 
             checkConfigChanges();
-
-            checkPLCReset();
 
             //====================================================|
             // For Debug Purposes                                 |
@@ -441,25 +419,6 @@ class Program
     /// <summary>
     /// 
     /// </summary>
-    private static int sendFireAlarm()
-    {
-        logger(AREA, INFO, "==== Send Fire Alarm To Scheduler ====");
-
-        // Need to add whether to turn alarm on/off and which alarm to affect from PLC
-        int restStatus = mirFleet.fleetManager.sendRESTdata(mirFleet.fleetManager.FireAlarm.putRequest(true, 1));
-
-        //SiemensPLC.updateTaskStatus(restStatus);
-        //logger(AREA, DEBUG, "Status: " + restStatus);
-        logger(AREA, DEBUG, "==== Fire Alarm Sent ====");
-
-        //Program.alarm_on = !Program.alarm_on;
-
-        return restStatus;
-    }
-
-    /// <summary>
-    /// 
-    /// </summary>
     private static int sendRobotGroup(int robotID, int robotGroupID)
     {
         string group_name = "";
@@ -494,18 +453,6 @@ class Program
         mirFleet.robots[robotID].sendRESTdata(mirFleet.robots[robotID].s.putReadyRequest(mirFleet.robots[robotID].getBaseURI()));
 
         return restStatus;
-    }
-
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <returns></returns>
-    private static void getRobotGroups()
-    {
-        logger(AREA, DEBUG, "Saving Robot Groups In Fleet PLC Block");
-
-        fleetMemoryToPLC();
-        SiemensPLC.writeFleetBlock(SiemensPLC.fleetBlock.getTaskStatus());
     }
 
     /// <summary>
